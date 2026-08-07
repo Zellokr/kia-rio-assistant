@@ -4,6 +4,7 @@ import { ElmPromptParser } from '~~/core/obd/parser/ElmPromptParser'
 import { MockObdTransport } from '~~/core/obd/transport/MockObdTransport'
 import { ElmCommandExecutor } from '~~/core/obd/protocol/ElmCommandExecutor'
 import { decodeMode01Response } from '~~/core/obd/decoder/decodeMode01Response'
+import { decodeSupportedPids } from '~~/core/obd/decoder/decodeSupportedPids'
 
 const transport = new MockObdTransport()
 const executor = new ElmCommandExecutor(transport)
@@ -21,6 +22,7 @@ const commands = [
   '0100',
   '010C',
   '0105',
+  '0120',
   '03'
 ]
 
@@ -140,6 +142,8 @@ async function sendCommand() {
     log.value.push(
       `DONE ← ${result.command}: ${result.normalizedText} (${result.latencyMs} ms)`
     )
+
+    // Decodificación normal de PIDs Mode 01
     try {
       const decoded = decodeMode01Response(
         result.normalizedText
@@ -154,6 +158,36 @@ async function sendCommand() {
       log.value.push(
         `DECODE ERROR: ${String(error)}`
       )
+    }
+
+    const supportedPidCommands = [
+      '0100',
+      '0120',
+      '0140',
+      '0160',
+      '0180',
+      '01A0',
+      '01C0'
+    ]
+
+    if (supportedPidCommands.includes(result.command)) {
+      try {
+        const supported = decodeSupportedPids(
+          result.normalizedText
+        )
+
+        log.value.push(
+          `SUPPORTED PIDS ← ${supported.pids.join(', ')}`
+        )
+
+        log.value.push(
+          `NEXT RANGE ← ${supported.hasNextRange ? 'sí' : 'no'}`
+        )
+      } catch (error) {
+        log.value.push(
+          `PID DISCOVERY ERROR: ${String(error)}`
+        )
+      }
     }
   } catch (error) {
     log.value.push(
