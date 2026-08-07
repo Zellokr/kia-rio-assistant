@@ -5,6 +5,7 @@ import { MockObdTransport } from '~~/core/obd/transport/MockObdTransport'
 import { ElmCommandExecutor } from '~~/core/obd/protocol/ElmCommandExecutor'
 import { decodeMode01Response } from '~~/core/obd/decoder/decodeMode01Response'
 import { decodeSupportedPids } from '~~/core/obd/decoder/decodeSupportedPids'
+import { initializeElm327 } from '~~/core/obd/protocol/Elm327Initializer'
 
 const transport = new MockObdTransport()
 const executor = new ElmCommandExecutor(transport)
@@ -114,8 +115,27 @@ async function connect() {
     status.value = transport.state
 
     log.value.push('Conectado')
+
+    log.value.push(
+      '--- ELM327 INITIALIZATION START ---'
+    )
+
+    const initialization
+      = await initializeElm327(executor)
+
+    for (const result of initialization.commands) {
+      log.value.push(
+        `INIT ← ${result.command}: ${result.normalizedText} (${result.latencyMs} ms)`
+      )
+    }
+
+    log.value.push(
+      '--- ELM327 READY ---'
+    )
   } catch (error) {
-    log.value.push(`ERROR: ${String(error)}`)
+    log.value.push(
+      `INITIALIZATION ERROR: ${String(error)}`
+    )
   }
 }
 
