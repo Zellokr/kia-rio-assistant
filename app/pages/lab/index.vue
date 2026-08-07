@@ -12,11 +12,16 @@ import {
 import {
   ObdSessionStateMachine
 } from '~~/core/obd/session/ObdSessionStateMachine'
+import {
+  ObdPollScheduler
+} from '~~/core/obd/polling/ObdPollScheduler'
 
 const transport = new MockObdTransport()
 const executor = new ElmCommandExecutor(transport)
 const session = new ObdSessionStateMachine()
-
+const pollScheduler = new ObdPollScheduler(executor)
+const supportedPids = ref<string[]>([])
+const telemetryRunning = ref(false)
 const sessionState = ref(session.state)
 
 const sessionBadgeColor = computed(() => {
@@ -34,6 +39,32 @@ const sessionBadgeColor = computed(() => {
     default: return 'neutral'
   }
 })
+
+const unsubscribePollResult
+  = pollScheduler.onResult(({ result }) => {
+    try {
+      const decoded = decodeMode01Response(
+        result.normalizedText
+      )
+
+      if (decoded) {
+        log.value.push(
+          `TELEMETRY ← ${decoded.label}: ${decoded.value} ${decoded.unit}`
+        )
+      }
+    } catch (error) {
+      log.value.push(
+        `TELEMETRY DECODE ERROR: ${String(error)}`
+      )
+    }
+  })
+
+const unsubscribePollError
+  = pollScheduler.onError(({ task, error }) => {
+    log.value.push(
+      `TELEMETRY ERROR ← ${task.command}: ${error.message}`
+    )
+  })
 
 const transportBadgeColor = computed(() => {
   switch (String(transport.state)) {
@@ -146,6 +177,74 @@ async function runQueueTest() {
   }
 }
 
+function startTelemetry() {
+  if (sessionState.value !== 'ready') {
+    log.value.push(
+      'TELEMETRY ERROR: session is not ready'
+    )
+
+    return
+  }
+
+  if (telemetryRunning.value) {
+    return
+  }
+
+  pollScheduler.clearTasks()
+
+  let taskCount = 0
+
+  if (supportedPids.value.includes('0C')) {
+    pollScheduler.addTask({
+      id: 'engine-rpm',
+      command: '010C',
+      intervalMs: 1000
+    })
+
+    taskCount++
+  }
+
+  if (supportedPids.value.includes('05')) {
+    pollScheduler.addTask({
+      id: 'coolant-temperature',
+      command: '0105',
+      intervalMs: 3000
+    })
+
+    taskCount++
+  }
+
+  if (taskCount === 0) {
+    log.value.push(
+      'TELEMETRY ERROR: no supported telemetry PIDs'
+    )
+
+    return
+  }
+
+  pollScheduler.start()
+
+  telemetryRunning.value = true
+
+  log.value.push(
+    '--- TELEMETRY START ---'
+  )
+}
+
+function stopTelemetry() {
+  if (!telemetryRunning.value) {
+    return
+  }
+
+  pollScheduler.stop()
+
+  telemetryRunning.value = false
+
+  log.value.push(
+    '--- TELEMETRY STOP ---'
+  )
+}
+
 async function selectDevice() {
   try {
     transitionSession('selecting')
@@ -202,6 +301,8 @@ async function connect() {
     const discovery
       = await discoverSupportedPids(executor)
 
+    supportedPids.value = discovery.pids
+
     for (const range of discovery.ranges) {
       log.value.push(
         `DISCOVERY ← ${range.command}: ${range.response.normalizedText}`
@@ -242,9 +343,14 @@ async function connect() {
 
 async function disconnect() {
   try {
+    pollScheduler.stop()
+    telemetryRunning.value = false
+
     transitionSession('disconnecting')
 
     await transport.disconnect()
+
+    supportedPids.value = []
 
     transitionSession('disconnected')
 
@@ -328,6 +434,11 @@ function clearLog() {
 }
 
 onBeforeUnmount(() => {
+  pollScheduler.stop()
+
+  unsubscribePollResult()
+  unsubscribePollError()
+
   executor.dispose()
   unsubscribe()
 })
@@ -341,69 +452,133 @@ onBeforeUnmount(() => {
       </h1>
 
       <UCard class="p-4 mb-4">
-        <div class="flex items-center justify-between">
-          <div class="text-sm flex items-center gap-4">
-            <div class="flex items-center gap-2">
-              <div class="text-muted text-md">
-                Estado sesión:
+        <div class="grid gap-4 md:grid-cols-2 items-start">
+          <div class="flex flex-col gap-3">
+            <div class="flex flex-wrap items-center gap-2">
+              <UButton
+                color="success"
+                variant="soft"
+                size="md"
+                :disabled="sessionState !== 'ready' || telemetryRunning"
+                @click="startTelemetry"
+              >
+                Iniciar telemetría
+              </UButton>
+
+              <UButton
+                color="neutral"
+                variant="soft"
+                size="md"
+                :disabled="!telemetryRunning"
+                @click="stopTelemetry"
+              >
+                Detener telemetría
+              </UButton>
+
+              <UButton
+                color="neutral"
+                variant="outline"
+                size="md"
+                @click="selectDevice"
+              >
+                Seleccionar adaptador
+              </UButton>
+
+              <UButton
+                color="primary"
+                size="md"
+                @click="connect"
+              >
+                Conectar
+              </UButton>
+
+              <UButton
+                color="warning"
+                variant="soft"
+                size="md"
+                @click="runQueueTest"
+              >
+                Probar cola
+              </UButton>
+
+              <UButton
+                color="error"
+                variant="soft"
+                size="md"
+                @click="disconnect"
+              >
+                Desconectar
+              </UButton>
+            </div>
+
+            <div class="flex items-center gap-3 flex-wrap">
+              <div class="text-sm text-muted">
+                PIDs soportados:
+              </div>
+              <div class="flex gap-2 flex-wrap">
+                <template v-if="supportedPids.length">
+                  <UBadge
+                    v-for="pid in supportedPids"
+                    :key="pid"
+                    color="neutral"
+                    variant="outline"
+                    size="xs"
+                  >
+                    {{ pid }}
+                  </UBadge>
+                </template>
+                <template v-else>
+                  <div class="text-sm text-muted">
+                    — ninguno —
+                  </div>
+                </template>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex flex-col items-start md:items-end gap-3">
+            <div class="text-sm text-muted">
+              Estado
+            </div>
+
+            <div class="flex items-center gap-3">
+              <div class="text-sm text-muted text-right">
+                Sesión
               </div>
               <UBadge
                 :color="sessionBadgeColor"
                 size="sm"
-                class="text-md"
                 variant="solid"
               >
                 {{ sessionState }}
               </UBadge>
             </div>
 
-            <div class="flex items-center gap-2">
-              <div class="text-muted text-md">
-                Estado transporte:
+            <div class="flex items-center gap-3">
+              <div class="text-sm text-muted text-right">
+                Transporte
               </div>
               <UBadge
                 :color="transportBadgeColor"
                 size="sm"
-                class="text-md"
                 variant="solid"
               >
                 {{ transport.state }}
               </UBadge>
             </div>
-          </div>
 
-          <div class="flex items-center gap-2">
-            <UButton
-              color="neutral"
-              size="md"
-              @click="selectDevice"
-            >
-              Seleccionar adaptador
-            </UButton>
-            <UButton
-              color="primary"
-              variant="soft"
-              size="md"
-              @click="connect"
-            >
-              Conectar
-            </UButton>
-            <UButton
-              color="warning"
-              variant="soft"
-              size="md"
-              @click="runQueueTest"
-            >
-              Probar cola
-            </UButton>
-            <UButton
-              color="error"
-              variant="soft"
-              size="md"
-              @click="disconnect"
-            >
-              Desconectar
-            </UButton>
+            <div class="flex items-center gap-3">
+              <div class="text-sm text-muted text-right">
+                Telemetría
+              </div>
+              <UBadge
+                :color="telemetryRunning ? 'success' : 'neutral'"
+                size="sm"
+                variant="solid"
+              >
+                {{ telemetryRunning ? 'running' : 'stopped' }}
+              </UBadge>
+            </div>
           </div>
         </div>
       </UCard>
