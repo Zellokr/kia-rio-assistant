@@ -21,6 +21,7 @@ function createResult(
     command,
     rawText: '41 0C 1A F8\r>',
     normalizedText: '41 0C 1A F8',
+    responseKind: 'obd-data',
     startedAt: new Date().toISOString(),
     completedAt: new Date().toISOString(),
     latencyMs: 1
@@ -123,7 +124,7 @@ describe('ObdPollScheduler', () => {
       | undefined
 
     const execute = vi.fn(
-      (command: string) => {
+      () => {
         return new Promise<ElmCommandResult>(
           (resolve) => {
             resolveExecution = resolve

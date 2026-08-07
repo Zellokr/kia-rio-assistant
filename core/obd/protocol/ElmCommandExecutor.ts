@@ -1,10 +1,19 @@
 import type { ObdTransport } from '../transport/ObdTransport'
 import { ElmPromptParser } from '../parser/ElmPromptParser'
+import {
+  classifyElmResponse,
+  isElmErrorResponse
+} from './classifyElmResponse'
+
+import type {
+  ElmResponseKind
+} from './classifyElmResponse'
 
 export interface ElmCommandResult {
   command: string
   rawText: string
   normalizedText: string
+  responseKind: ElmResponseKind
   startedAt: string
   completedAt: string
   latencyMs: number
@@ -171,6 +180,27 @@ export class ElmCommandExecutor {
 
       const completedAt = Date.now()
 
+      const responseKind = classifyElmResponse(
+        response.normalizedText
+      )
+
+      if (isElmErrorResponse(responseKind)) {
+        clearTimeout(current.timer)
+
+        current.item.reject(
+          new Error(
+            `ELM327 ${responseKind}: ${response.normalizedText || '<empty>'}`
+          )
+        )
+
+        this.current = undefined
+        this.processing = false
+
+        void this.processNext()
+
+        continue
+      }
+
       current.item.resolve({
         command: current.item.command,
         rawText: response.rawText,
@@ -178,6 +208,7 @@ export class ElmCommandExecutor {
         startedAt: new Date(
           current.startedAt
         ).toISOString(),
+        responseKind,
         completedAt: new Date(
           completedAt
         ).toISOString(),
