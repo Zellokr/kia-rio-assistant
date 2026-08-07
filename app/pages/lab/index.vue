@@ -106,6 +106,7 @@ const commands = [
   '0105',
   '0120',
   '0199',
+  '0198',
   '03'
 ]
 
@@ -371,7 +372,14 @@ async function sendCommand() {
   log.value.push(`QUEUE → ${command}`)
 
   try {
-    const result = await executor.execute(command)
+    const timeoutMs = command === '0198'
+      ? 1000
+      : 3000
+
+    const result = await executor.execute(
+      command,
+      timeoutMs
+    )
 
     log.value.push(
       `DONE ← ${result.command}: ${result.normalizedText} (${result.latencyMs} ms)`

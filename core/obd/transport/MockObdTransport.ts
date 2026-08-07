@@ -59,6 +59,11 @@ export class MockObdTransport implements ObdTransport {
 
     const response = this.getResponse(command)
 
+    if (command === '0198') {
+      // Simula un adaptador que no responde.
+      await this.delay(100)
+      return
+    }
     if (command === '010C') {
       const fragments = [
         '41 0',

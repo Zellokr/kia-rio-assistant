@@ -42,4 +42,37 @@ describe('ElmCommandExecutor', () => {
 
     await transport.disconnect()
   })
+
+  it('recovers after a command timeout', async () => {
+    const transport = new MockObdTransport()
+
+    await transport.select()
+    await transport.connect()
+
+    const executor = new ElmCommandExecutor(
+      transport
+    )
+
+    await expect(
+      executor.execute('0198', 300)
+    ).rejects.toThrow(
+      'Timeout waiting for ELM327 response to 0198'
+    )
+
+    const result = await executor.execute(
+      '010C'
+    )
+
+    expect(
+      result.normalizedText
+    ).toBe('41 0C 1A F8')
+
+    expect(
+      result.responseKind
+    ).toBe('obd-data')
+
+    executor.dispose()
+
+    await transport.disconnect()
+  })
 })
