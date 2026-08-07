@@ -2,9 +2,10 @@
 import { onBeforeUnmount, ref } from 'vue'
 import { ElmPromptParser } from '~~/core/obd/parser/ElmPromptParser'
 import { MockObdTransport } from '~~/core/obd/transport/MockObdTransport'
+import { ElmCommandExecutor } from '~~/core/obd/protocol/ElmCommandExecutor'
 
 const transport = new MockObdTransport()
-
+const executor = new ElmCommandExecutor(transport)
 const status = ref(transport.state)
 const log = ref<string[]>([])
 const parser = new ElmPromptParser()
@@ -46,6 +47,36 @@ const unsubscribe = transport.subscribe((data) => {
   }
 })
 
+async function runQueueTest() {
+  log.value.push('--- QUEUE TEST START ---')
+
+  const commandsToRun = [
+    '010C',
+    '0105',
+    '03'
+  ]
+
+  const promises = commandsToRun.map(
+    command => executor.execute(command)
+  )
+
+  try {
+    const results = await Promise.all(promises)
+
+    for (const result of results) {
+      log.value.push(
+        `QUEUE RESULT ← ${result.command}: ${result.normalizedText}`
+      )
+    }
+
+    log.value.push('--- QUEUE TEST END ---')
+  } catch (error) {
+    log.value.push(
+      `QUEUE ERROR: ${String(error)}`
+    )
+  }
+}
+
 async function selectDevice() {
   try {
     await transport.select()
@@ -85,14 +116,18 @@ async function disconnect() {
 async function sendCommand() {
   const command = selectedCommand.value
 
-  log.value.push(`TX → ${command}`)
+  log.value.push(`QUEUE → ${command}`)
 
   try {
-    await transport.write(new TextEncoder().encode(`${command}\r`))
+    const result = await executor.execute(command)
 
-    status.value = transport.state
+    log.value.push(
+      `DONE ← ${result.command}: ${result.normalizedText} (${result.latencyMs} ms)`
+    )
   } catch (error) {
-    log.value.push(`ERROR: ${String(error)}`)
+    log.value.push(
+      `ERROR: ${String(error)}`
+    )
   }
 }
 
@@ -101,6 +136,7 @@ function clearLog() {
 }
 
 onBeforeUnmount(() => {
+  executor.dispose()
   unsubscribe()
 })
 </script>
@@ -133,6 +169,14 @@ onBeforeUnmount(() => {
               @click="connect"
             >
               Conectar
+            </UButton>
+            <UButton
+              color="warning"
+              variant="soft"
+              size="md"
+              @click="runQueueTest"
+            >
+              Probar cola
             </UButton>
             <UButton
               color="error"
