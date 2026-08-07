@@ -6,6 +6,9 @@ import { ElmCommandExecutor } from '~~/core/obd/protocol/ElmCommandExecutor'
 import { decodeMode01Response } from '~~/core/obd/decoder/decodeMode01Response'
 import { decodeSupportedPids } from '~~/core/obd/decoder/decodeSupportedPids'
 import { initializeElm327 } from '~~/core/obd/protocol/Elm327Initializer'
+import {
+  discoverSupportedPids
+} from '~~/core/obd/protocol/SupportedPidDiscovery'
 
 const transport = new MockObdTransport()
 const executor = new ElmCommandExecutor(transport)
@@ -131,6 +134,36 @@ async function connect() {
 
     log.value.push(
       '--- ELM327 READY ---'
+    )
+    log.value.push(
+      '--- PID DISCOVERY START ---'
+    )
+
+    const discovery
+      = await discoverSupportedPids(executor)
+
+    for (const range of discovery.ranges) {
+      log.value.push(
+        `DISCOVERY ← ${range.command}: ${range.response.normalizedText}`
+      )
+
+      log.value.push(
+        `RANGE ${range.rangeStart
+          .toString(16)
+          .toUpperCase()
+          .padStart(2, '0')}-${range.rangeEnd
+          .toString(16)
+          .toUpperCase()
+          .padStart(2, '0')} ← ${range.pids.join(', ')}`
+      )
+    }
+
+    log.value.push(
+      `SUPPORTED PIDS ALL ← ${discovery.pids.join(', ')}`
+    )
+
+    log.value.push(
+      '--- PID DISCOVERY END ---'
     )
   } catch (error) {
     log.value.push(
