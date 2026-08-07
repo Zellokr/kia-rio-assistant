@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref } from 'vue'
-
+import { ElmPromptParser } from '~~/core/obd/parser/ElmPromptParser'
 import { MockObdTransport } from '~~/core/obd/transport/MockObdTransport'
 
 const transport = new MockObdTransport()
 
 const status = ref(transport.state)
 const log = ref<string[]>([])
+const parser = new ElmPromptParser()
 
 const commands = [
   'ATZ',
@@ -24,9 +25,25 @@ const commands = [
 const selectedCommand = ref('ATZ')
 
 const unsubscribe = transport.subscribe((data) => {
-  const text = new TextDecoder().decode(data)
+  const chunkText = new TextDecoder().decode(data)
 
-  log.value.push(`RX ← ${text}`)
+  log.value.push(
+    `RX CHUNK ← ${JSON.stringify(chunkText)}`
+  )
+
+  try {
+    const responses = parser.push(data)
+
+    for (const response of responses) {
+      log.value.push(
+        `RX FRAME ← ${response.normalizedText}`
+      )
+    }
+  } catch (error) {
+    log.value.push(
+      `PARSER ERROR: ${String(error)}`
+    )
+  }
 })
 
 async function selectDevice() {

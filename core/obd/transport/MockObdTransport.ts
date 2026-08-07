@@ -59,6 +59,24 @@ export class MockObdTransport implements ObdTransport {
 
     const response = this.getResponse(command)
 
+    if (command === '010C') {
+      const fragments = [
+        '41 0',
+        'C 1A',
+        ' F8\r>'
+      ]
+
+      for (const fragment of fragments) {
+        await this.delay(60)
+
+        this.emit(
+          new TextEncoder().encode(fragment)
+        )
+      }
+
+      return
+    }
+
     this.emit(
       new TextEncoder().encode(response)
     )
