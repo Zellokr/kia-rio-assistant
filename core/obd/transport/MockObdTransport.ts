@@ -124,7 +124,9 @@ export class MockObdTransport implements ObdTransport {
       // Sin DTC almacenados
       '03': '43 00 00 00 00 00 00\r>',
 
-      '0120': '41 20 80 00 00 00\r>'
+      '0120': '41 20 80 00 00 00\r>',
+
+      '03TEST': '43 03 00 04 20 00 00\r>'
     }
 
     return responses[command] ?? 'NO DATA\r>'

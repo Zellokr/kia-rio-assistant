@@ -15,6 +15,9 @@ import {
 import {
   ObdPollScheduler
 } from '~~/core/obd/polling/ObdPollScheduler'
+import {
+  decodeMode03Response
+} from '~~/core/obd/decoder/decodeMode03Response'
 
 const transport = new MockObdTransport()
 const executor = new ElmCommandExecutor(transport)
@@ -107,6 +110,7 @@ const commands = [
   '0120',
   '0199',
   '0198',
+  '03TEST',
   '03'
 ]
 
@@ -400,6 +404,31 @@ async function sendCommand() {
       log.value.push(
         `DECODE ERROR: ${String(error)}`
       )
+    }
+
+    if (
+      result.command === '03'
+      || result.command === '03TEST'
+    ) {
+      try {
+        const dtcResult = decodeMode03Response(
+          result.normalizedText
+        )
+
+        if (dtcResult.dtcs.length === 0) {
+          log.value.push(
+            'DTC ← Sin códigos almacenados'
+          )
+        } else {
+          log.value.push(
+            `DTC ← ${dtcResult.dtcs.join(', ')}`
+          )
+        }
+      } catch (error) {
+        log.value.push(
+          `DTC DECODE ERROR: ${String(error)}`
+        )
+      }
     }
 
     const supportedPidCommands = [
