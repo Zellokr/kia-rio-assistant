@@ -3,6 +3,7 @@ import { onBeforeUnmount, ref } from 'vue'
 import { ElmPromptParser } from '~~/core/obd/parser/ElmPromptParser'
 import { MockObdTransport } from '~~/core/obd/transport/MockObdTransport'
 import { ElmCommandExecutor } from '~~/core/obd/protocol/ElmCommandExecutor'
+import { decodeMode01Response } from '~~/core/obd/decoder/decodeMode01Response'
 
 const transport = new MockObdTransport()
 const executor = new ElmCommandExecutor(transport)
@@ -67,6 +68,21 @@ async function runQueueTest() {
       log.value.push(
         `QUEUE RESULT ← ${result.command}: ${result.normalizedText}`
       )
+      try {
+        const decoded = decodeMode01Response(
+          result.normalizedText
+        )
+
+        if (decoded) {
+          log.value.push(
+            `VALUE ← ${decoded.label}: ${decoded.value} ${decoded.unit}`
+          )
+        }
+      } catch (error) {
+        log.value.push(
+          `DECODE ERROR: ${String(error)}`
+        )
+      }
     }
 
     log.value.push('--- QUEUE TEST END ---')
@@ -124,6 +140,21 @@ async function sendCommand() {
     log.value.push(
       `DONE ← ${result.command}: ${result.normalizedText} (${result.latencyMs} ms)`
     )
+    try {
+      const decoded = decodeMode01Response(
+        result.normalizedText
+      )
+
+      if (decoded) {
+        log.value.push(
+          `VALUE ← ${decoded.label}: ${decoded.value} ${decoded.unit}`
+        )
+      }
+    } catch (error) {
+      log.value.push(
+        `DECODE ERROR: ${String(error)}`
+      )
+    }
   } catch (error) {
     log.value.push(
       `ERROR: ${String(error)}`
