@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, ref } from 'vue'
+import { onBeforeUnmount, ref, computed } from 'vue'
 import { ElmPromptParser } from '~~/core/obd/parser/ElmPromptParser'
 import { MockObdTransport } from '~~/core/obd/transport/MockObdTransport'
 import { ElmCommandExecutor } from '~~/core/obd/protocol/ElmCommandExecutor'
@@ -9,12 +9,59 @@ import { initializeElm327 } from '~~/core/obd/protocol/Elm327Initializer'
 import {
   discoverSupportedPids
 } from '~~/core/obd/protocol/SupportedPidDiscovery'
+import {
+  ObdSessionStateMachine
+} from '~~/core/obd/session/ObdSessionStateMachine'
 
 const transport = new MockObdTransport()
 const executor = new ElmCommandExecutor(transport)
-const status = ref(transport.state)
+const session = new ObdSessionStateMachine()
+
+const sessionState = ref(session.state)
+
+const sessionBadgeColor = computed(() => {
+  switch (String(sessionState.value)) {
+    case 'idle': return 'neutral'
+    case 'selecting': return 'warning'
+    case 'selected': return 'primary'
+    case 'connecting': return 'warning'
+    case 'initializing': return 'neutral'
+    case 'discovering': return 'neutral'
+    case 'ready': return 'success'
+    case 'disconnecting': return 'warning'
+    case 'disconnected': return 'neutral'
+    case 'error': return 'error'
+    default: return 'neutral'
+  }
+})
+
+const transportBadgeColor = computed(() => {
+  switch (String(transport.state)) {
+    case 'idle': return 'neutral'
+    case 'selecting': return 'warning'
+    case 'selected': return 'primary'
+    case 'connecting': return 'warning'
+    case 'connected': return 'success'
+    case 'disconnecting': return 'warning'
+    case 'disconnected': return 'neutral'
+    case 'error': return 'error'
+    default: return 'neutral'
+  }
+})
 const log = ref<string[]>([])
 const parser = new ElmPromptParser()
+
+function transitionSession(
+  next: Parameters<typeof session.transition>[0]
+) {
+  session.transition(next)
+  sessionState.value = session.state
+}
+
+function failSession() {
+  session.fail()
+  sessionState.value = session.state
+}
 
 const commands = [
   'ATZ',
@@ -101,23 +148,33 @@ async function runQueueTest() {
 
 async function selectDevice() {
   try {
+    transitionSession('selecting')
+
     await transport.select()
 
-    status.value = transport.state
+    transitionSession('selected')
 
-    log.value.push('Dispositivo seleccionado')
+    log.value.push(
+      'Dispositivo seleccionado'
+    )
   } catch (error) {
-    log.value.push(`ERROR: ${String(error)}`)
+    failSession()
+
+    log.value.push(
+      `SELECTION ERROR: ${String(error)}`
+    )
   }
 }
 
 async function connect() {
   try {
+    transitionSession('connecting')
+
     await transport.connect()
 
-    status.value = transport.state
-
     log.value.push('Conectado')
+
+    transitionSession('initializing')
 
     log.value.push(
       '--- ELM327 INITIALIZATION START ---'
@@ -135,6 +192,9 @@ async function connect() {
     log.value.push(
       '--- ELM327 READY ---'
     )
+
+    transitionSession('discovering')
+
     log.value.push(
       '--- PID DISCOVERY START ---'
     )
@@ -165,22 +225,36 @@ async function connect() {
     log.value.push(
       '--- PID DISCOVERY END ---'
     )
-  } catch (error) {
+
+    transitionSession('ready')
+
     log.value.push(
-      `INITIALIZATION ERROR: ${String(error)}`
+      'SESSION READY'
+    )
+  } catch (error) {
+    failSession()
+
+    log.value.push(
+      `CONNECTION ERROR: ${String(error)}`
     )
   }
 }
 
 async function disconnect() {
   try {
+    transitionSession('disconnecting')
+
     await transport.disconnect()
 
-    status.value = transport.state
+    transitionSession('disconnected')
 
     log.value.push('Desconectado')
   } catch (error) {
-    log.value.push(`ERROR: ${String(error)}`)
+    failSession()
+
+    log.value.push(
+      `DISCONNECT ERROR: ${String(error)}`
+    )
   }
 }
 
@@ -268,8 +342,34 @@ onBeforeUnmount(() => {
 
       <UCard class="p-4 mb-4">
         <div class="flex items-center justify-between">
-          <div class="text-sm text-muted">
-            Estado: <strong class="ml-2">{{ status }}</strong>
+          <div class="text-sm flex items-center gap-4">
+            <div class="flex items-center gap-2">
+              <div class="text-muted text-md">
+                Estado sesión:
+              </div>
+              <UBadge
+                :color="sessionBadgeColor"
+                size="sm"
+                class="text-md"
+                variant="solid"
+              >
+                {{ sessionState }}
+              </UBadge>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <div class="text-muted text-md">
+                Estado transporte:
+              </div>
+              <UBadge
+                :color="transportBadgeColor"
+                size="sm"
+                class="text-md"
+                variant="solid"
+              >
+                {{ transport.state }}
+              </UBadge>
+            </div>
           </div>
 
           <div class="flex items-center gap-2">
