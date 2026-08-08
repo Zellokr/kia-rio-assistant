@@ -87,6 +87,48 @@ describe('ObdTelemetryStore', () => {
       )
     )
 
+    store.update(
+      {
+        pid: '0104',
+        key: 'engineLoad',
+        label: 'Carga del motor',
+        value: (0x50 * 100) / 255,
+        unit: '%'
+      },
+      createResult(
+        '0104',
+        '41 04 50'
+      )
+    )
+
+    store.update(
+      {
+        pid: '010D',
+        key: 'vehicleSpeed',
+        label: 'Velocidad',
+        value: 0,
+        unit: 'km/h'
+      },
+      createResult(
+        '010D',
+        '41 0D 00'
+      )
+    )
+
+    store.update(
+      {
+        pid: '0111',
+        key: 'throttlePosition',
+        label: 'Posición del acelerador',
+        value: (0x20 * 100) / 255,
+        unit: '%'
+      },
+      createResult(
+        '0111',
+        '41 11 20'
+      )
+    )
+
     const snapshot = store.getSnapshot()
 
     expect(
@@ -96,6 +138,18 @@ describe('ObdTelemetryStore', () => {
     expect(
       snapshot.values.coolantTemperature?.value
     ).toBe(50)
+
+    expect(
+      snapshot.values.engineLoad?.value
+    ).toBeCloseTo(31.37, 2)
+
+    expect(
+      snapshot.values.vehicleSpeed?.value
+    ).toBe(0)
+
+    expect(
+      snapshot.values.throttlePosition?.value
+    ).toBeCloseTo(12.55, 2)
   })
 
   it('replaces an old value with the latest value', () => {

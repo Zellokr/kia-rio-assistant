@@ -112,20 +112,16 @@ export class MockObdTransport implements ObdTransport {
       'ATH0': 'OK\r>',
       'ATSP0': 'OK\r>',
 
-      // PIDs disponibles
       '0100': '41 00 BE 3F A8 13\r>',
-
-      // RPM simuladas
-      '010C': '41 0C 1A F8\r>',
-
-      // Refrigerante: 0x5A - 40 = 50 °C
-      '0105': '41 05 5A\r>',
-
-      // Sin DTC almacenados
-      '03': '43 00 00 00 00 00 00\r>',
-
       '0120': '41 20 80 00 00 00\r>',
 
+      '0104': '41 04 50\r>',
+      '0105': '41 05 5A\r>',
+      '010C': '41 0C 1A F8\r>',
+      '010D': '41 0D 00\r>',
+      '0111': '41 11 20\r>',
+
+      '03': '43 00 00 00 00 00 00\r>',
       '03TEST': '43 03 00 04 20 00 00\r>'
     }
 

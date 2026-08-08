@@ -21,6 +21,9 @@ import {
 import {
   ObdTelemetryStore
 } from '~~/core/obd/telemetry/ObdTelemetryStore'
+import {
+  createSupportedTelemetryPollTasks
+} from '~~/core/obd/telemetry/createSupportedTelemetryPollTasks'
 
 const transport = new MockObdTransport()
 const executor = new ElmCommandExecutor(transport)
@@ -36,6 +39,9 @@ const {
   engineRpm: engineRpmMetric,
   coolantTemperature:
     coolantTemperatureMetric,
+  engineLoad: engineLoadMetric,
+  vehicleSpeed: vehicleSpeedMetric,
+  throttlePosition: throttlePositionMetric,
   setSnapshot: setTelemetrySnapshot,
   clear: clearReactiveTelemetry
 } = useObdTelemetry()
@@ -142,7 +148,10 @@ const commands = [
   '0199',
   '0198',
   '03TEST',
-  '03'
+  '03',
+  '0104',
+  '010D',
+  '0111'
 ]
 
 const selectedCommand = ref('ATZ')
@@ -229,29 +238,15 @@ function startTelemetry() {
 
   pollScheduler.clearTasks()
 
-  let taskCount = 0
+  const tasks = createSupportedTelemetryPollTasks(
+    supportedPids.value
+  )
 
-  if (supportedPids.value.includes('0C')) {
-    pollScheduler.addTask({
-      id: 'engine-rpm',
-      command: '010C',
-      intervalMs: 1000
-    })
-
-    taskCount++
+  for (const task of tasks) {
+    pollScheduler.addTask(task)
   }
 
-  if (supportedPids.value.includes('05')) {
-    pollScheduler.addTask({
-      id: 'coolant-temperature',
-      command: '0105',
-      intervalMs: 3000
-    })
-
-    taskCount++
-  }
-
-  if (taskCount === 0) {
+  if (tasks.length === 0) {
     log.value.push(
       'TELEMETRY ERROR: no supported telemetry PIDs'
     )
@@ -676,13 +671,17 @@ onBeforeUnmount(() => {
           </div>
 
           <div class="text-3xl font-semibold">
-            {{
-              engineRpmMetric
-                ? Math.round(engineRpmMetric.value)
-                : '—'
-            }}
+            <template v-if="engineRpmMetric">
+              {{ Math.round(engineRpmMetric.value) }}
+            </template>
+            <template v-else>
+              —
+            </template>
 
-            <span class="text-base text-muted">
+            <span
+              v-if="engineRpmMetric"
+              class="text-base text-muted"
+            >
               rpm
             </span>
           </div>
@@ -702,13 +701,17 @@ onBeforeUnmount(() => {
           </div>
 
           <div class="text-3xl font-semibold">
-            {{
-              coolantTemperatureMetric
-                ? coolantTemperatureMetric.value
-                : '—'
-            }}
+            <template v-if="coolantTemperatureMetric">
+              {{ coolantTemperatureMetric.value }}
+            </template>
+            <template v-else>
+              —
+            </template>
 
-            <span class="text-base text-muted">
+            <span
+              v-if="coolantTemperatureMetric"
+              class="text-base text-muted"
+            >
               °C
             </span>
           </div>
@@ -719,6 +722,96 @@ onBeforeUnmount(() => {
           >
             PID {{ coolantTemperatureMetric.pid }}
             · {{ coolantTemperatureMetric.latencyMs }} ms
+          </div>
+        </UCard>
+
+        <UCard class="p-4">
+          <div class="text-sm text-muted mb-2">
+            Carga del motor
+          </div>
+
+          <div class="text-3xl font-semibold">
+            <template v-if="engineLoadMetric">
+              {{ engineLoadMetric.value.toFixed(1) }}
+            </template>
+            <template v-else>
+              —
+            </template>
+
+            <span
+              v-if="engineLoadMetric"
+              class="text-base text-muted"
+            >
+              %
+            </span>
+          </div>
+
+          <div
+            v-if="engineLoadMetric"
+            class="text-xs text-muted mt-2"
+          >
+            PID {{ engineLoadMetric.pid }}
+            · {{ engineLoadMetric.latencyMs }} ms
+          </div>
+        </UCard>
+
+        <UCard class="p-4">
+          <div class="text-sm text-muted mb-2">
+            Velocidad
+          </div>
+
+          <div class="text-3xl font-semibold">
+            <template v-if="vehicleSpeedMetric">
+              {{ Math.round(vehicleSpeedMetric.value) }}
+            </template>
+            <template v-else>
+              —
+            </template>
+
+            <span
+              v-if="vehicleSpeedMetric"
+              class="text-base text-muted"
+            >
+              km/h
+            </span>
+          </div>
+
+          <div
+            v-if="vehicleSpeedMetric"
+            class="text-xs text-muted mt-2"
+          >
+            PID {{ vehicleSpeedMetric.pid }}
+            · {{ vehicleSpeedMetric.latencyMs }} ms
+          </div>
+        </UCard>
+
+        <UCard class="p-4">
+          <div class="text-sm text-muted mb-2">
+            Acelerador
+          </div>
+
+          <div class="text-3xl font-semibold">
+            <template v-if="throttlePositionMetric">
+              {{ throttlePositionMetric.value.toFixed(1) }}
+            </template>
+            <template v-else>
+              —
+            </template>
+
+            <span
+              v-if="throttlePositionMetric"
+              class="text-base text-muted"
+            >
+              %
+            </span>
+          </div>
+
+          <div
+            v-if="throttlePositionMetric"
+            class="text-xs text-muted mt-2"
+          >
+            PID {{ throttlePositionMetric.pid }}
+            · {{ throttlePositionMetric.latencyMs }} ms
           </div>
         </UCard>
       </div>

@@ -22,6 +22,18 @@ export function useObdTelemetry() {
       .values.coolantTemperature
   })
 
+  const engineLoad = computed(() => {
+    return snapshot.value.values.engineLoad
+  })
+
+  const vehicleSpeed = computed(() => {
+    return snapshot.value.values.vehicleSpeed
+  })
+
+  const throttlePosition = computed(() => {
+    return snapshot.value.values.throttlePosition
+  })
+
   function setSnapshot(
     next: ObdTelemetrySnapshot
   ): void {
@@ -39,6 +51,9 @@ export function useObdTelemetry() {
     snapshot,
     engineRpm,
     coolantTemperature,
+    engineLoad,
+    vehicleSpeed,
+    throttlePosition,
     setSnapshot,
     clear
   }

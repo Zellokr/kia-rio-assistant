@@ -80,17 +80,6 @@ La tarea queda terminada cuando:
 - La prueba física queda marcada como `NOT RUN` hasta que el usuario
   la realice en el coche.
 
-## Fuentes
-
-Consulta solo cuando sea necesario:
-
-- `docs/architecture.md`
-- `docs/phase-0.md`
-- `docs/obd-protocol.md`
-- `docs/testing.md`
-- `docs/safety.md`
-- `Especificacion_Final_Asistente_Kia_Rio_v2.0.pdf`
-
 ## Forma de trabajar
 
 Antes de cambiar código:

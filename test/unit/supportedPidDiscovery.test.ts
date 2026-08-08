@@ -38,8 +38,15 @@ describe('discoverSupportedPids', () => {
       '0120'
     ])
 
-    expect(result.pids).toContain('05')
-    expect(result.pids).toContain('0C')
+    expect(result.pids).toEqual(
+      expect.arrayContaining([
+        '04',
+        '05',
+        '0C',
+        '0D',
+        '11'
+      ])
+    )
     expect(result.pids).toContain('21')
 
     expect(
