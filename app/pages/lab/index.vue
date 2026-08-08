@@ -18,6 +18,9 @@ import {
 import {
   decodeMode03Response
 } from '~~/core/obd/decoder/decodeMode03Response'
+import {
+  ObdTelemetryStore
+} from '~~/core/obd/telemetry/ObdTelemetryStore'
 
 const transport = new MockObdTransport()
 const executor = new ElmCommandExecutor(transport)
@@ -26,6 +29,27 @@ const pollScheduler = new ObdPollScheduler(executor)
 const supportedPids = ref<string[]>([])
 const telemetryRunning = ref(false)
 const sessionState = ref(session.state)
+const telemetryDomainStore
+  = new ObdTelemetryStore()
+
+const {
+  engineRpm: engineRpmMetric,
+  coolantTemperature:
+    coolantTemperatureMetric,
+  setSnapshot: setTelemetrySnapshot,
+  clear: clearReactiveTelemetry
+} = useObdTelemetry()
+
+function syncTelemetryState(): void {
+  setTelemetrySnapshot(
+    telemetryDomainStore.getSnapshot()
+  )
+}
+
+function clearTelemetryState(): void {
+  telemetryDomainStore.clear()
+  clearReactiveTelemetry()
+}
 
 const sessionBadgeColor = computed(() => {
   switch (String(sessionState.value)) {
@@ -51,6 +75,13 @@ const unsubscribePollResult
       )
 
       if (decoded) {
+        telemetryDomainStore.update(
+          decoded,
+          result
+        )
+
+        syncTelemetryState()
+
         log.value.push(
           `TELEMETRY ← ${decoded.label}: ${decoded.value} ${decoded.unit}`
         )
@@ -352,6 +383,8 @@ async function disconnect() {
     pollScheduler.stop()
     telemetryRunning.value = false
 
+    clearTelemetryState()
+
     transitionSession('disconnecting')
 
     await transport.disconnect()
@@ -396,6 +429,13 @@ async function sendCommand() {
       )
 
       if (decoded) {
+        telemetryDomainStore.update(
+          decoded,
+          result
+        )
+
+        syncTelemetryState()
+
         log.value.push(
           `VALUE ← ${decoded.label}: ${decoded.value} ${decoded.unit}`
         )
@@ -621,6 +661,68 @@ onBeforeUnmount(() => {
         </div>
       </UCard>
 
+      <div
+        class="
+          grid
+          grid-cols-1
+          md:grid-cols-2
+          gap-4
+          mb-4
+        "
+      >
+        <UCard class="p-4">
+          <div class="text-sm text-muted mb-2">
+            RPM del motor
+          </div>
+
+          <div class="text-3xl font-semibold">
+            {{
+              engineRpmMetric
+                ? Math.round(engineRpmMetric.value)
+                : '—'
+            }}
+
+            <span class="text-base text-muted">
+              rpm
+            </span>
+          </div>
+
+          <div
+            v-if="engineRpmMetric"
+            class="text-xs text-muted mt-2"
+          >
+            PID {{ engineRpmMetric.pid }}
+            · {{ engineRpmMetric.latencyMs }} ms
+          </div>
+        </UCard>
+
+        <UCard class="p-4">
+          <div class="text-sm text-muted mb-2">
+            Temperatura del refrigerante
+          </div>
+
+          <div class="text-3xl font-semibold">
+            {{
+              coolantTemperatureMetric
+                ? coolantTemperatureMetric.value
+                : '—'
+            }}
+
+            <span class="text-base text-muted">
+              °C
+            </span>
+          </div>
+
+          <div
+            v-if="coolantTemperatureMetric"
+            class="text-xs text-muted mt-2"
+          >
+            PID {{ coolantTemperatureMetric.pid }}
+            · {{ coolantTemperatureMetric.latencyMs }} ms
+          </div>
+        </UCard>
+      </div>
+
       <UCard class="p-4 mb-4">
         <div class="flex items-center gap-4">
           <USelect
@@ -655,7 +757,7 @@ onBeforeUnmount(() => {
           </UButton>
         </div>
 
-        <pre class="min-h-[300px] p-4 bg-elevated text-default rounded overflow-auto">{{ log.join('\n') }}</pre>
+        <pre class="min-h-75 p-4 bg-elevated text-default rounded overflow-auto">{{ log.join('\n') }}</pre>
       </UCard>
     </UContainer>
   </main>
