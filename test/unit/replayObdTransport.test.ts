@@ -9,80 +9,12 @@ import {
   buildReplayTranscript,
   ReplayObdTransport
 } from '../../core/obd/transport/ReplayObdTransport'
-
-interface EventInput {
-  type: string
-  commandId?: string
-  command?: string
-  rawText?: string
-  normalizedText?: string
-  responseKind?: string
-  latencyMs?: number
-  error?: {
-    name: string
-    message: string
-    phase: string
-  }
-}
-
-function createSession(events: EventInput[]) {
-  return {
-    schemaVersion: 1,
-    sessionId: 'recording-1',
-    startedAt: '2026-08-08T10:00:00.000Z',
-    endedAt: '2026-08-08T10:01:00.000Z',
-    transport: {
-      kind: 'mock',
-      name: 'Recorded adapter'
-    },
-    retention: {
-      maxEvents: 100,
-      droppedEvents: 0,
-      complete: true
-    },
-    events: events.map((event, index) => ({
-      ...event,
-      sequence: index + 1,
-      timestamp: new Date(
-        Date.parse('2026-08-08T10:00:00.000Z')
-        + index * 10
-      ).toISOString(),
-      elapsedMs: index * 10
-    }))
-  }
-}
-
-function responseEvents(
-  commandId: string,
-  command: string,
-  chunks: string[],
-  normalizedText: string
-): EventInput[] {
-  return [
-    {
-      type: 'tx',
-      commandId,
-      command,
-      rawText: `${command}\r`,
-      normalizedText: command
-    },
-    ...chunks.map(rawText => ({
-      type: 'rx-chunk',
-      commandId,
-      command,
-      rawText
-    })),
-    {
-      type: 'rx-frame',
-      commandId,
-      command,
-      rawText: chunks.join(''),
-      normalizedText,
-      responseKind: 'obd-data',
-      latencyMs: chunks.length * 10
-    }
-  ]
-}
+import {
+  createSession,
+  responseEvents,
+  timeoutEvents,
+  transportWriteErrorEvents
+} from '../fixtures/obdReplaySessions'
 
 describe('ReplayObdTransport', () => {
   it('builds ordered transactions from a complete schema v1 export', () => {
@@ -195,26 +127,6 @@ describe('ReplayObdTransport', () => {
   })
 
   it('reproduces responses and recorded timeouts through ElmCommandExecutor', async () => {
-    const timeoutEvents: EventInput[] = [
-      {
-        type: 'tx',
-        commandId: 'command-3',
-        command: '0198',
-        rawText: '0198\r',
-        normalizedText: '0198'
-      },
-      {
-        type: 'error',
-        commandId: 'command-3',
-        command: '0198',
-        latencyMs: 1000,
-        error: {
-          name: 'Error',
-          message: 'Timeout waiting for ELM327 response to 0198',
-          phase: 'timeout'
-        }
-      }
-    ]
     const transport = new ReplayObdTransport(
       createSession([
         ...responseEvents(
@@ -229,7 +141,7 @@ describe('ReplayObdTransport', () => {
           ['NO DATA\r>'],
           'NO DATA'
         ),
-        ...timeoutEvents,
+        ...timeoutEvents('command-3', '0198'),
         ...responseEvents(
           'command-4',
           '03',
@@ -291,25 +203,11 @@ describe('ReplayObdTransport', () => {
 
   it('rethrows recorded transport-write errors through the executor', async () => {
     const transport = new ReplayObdTransport(
-      createSession([
-        {
-          type: 'tx',
-          commandId: 'command-1',
-          command: '010C',
-          rawText: '010C\r',
-          normalizedText: '010C'
-        },
-        {
-          type: 'error',
-          commandId: 'command-1',
-          command: '010C',
-          error: {
-            name: 'Error',
-            message: 'Recorded adapter disconnected',
-            phase: 'transport-write'
-          }
-        }
-      ]),
+      createSession(transportWriteErrorEvents(
+        'command-1',
+        '010C',
+        'Recorded adapter disconnected'
+      )),
       { timingScale: 0 }
     )
 
