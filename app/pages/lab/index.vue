@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref, computed } from 'vue'
-import { ElmPromptParser } from '~~/core/obd/parser/ElmPromptParser'
 import { MockObdTransport } from '~~/core/obd/transport/MockObdTransport'
+import {
+  buildReplayTranscript,
+  ReplayObdTransport
+} from '~~/core/obd/transport/ReplayObdTransport'
+import {
+  WebSerialRfcommTransport
+} from '~~/core/obd/transport/WebSerialRfcommTransport'
 import { ElmCommandExecutor } from '~~/core/obd/protocol/ElmCommandExecutor'
 import { decodeMode01Response } from '~~/core/obd/decoder/decodeMode01Response'
 import { decodeSupportedPids } from '~~/core/obd/decoder/decodeSupportedPids'
@@ -24,16 +30,101 @@ import {
 import {
   createSupportedTelemetryPollTasks
 } from '~~/core/obd/telemetry/createSupportedTelemetryPollTasks'
+import {
+  ObdSessionLog
+} from '~~/core/obd/logging/ObdSessionLog'
+import type {
+  ObdErrorPhase
+} from '~~/core/obd/logging/ObdSessionLog'
+import type {
+  ObdTransport,
+  ObdTransportMetadata
+} from '~~/core/obd/transport/ObdTransport'
 
-const transport = new MockObdTransport()
-const executor = new ElmCommandExecutor(transport)
+definePageMeta({
+  alias: ['/']
+})
+
+let transport: ObdTransport = new MockObdTransport()
+const sessionLog = new ObdSessionLog({
+  transport: { kind: transport.kind }
+})
+let executor = new ElmCommandExecutor(
+  transport,
+  event => sessionLog.record(event)
+)
 const session = new ObdSessionStateMachine()
-const pollScheduler = new ObdPollScheduler(executor)
+let pollScheduler = new ObdPollScheduler(executor)
 const supportedPids = ref<string[]>([])
 const telemetryRunning = ref(false)
 const sessionState = ref(session.state)
+const transportState = ref(transport.state)
+const activeView = ref<'connection' | 'data' | 'log'>('connection')
+const transportChoice = ref<
+  'mock' | 'replay' | 'web-serial-rfcomm'
+>('mock')
+const replayFilename = ref('')
+const replayImportError = ref('')
+const transportError = ref('')
+let replaySessionExport: unknown
 const telemetryDomainStore
   = new ObdTelemetryStore()
+let selectedTransport: ObdTransportMetadata = {
+  kind: transport.kind
+}
+
+const {
+  events: sessionEvents,
+  droppedEvents,
+  truncated: logTruncated,
+  clearDisplay: clearLog,
+  downloadJson: downloadSessionLog
+} = useObdSessionLog(sessionLog)
+
+const mobileViews = [
+  {
+    value: 'connection' as const,
+    label: 'Conexión',
+    icon: 'i-lucide-plug-zap'
+  },
+  {
+    value: 'data' as const,
+    label: 'Datos',
+    icon: 'i-lucide-gauge'
+  },
+  {
+    value: 'log' as const,
+    label: 'Registro',
+    icon: 'i-lucide-scroll-text'
+  }
+]
+
+const sessionStateLabel = computed(() => {
+  const labels: Record<string, string> = {
+    idle: 'Sin conexión',
+    selecting: 'Seleccionando adaptador',
+    selected: 'Adaptador seleccionado',
+    connecting: 'Conectando',
+    initializing: 'Inicializando ELM327',
+    discovering: 'Descubriendo PIDs',
+    ready: 'Preparado',
+    disconnecting: 'Desconectando',
+    disconnected: 'Desconectado',
+    error: 'Necesita atención'
+  }
+
+  return labels[String(sessionState.value)] ?? String(sessionState.value)
+})
+
+const sessionBusy = computed(() => {
+  return [
+    'selecting',
+    'connecting',
+    'initializing',
+    'discovering',
+    'disconnecting'
+  ].includes(String(sessionState.value))
+})
 
 const {
   engineRpm: engineRpmMetric,
@@ -57,6 +148,30 @@ function clearTelemetryState(): void {
   clearReactiveTelemetry()
 }
 
+function toError(error: unknown): Error {
+  return error instanceof Error
+    ? error
+    : new Error(String(error))
+}
+
+function recordError(
+  error: unknown,
+  phase: ObdErrorPhase,
+  command?: string
+): void {
+  const normalizedError = toError(error)
+
+  sessionLog.record({
+    type: 'error',
+    command,
+    error: {
+      name: normalizedError.name,
+      message: normalizedError.message,
+      phase
+    }
+  })
+}
+
 const sessionBadgeColor = computed(() => {
   switch (String(sessionState.value)) {
     case 'idle': return 'neutral'
@@ -73,8 +188,11 @@ const sessionBadgeColor = computed(() => {
   }
 })
 
-const unsubscribePollResult
-  = pollScheduler.onResult(({ result }) => {
+let unsubscribePollResult = () => {}
+let unsubscribePollError = () => {}
+
+function attachPollObservers(): void {
+  unsubscribePollResult = pollScheduler.onResult(({ result }) => {
     try {
       const decoded = decodeMode01Response(
         result.normalizedText
@@ -88,53 +206,119 @@ const unsubscribePollResult
 
         syncTelemetryState()
 
-        log.value.push(
-          `TELEMETRY ← ${decoded.label}: ${decoded.value} ${decoded.unit}`
-        )
+        sessionLog.record({
+          type: 'decoded-value',
+          source: 'telemetry',
+          command: result.command,
+          latencyMs: result.latencyMs,
+          decoded: {
+            kind: 'pid',
+            ...decoded
+          }
+        })
       }
     } catch (error) {
-      log.value.push(
-        `TELEMETRY DECODE ERROR: ${String(error)}`
-      )
+      recordError(error, 'decode', result.command)
     }
   })
 
-const unsubscribePollError
-  = pollScheduler.onError(({ task, error }) => {
-    log.value.push(
-      `TELEMETRY ERROR ← ${task.command}: ${error.message}`
-    )
+  unsubscribePollError = pollScheduler.onError(({ task, error }) => {
+    recordError(error, 'poll', task.command)
   })
+}
 
-const transportBadgeColor = computed(() => {
-  switch (String(transport.state)) {
-    case 'idle': return 'neutral'
-    case 'selecting': return 'warning'
-    case 'selected': return 'primary'
-    case 'connecting': return 'warning'
-    case 'connected': return 'success'
-    case 'disconnecting': return 'warning'
-    case 'disconnected': return 'neutral'
-    case 'error': return 'error'
-    default: return 'neutral'
+attachPollObservers()
+
+function replaceTransport(next: ObdTransport): void {
+  pollScheduler.stop()
+  unsubscribePollResult()
+  unsubscribePollError()
+  executor.dispose()
+
+  transport = next
+  executor = new ElmCommandExecutor(
+    transport,
+    event => sessionLog.record(event)
+  )
+  pollScheduler = new ObdPollScheduler(executor)
+  attachPollObservers()
+  transportState.value = transport.state
+}
+
+function prepareSelectedTransport(): void {
+  if (transportChoice.value === 'mock') {
+    if (transport.kind !== 'mock') {
+      replaceTransport(new MockObdTransport())
+    }
+
+    return
   }
-})
-const log = ref<string[]>([])
-const parser = new ElmPromptParser()
 
+  if (transportChoice.value === 'web-serial-rfcomm') {
+    if (transport.kind !== 'web-serial-rfcomm') {
+      replaceTransport(new WebSerialRfcommTransport())
+    }
+
+    return
+  }
+
+  if (replaySessionExport === undefined) {
+    throw new Error(
+      'Importa una sesión OBD antes de seleccionar Replay'
+    )
+  }
+
+  replaceTransport(
+    new ReplayObdTransport(replaySessionExport)
+  )
+}
+
+async function importReplayFile(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+
+  replayImportError.value = ''
+  replayFilename.value = ''
+  replaySessionExport = undefined
+
+  if (!file) {
+    return
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(await file.text())
+
+    buildReplayTranscript(parsed)
+    replaySessionExport = parsed
+    replayFilename.value = file.name
+  } catch (error) {
+    replayImportError.value = toError(error).message
+    input.value = ''
+  }
+}
 function transitionSession(
   next: Parameters<typeof session.transition>[0]
 ) {
   session.transition(next)
   sessionState.value = session.state
+
+  sessionLog.record({
+    type: 'session-state',
+    state: session.state
+  })
 }
 
 function failSession() {
   session.fail()
   sessionState.value = session.state
+
+  sessionLog.record({
+    type: 'session-state',
+    state: session.state
+  })
 }
 
-const commands = [
+const simulatedCommands = [
   'ATZ',
   'ATE0',
   'ATL0',
@@ -154,32 +338,32 @@ const commands = [
   '0111'
 ]
 
+const physicalCommands = [
+  'ATZ',
+  'ATE0',
+  'ATL0',
+  'ATS0',
+  'ATH0',
+  'ATSP0',
+  '0100',
+  '010C',
+  '0105',
+  '03'
+]
+
+const commands = computed(() => (
+  transportChoice.value === 'web-serial-rfcomm'
+    ? physicalCommands
+    : simulatedCommands
+))
+
 const selectedCommand = ref('ATZ')
 
-const unsubscribe = transport.subscribe((data) => {
-  const chunkText = new TextDecoder().decode(data)
-
-  log.value.push(
-    `RX CHUNK ← ${JSON.stringify(chunkText)}`
-  )
-
-  try {
-    const responses = parser.push(data)
-
-    for (const response of responses) {
-      log.value.push(
-        `RX FRAME ← ${response.normalizedText}`
-      )
-    }
-  } catch (error) {
-    log.value.push(
-      `PARSER ERROR: ${String(error)}`
-    )
-  }
-})
-
 async function runQueueTest() {
-  log.value.push('--- QUEUE TEST START ---')
+  sessionLog.record({
+    type: 'activity',
+    activity: 'queue-test-started'
+  })
 
   const commandsToRun = [
     '010C',
@@ -195,38 +379,42 @@ async function runQueueTest() {
     const results = await Promise.all(promises)
 
     for (const result of results) {
-      log.value.push(
-        `QUEUE RESULT ← ${result.command}: ${result.normalizedText}`
-      )
       try {
         const decoded = decodeMode01Response(
           result.normalizedText
         )
 
         if (decoded) {
-          log.value.push(
-            `VALUE ← ${decoded.label}: ${decoded.value} ${decoded.unit}`
-          )
+          sessionLog.record({
+            type: 'decoded-value',
+            source: 'manual',
+            command: result.command,
+            latencyMs: result.latencyMs,
+            decoded: {
+              kind: 'pid',
+              ...decoded
+            }
+          })
         }
       } catch (error) {
-        log.value.push(
-          `DECODE ERROR: ${String(error)}`
-        )
+        recordError(error, 'decode', result.command)
       }
     }
 
-    log.value.push('--- QUEUE TEST END ---')
-  } catch (error) {
-    log.value.push(
-      `QUEUE ERROR: ${String(error)}`
-    )
+    sessionLog.record({
+      type: 'activity',
+      activity: 'queue-test-completed'
+    })
+  } catch {
+    // Protocol errors are already recorded by the executor.
   }
 }
 
 function startTelemetry() {
   if (sessionState.value !== 'ready') {
-    log.value.push(
-      'TELEMETRY ERROR: session is not ready'
+    recordError(
+      new Error('Session is not ready'),
+      'poll'
     )
 
     return
@@ -247,8 +435,9 @@ function startTelemetry() {
   }
 
   if (tasks.length === 0) {
-    log.value.push(
-      'TELEMETRY ERROR: no supported telemetry PIDs'
+    recordError(
+      new Error('No supported telemetry PIDs'),
+      'poll'
     )
 
     return
@@ -258,9 +447,10 @@ function startTelemetry() {
 
   telemetryRunning.value = true
 
-  log.value.push(
-    '--- TELEMETRY START ---'
-  )
+  sessionLog.record({
+    type: 'telemetry-state',
+    state: 'started'
+  })
 }
 
 function stopTelemetry() {
@@ -272,63 +462,79 @@ function stopTelemetry() {
 
   telemetryRunning.value = false
 
-  log.value.push(
-    '--- TELEMETRY STOP ---'
-  )
+  sessionLog.record({
+    type: 'telemetry-state',
+    state: 'stopped'
+  })
 }
 
 async function selectDevice() {
+  transportError.value = ''
+
   try {
+    prepareSelectedTransport()
+    sessionLog.start({ kind: transport.kind })
+
     transitionSession('selecting')
 
-    await transport.select()
+    selectedTransport = await transport.select()
+    transportState.value = transport.state
+    sessionLog.updateTransport(selectedTransport)
 
     transitionSession('selected')
 
-    log.value.push(
-      'Dispositivo seleccionado'
-    )
+    sessionLog.record({
+      type: 'activity',
+      activity: 'adapter-selected'
+    })
   } catch (error) {
+    transportError.value = toError(error).message
+    transportState.value = transport.state
     failSession()
 
-    log.value.push(
-      `SELECTION ERROR: ${String(error)}`
-    )
+    recordError(error, 'selection')
   }
 }
 
 async function connect() {
+  transportError.value = ''
+
+  if (sessionState.value !== 'selected') {
+    sessionLog.start(selectedTransport)
+  }
+
   try {
     transitionSession('connecting')
 
-    await transport.connect()
+    selectedTransport = await transport.connect()
+    transportState.value = transport.state
+    sessionLog.updateTransport(selectedTransport)
 
-    log.value.push('Conectado')
+    sessionLog.record({
+      type: 'activity',
+      activity: 'connected'
+    })
 
     transitionSession('initializing')
 
-    log.value.push(
-      '--- ELM327 INITIALIZATION START ---'
-    )
+    sessionLog.record({
+      type: 'activity',
+      activity: 'initialization-started'
+    })
 
-    const initialization
-      = await initializeElm327(executor)
+    await initializeElm327(executor)
 
-    for (const result of initialization.commands) {
-      log.value.push(
-        `INIT ← ${result.command}: ${result.normalizedText} (${result.latencyMs} ms)`
-      )
-    }
-
-    log.value.push(
-      '--- ELM327 READY ---'
-    )
+    sessionLog.record({
+      type: 'activity',
+      activity: 'initialization-completed'
+    })
 
     transitionSession('discovering')
 
-    log.value.push(
-      '--- PID DISCOVERY START ---'
-    )
+    sessionLog.record({
+      type: 'activity',
+      activity: 'discovery-started'
+    })
 
     const discovery
       = await discoverSupportedPids(executor)
@@ -336,72 +542,83 @@ async function connect() {
     supportedPids.value = discovery.pids
 
     for (const range of discovery.ranges) {
-      log.value.push(
-        `DISCOVERY ← ${range.command}: ${range.response.normalizedText}`
-      )
-
-      log.value.push(
-        `RANGE ${range.rangeStart
-          .toString(16)
-          .toUpperCase()
-          .padStart(2, '0')}-${range.rangeEnd
-          .toString(16)
-          .toUpperCase()
-          .padStart(2, '0')} ← ${range.pids.join(', ')}`
-      )
+      sessionLog.record({
+        type: 'capability-discovery',
+        command: range.command,
+        pids: range.pids,
+        rangeStart: range.rangeStart,
+        rangeEnd: range.rangeEnd,
+        hasNextRange: range.hasNextRange
+      })
     }
 
-    log.value.push(
-      `SUPPORTED PIDS ALL ← ${discovery.pids.join(', ')}`
-    )
+    sessionLog.record({
+      type: 'capability-discovery',
+      pids: discovery.pids
+    })
 
-    log.value.push(
-      '--- PID DISCOVERY END ---'
-    )
+    sessionLog.record({
+      type: 'activity',
+      activity: 'discovery-completed'
+    })
 
     transitionSession('ready')
-
-    log.value.push(
-      'SESSION READY'
-    )
   } catch (error) {
+    transportError.value = toError(error).message
+    transportState.value = transport.state
     failSession()
 
-    log.value.push(
-      `CONNECTION ERROR: ${String(error)}`
-    )
+    recordError(error, 'connection')
   }
 }
 
 async function disconnect() {
+  transportError.value = ''
+
   try {
-    pollScheduler.stop()
-    telemetryRunning.value = false
+    stopTelemetry()
 
     clearTelemetryState()
 
     transitionSession('disconnecting')
 
     await transport.disconnect()
+    transportState.value = transport.state
 
     supportedPids.value = []
 
     transitionSession('disconnected')
 
-    log.value.push('Desconectado')
+    sessionLog.record({
+      type: 'activity',
+      activity: 'disconnected'
+    })
+
+    sessionLog.finish()
   } catch (error) {
+    transportError.value = toError(error).message
+    transportState.value = transport.state
     failSession()
 
-    log.value.push(
-      `DISCONNECT ERROR: ${String(error)}`
-    )
+    recordError(error, 'disconnect')
   }
 }
 
 async function sendCommand() {
   const command = selectedCommand.value
 
-  log.value.push(`QUEUE → ${command}`)
+  if (
+    transport.kind === 'web-serial-rfcomm'
+    && !physicalCommands.includes(command)
+  ) {
+    recordError(
+      new Error('Command is not allowed on the physical transport'),
+      'transport-write',
+      command
+    )
+
+    return
+  }
 
   try {
     const timeoutMs = command === '0198'
@@ -411,10 +628,6 @@ async function sendCommand() {
     const result = await executor.execute(
       command,
       timeoutMs
-    )
-
-    log.value.push(
-      `DONE ← ${result.command}: ${result.normalizedText} (${result.latencyMs} ms)`
     )
 
     // Decodificación normal de PIDs Mode 01
@@ -431,14 +644,19 @@ async function sendCommand() {
 
         syncTelemetryState()
 
-        log.value.push(
-          `VALUE ← ${decoded.label}: ${decoded.value} ${decoded.unit}`
-        )
+        sessionLog.record({
+          type: 'decoded-value',
+          source: 'manual',
+          command: result.command,
+          latencyMs: result.latencyMs,
+          decoded: {
+            kind: 'pid',
+            ...decoded
+          }
+        })
       }
     } catch (error) {
-      log.value.push(
-        `DECODE ERROR: ${String(error)}`
-      )
+      recordError(error, 'decode', result.command)
     }
 
     if (
@@ -450,19 +668,18 @@ async function sendCommand() {
           result.normalizedText
         )
 
-        if (dtcResult.dtcs.length === 0) {
-          log.value.push(
-            'DTC ← Sin códigos almacenados'
-          )
-        } else {
-          log.value.push(
-            `DTC ← ${dtcResult.dtcs.join(', ')}`
-          )
-        }
+        sessionLog.record({
+          type: 'decoded-value',
+          source: 'manual',
+          command: result.command,
+          latencyMs: result.latencyMs,
+          decoded: {
+            kind: 'dtc',
+            dtcs: dtcResult.dtcs
+          }
+        })
       } catch (error) {
-        log.value.push(
-          `DTC DECODE ERROR: ${String(error)}`
-        )
+        recordError(error, 'decode', result.command)
       }
     }
 
@@ -482,28 +699,21 @@ async function sendCommand() {
           result.normalizedText
         )
 
-        log.value.push(
-          `SUPPORTED PIDS ← ${supported.pids.join(', ')}`
-        )
-
-        log.value.push(
-          `NEXT RANGE ← ${supported.hasNextRange ? 'sí' : 'no'}`
-        )
+        sessionLog.record({
+          type: 'capability-discovery',
+          command: result.command,
+          pids: supported.pids,
+          rangeStart: supported.rangeStart,
+          rangeEnd: supported.rangeEnd,
+          hasNextRange: supported.hasNextRange
+        })
       } catch (error) {
-        log.value.push(
-          `PID DISCOVERY ERROR: ${String(error)}`
-        )
+        recordError(error, 'decode', result.command)
       }
     }
-  } catch (error) {
-    log.value.push(
-      `ERROR: ${String(error)}`
-    )
+  } catch {
+    // Protocol errors are already recorded by the executor.
   }
-}
-
-function clearLog() {
-  log.value = []
 }
 
 onBeforeUnmount(() => {
@@ -513,352 +723,530 @@ onBeforeUnmount(() => {
   unsubscribePollError()
 
   executor.dispose()
-  unsubscribe()
+
+  if (
+    transport.state !== 'idle'
+    && transport.state !== 'disconnected'
+  ) {
+    void transport.disconnect().catch(() => undefined)
+  }
 })
 </script>
 
 <template>
-  <main class="px-4 sm:px-6 lg:px-8 py-6">
-    <UContainer>
-      <h1 class="text-2xl font-semibold mb-4">
-        OBD-II Lab
-      </h1>
+  <main class="pb-[calc(7rem+env(safe-area-inset-bottom))] pt-4 sm:pt-6">
+    <UContainer class="flex max-w-3xl flex-col gap-4">
+      <div class="flex items-center justify-between gap-3 rounded-xl border border-success/30 bg-success/5 px-4 py-3">
+        <div class="flex min-w-0 items-center gap-3">
+          <UIcon
+            name="i-lucide-shield-check"
+            class="size-5 shrink-0 text-success"
+            aria-hidden="true"
+          />
+          <div class="min-w-0">
+            <p class="font-semibold text-highlighted">
+              Diagnóstico · Solo lectura
+            </p>
+            <p class="text-xs text-muted">
+              Sin Mode 04, programación ni escritura en ECU
+            </p>
+          </div>
+        </div>
+        <UBadge
+          :color="sessionBadgeColor"
+          variant="subtle"
+          class="shrink-0"
+        >
+          {{ sessionStateLabel }}
+        </UBadge>
+      </div>
 
-      <UCard class="p-4 mb-4">
-        <div class="grid gap-4 md:grid-cols-2 items-start">
-          <div class="flex flex-col gap-3">
-            <div class="flex flex-wrap items-center gap-2">
+      <section
+        v-if="activeView === 'connection'"
+        class="flex flex-col gap-4"
+        aria-labelledby="connection-view-title"
+      >
+        <div class="flex flex-col gap-1 px-1">
+          <p class="text-sm font-medium text-primary">
+            Primer paso
+          </p>
+          <h1
+            id="connection-view-title"
+            class="text-2xl font-bold tracking-tight text-highlighted"
+          >
+            Preparar conexión
+          </h1>
+          <p class="text-sm leading-5 text-muted">
+            Identifica el VEEPEAK con seguridad antes de activar cualquier
+            transporte OBD.
+          </p>
+        </div>
+
+        <GattInspectorPanel />
+
+        <details class="group rounded-xl border border-default bg-default">
+          <summary class="flex min-h-16 cursor-pointer list-none items-center gap-3 px-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+            <span class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-elevated text-muted">
+              <UIcon
+                name="i-lucide-toolbox"
+                class="size-5"
+                aria-hidden="true"
+              />
+            </span>
+            <span class="min-w-0 flex-1">
+              <span class="block font-semibold text-highlighted">
+                Herramientas OBD avanzadas
+              </span>
+              <span class="block text-sm text-muted">
+                Mock, Replay y Web Serial para desarrollo
+              </span>
+            </span>
+            <UIcon
+              name="i-lucide-chevron-down"
+              class="size-5 shrink-0 text-muted transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none"
+              aria-hidden="true"
+            />
+          </summary>
+
+          <div class="flex flex-col gap-5 border-t border-default p-4">
+            <div class="flex flex-col gap-2">
+              <label
+                for="transport-choice"
+                class="text-sm font-medium text-highlighted"
+              >
+                Fuente de datos OBD
+              </label>
+              <select
+                id="transport-choice"
+                v-model="transportChoice"
+                class="min-h-12 w-full rounded-lg border border-default bg-default px-4 text-base text-highlighted outline-none transition focus-visible:ring-2 focus-visible:ring-primary"
+                :disabled="sessionState !== 'idle' && sessionState !== 'disconnected' && sessionState !== 'error'"
+              >
+                <option value="mock">
+                  Mock · datos sintéticos
+                </option>
+                <option value="replay">
+                  Replay · sesión grabada
+                </option>
+                <option value="web-serial-rfcomm">
+                  Real · Web Serial / RFCOMM
+                </option>
+              </select>
+              <p class="text-sm text-muted">
+                <template v-if="transportChoice === 'mock'">
+                  Verifica la aplicación sin adaptador físico.
+                </template>
+                <template v-else-if="transportChoice === 'replay'">
+                  Reproduce localmente una sesión estructurada.
+                </template>
+                <template v-else>
+                  Requiere una plataforma con Web Serial y RFCOMM.
+                </template>
+              </p>
+            </div>
+
+            <div
+              v-if="transportChoice === 'replay'"
+              class="flex flex-col gap-2 rounded-xl border border-default bg-elevated p-4"
+            >
+              <label
+                for="replay-file"
+                class="text-sm font-medium"
+              >
+                Archivo de sesión JSON
+              </label>
+              <input
+                id="replay-file"
+                type="file"
+                accept="application/json,.json"
+                class="min-h-12 w-full text-sm text-muted file:mr-3 file:min-h-10 file:rounded-md file:border-0 file:bg-primary/10 file:px-3 file:text-primary"
+                @change="importReplayFile"
+              >
+              <p
+                v-if="replayFilename"
+                class="text-sm text-success"
+                role="status"
+              >
+                Sesión cargada: {{ replayFilename }}
+              </p>
+              <p
+                v-if="replayImportError"
+                class="text-sm text-error"
+                role="alert"
+              >
+                {{ replayImportError }}
+              </p>
+            </div>
+
+            <div class="flex items-center justify-between gap-3 rounded-xl border border-default bg-elevated p-4">
+              <div class="min-w-0">
+                <p class="text-sm font-medium text-highlighted">
+                  Estado OBD
+                </p>
+                <p class="text-sm text-muted">
+                  {{ sessionStateLabel }} · {{ transportState }}
+                </p>
+              </div>
+              <UBadge
+                :color="sessionBadgeColor"
+                variant="solid"
+              >
+                {{ sessionStateLabel }}
+              </UBadge>
+            </div>
+
+            <UAlert
+              v-if="transportError"
+              color="error"
+              variant="soft"
+              icon="i-lucide-circle-alert"
+              title="No se pudo completar la operación"
+              :description="transportError"
+            />
+
+            <UButton
+              v-if="sessionState === 'idle' || sessionState === 'disconnected' || sessionState === 'error'"
+              color="primary"
+              size="xl"
+              block
+              icon="i-lucide-mouse-pointer-click"
+              class="min-h-12 justify-center"
+              @click="selectDevice"
+            >
+              Seleccionar adaptador
+            </UButton>
+            <UButton
+              v-else-if="sessionState === 'selected'"
+              color="primary"
+              size="xl"
+              block
+              icon="i-lucide-plug"
+              class="min-h-12 justify-center"
+              @click="connect"
+            >
+              Conectar e inicializar
+            </UButton>
+            <UButton
+              v-else-if="sessionBusy"
+              color="neutral"
+              variant="soft"
+              size="xl"
+              block
+              loading
+              disabled
+              class="min-h-12 justify-center"
+            >
+              {{ sessionStateLabel }}
+            </UButton>
+            <UButton
+              v-else
+              color="error"
+              variant="soft"
+              size="xl"
+              block
+              icon="i-lucide-unplug"
+              class="min-h-12 justify-center"
+              @click="disconnect"
+            >
+              Desconectar
+            </UButton>
+          </div>
+        </details>
+      </section>
+
+      <section
+        v-else-if="activeView === 'data'"
+        class="flex flex-col gap-4"
+        aria-labelledby="data-view-title"
+      >
+        <div class="flex flex-col gap-1 px-1">
+          <p class="text-sm font-medium text-primary">
+            Vehículo estacionado
+          </p>
+          <h1
+            id="data-view-title"
+            class="text-2xl font-bold tracking-tight text-highlighted"
+          >
+            Datos del vehículo
+          </h1>
+          <p class="text-sm text-muted">
+            Prioriza las métricas esenciales y consulta el resto cuando lo necesites.
+          </p>
+        </div>
+
+        <UCard v-if="sessionState !== 'ready'">
+          <div class="flex min-h-64 flex-col items-center justify-center gap-4 text-center">
+            <span class="flex size-14 items-center justify-center rounded-full bg-elevated text-muted">
+              <UIcon
+                name="i-lucide-plug"
+                class="size-7"
+                aria-hidden="true"
+              />
+            </span>
+            <div class="flex max-w-sm flex-col gap-1">
+              <h2 class="text-lg font-semibold text-highlighted">
+                Primero prepara una conexión
+              </h2>
+              <p class="text-sm text-muted">
+                Las métricas permanecerán ocultas hasta que la sesión esté preparada.
+              </p>
+            </div>
+            <UButton
+              color="primary"
+              size="lg"
+              icon="i-lucide-arrow-left"
+              class="min-h-12 justify-center"
+              @click="activeView = 'connection'"
+            >
+              Ir a Conexión
+            </UButton>
+          </div>
+        </UCard>
+
+        <template v-else>
+          <UCard>
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div class="flex items-center gap-3">
+                <span class="flex size-10 items-center justify-center rounded-xl bg-success/10 text-success">
+                  <UIcon
+                    name="i-lucide-activity"
+                    class="size-5"
+                    aria-hidden="true"
+                  />
+                </span>
+                <div>
+                  <h2 class="font-semibold text-highlighted">
+                    Telemetría
+                  </h2>
+                  <p class="text-sm text-muted">
+                    {{ telemetryRunning ? 'Actualización activa' : 'Detenida hasta que tú la inicies' }}
+                  </p>
+                </div>
+              </div>
               <UButton
+                v-if="!telemetryRunning"
                 color="success"
-                variant="soft"
-                size="md"
-                :disabled="sessionState !== 'ready' || telemetryRunning"
+                size="lg"
+                icon="i-lucide-play"
+                class="min-h-12 justify-center"
                 @click="startTelemetry"
               >
                 Iniciar telemetría
               </UButton>
-
               <UButton
+                v-else
                 color="neutral"
                 variant="soft"
-                size="md"
-                :disabled="!telemetryRunning"
+                size="lg"
+                icon="i-lucide-square"
+                class="min-h-12 justify-center"
                 @click="stopTelemetry"
               >
                 Detener telemetría
               </UButton>
-
-              <UButton
-                color="neutral"
-                variant="outline"
-                size="md"
-                @click="selectDevice"
-              >
-                Seleccionar adaptador
-              </UButton>
-
-              <UButton
-                color="primary"
-                size="md"
-                @click="connect"
-              >
-                Conectar
-              </UButton>
-
-              <UButton
-                color="warning"
-                variant="soft"
-                size="md"
-                @click="runQueueTest"
-              >
-                Probar cola
-              </UButton>
-
-              <UButton
-                color="error"
-                variant="soft"
-                size="md"
-                @click="disconnect"
-              >
-                Desconectar
-              </UButton>
             </div>
+          </UCard>
 
-            <div class="flex items-center gap-3 flex-wrap">
-              <div class="text-sm text-muted">
-                PIDs soportados:
+          <div class="grid grid-cols-2 gap-3">
+            <UCard>
+              <div class="flex min-h-36 flex-col justify-between gap-3">
+                <div class="flex items-center justify-between">
+                  <span class="text-sm font-medium text-muted">RPM</span>
+                  <UIcon
+                    name="i-lucide-gauge"
+                    class="size-5 text-primary"
+                    aria-hidden="true"
+                  />
+                </div>
+                <div>
+                  <span class="font-mono text-4xl font-bold tabular-nums text-highlighted">
+                    {{ engineRpmMetric ? Math.round(engineRpmMetric.value) : '—' }}
+                  </span>
+                  <span
+                    v-if="engineRpmMetric"
+                    class="ml-1 text-xs text-muted"
+                  >rpm</span>
+                </div>
+                <span class="text-xs text-muted">
+                  {{ engineRpmMetric ? `${engineRpmMetric.latencyMs} ms` : 'Sin muestra' }}
+                </span>
               </div>
-              <div class="flex gap-2 flex-wrap">
-                <template v-if="supportedPids.length">
-                  <UBadge
-                    v-for="pid in supportedPids"
-                    :key="pid"
-                    color="neutral"
-                    variant="outline"
-                    size="xs"
+            </UCard>
+
+            <UCard>
+              <div class="flex min-h-36 flex-col justify-between gap-3">
+                <div class="flex items-center justify-between">
+                  <span class="text-sm font-medium text-muted">Velocidad</span>
+                  <UIcon
+                    name="i-lucide-navigation"
+                    class="size-5 text-primary"
+                    aria-hidden="true"
+                  />
+                </div>
+                <div>
+                  <span class="font-mono text-4xl font-bold tabular-nums text-highlighted">
+                    {{ vehicleSpeedMetric ? Math.round(vehicleSpeedMetric.value) : '—' }}
+                  </span>
+                  <span
+                    v-if="vehicleSpeedMetric"
+                    class="ml-1 text-xs text-muted"
+                  >km/h</span>
+                </div>
+                <span class="text-xs text-muted">
+                  {{ vehicleSpeedMetric ? `${vehicleSpeedMetric.latencyMs} ms` : 'Sin muestra' }}
+                </span>
+              </div>
+            </UCard>
+          </div>
+
+          <details class="group rounded-xl border border-default bg-default">
+            <summary class="flex min-h-16 cursor-pointer list-none items-center gap-3 px-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+              <UIcon
+                name="i-lucide-chart-no-axes-column-increasing"
+                class="size-5 text-primary"
+                aria-hidden="true"
+              />
+              <span class="flex-1 font-semibold text-highlighted">Más datos del motor</span>
+              <UIcon
+                name="i-lucide-chevron-down"
+                class="size-5 text-muted transition-transform group-open:rotate-180 motion-reduce:transition-none"
+                aria-hidden="true"
+              />
+            </summary>
+            <div class="grid gap-3 border-t border-default p-4 sm:grid-cols-3">
+              <div class="rounded-xl bg-elevated p-4">
+                <p class="text-sm text-muted">
+                  Refrigerante
+                </p>
+                <p class="mt-2 font-mono text-2xl font-bold tabular-nums text-highlighted">
+                  {{ coolantTemperatureMetric ? `${coolantTemperatureMetric.value} °C` : '—' }}
+                </p>
+              </div>
+              <div class="rounded-xl bg-elevated p-4">
+                <p class="text-sm text-muted">
+                  Carga del motor
+                </p>
+                <p class="mt-2 font-mono text-2xl font-bold tabular-nums text-highlighted">
+                  {{ engineLoadMetric ? `${engineLoadMetric.value.toFixed(1)} %` : '—' }}
+                </p>
+              </div>
+              <div class="rounded-xl bg-elevated p-4">
+                <p class="text-sm text-muted">
+                  Acelerador
+                </p>
+                <p class="mt-2 font-mono text-2xl font-bold tabular-nums text-highlighted">
+                  {{ throttlePositionMetric ? `${throttlePositionMetric.value.toFixed(1)} %` : '—' }}
+                </p>
+              </div>
+            </div>
+          </details>
+
+          <details class="group rounded-xl border border-default bg-default">
+            <summary class="flex min-h-16 cursor-pointer list-none items-center gap-3 px-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+              <UIcon
+                name="i-lucide-terminal"
+                class="size-5 text-primary"
+                aria-hidden="true"
+              />
+              <span class="flex-1">
+                <span class="block font-semibold text-highlighted">Consultas manuales</span>
+                <span class="block text-sm text-muted">Un único comando permitido cada vez</span>
+              </span>
+              <UIcon
+                name="i-lucide-chevron-down"
+                class="size-5 text-muted transition-transform group-open:rotate-180 motion-reduce:transition-none"
+                aria-hidden="true"
+              />
+            </summary>
+            <div class="flex flex-col gap-4 border-t border-default p-4">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="text-sm font-medium text-highlighted">PIDs compatibles</span>
+                <UBadge
+                  v-for="pid in supportedPids"
+                  :key="pid"
+                  color="neutral"
+                  variant="outline"
+                >
+                  {{ pid }}
+                </UBadge>
+                <span
+                  v-if="supportedPids.length === 0"
+                  class="text-sm text-muted"
+                >Ninguno descubierto</span>
+              </div>
+              <div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-end">
+                <div class="flex flex-col gap-2">
+                  <label
+                    for="manual-command"
+                    class="text-sm font-medium text-highlighted"
                   >
-                    {{ pid }}
-                  </UBadge>
-                </template>
-                <template v-else>
-                  <div class="text-sm text-muted">
-                    — ninguno —
-                  </div>
-                </template>
+                    Comando permitido
+                  </label>
+                  <USelect
+                    id="manual-command"
+                    v-model="selectedCommand"
+                    :items="commands"
+                    size="lg"
+                    class="w-full"
+                  />
+                </div>
+                <UButton
+                  color="primary"
+                  size="lg"
+                  icon="i-lucide-send"
+                  class="min-h-12 justify-center"
+                  @click="sendCommand"
+                >
+                  Enviar
+                </UButton>
+                <UButton
+                  v-if="transportChoice !== 'web-serial-rfcomm'"
+                  color="warning"
+                  variant="soft"
+                  size="lg"
+                  icon="i-lucide-list-checks"
+                  class="min-h-12 justify-center"
+                  @click="runQueueTest"
+                >
+                  Probar cola
+                </UButton>
               </div>
             </div>
-          </div>
+          </details>
+        </template>
+      </section>
 
-          <div class="flex flex-col items-start md:items-end gap-3">
-            <div class="text-sm text-muted">
-              Estado
-            </div>
-
-            <div class="flex items-center gap-3">
-              <div class="text-sm text-muted text-right">
-                Sesión
-              </div>
-              <UBadge
-                :color="sessionBadgeColor"
-                size="sm"
-                variant="solid"
-              >
-                {{ sessionState }}
-              </UBadge>
-            </div>
-
-            <div class="flex items-center gap-3">
-              <div class="text-sm text-muted text-right">
-                Transporte
-              </div>
-              <UBadge
-                :color="transportBadgeColor"
-                size="sm"
-                variant="solid"
-              >
-                {{ transport.state }}
-              </UBadge>
-            </div>
-
-            <div class="flex items-center gap-3">
-              <div class="text-sm text-muted text-right">
-                Telemetría
-              </div>
-              <UBadge
-                :color="telemetryRunning ? 'success' : 'neutral'"
-                size="sm"
-                variant="solid"
-              >
-                {{ telemetryRunning ? 'running' : 'stopped' }}
-              </UBadge>
-            </div>
-          </div>
-        </div>
-      </UCard>
-
-      <div
-        class="
-          grid
-          grid-cols-1
-          md:grid-cols-2
-          gap-4
-          mb-4
-        "
-      >
-        <UCard class="p-4">
-          <div class="text-sm text-muted mb-2">
-            RPM del motor
-          </div>
-
-          <div class="text-3xl font-semibold">
-            <template v-if="engineRpmMetric">
-              {{ Math.round(engineRpmMetric.value) }}
-            </template>
-            <template v-else>
-              —
-            </template>
-
-            <span
-              v-if="engineRpmMetric"
-              class="text-base text-muted"
-            >
-              rpm
-            </span>
-          </div>
-
-          <div
-            v-if="engineRpmMetric"
-            class="text-xs text-muted mt-2"
-          >
-            PID {{ engineRpmMetric.pid }}
-            · {{ engineRpmMetric.latencyMs }} ms
-          </div>
-        </UCard>
-
-        <UCard class="p-4">
-          <div class="text-sm text-muted mb-2">
-            Temperatura del refrigerante
-          </div>
-
-          <div class="text-3xl font-semibold">
-            <template v-if="coolantTemperatureMetric">
-              {{ coolantTemperatureMetric.value }}
-            </template>
-            <template v-else>
-              —
-            </template>
-
-            <span
-              v-if="coolantTemperatureMetric"
-              class="text-base text-muted"
-            >
-              °C
-            </span>
-          </div>
-
-          <div
-            v-if="coolantTemperatureMetric"
-            class="text-xs text-muted mt-2"
-          >
-            PID {{ coolantTemperatureMetric.pid }}
-            · {{ coolantTemperatureMetric.latencyMs }} ms
-          </div>
-        </UCard>
-
-        <UCard class="p-4">
-          <div class="text-sm text-muted mb-2">
-            Carga del motor
-          </div>
-
-          <div class="text-3xl font-semibold">
-            <template v-if="engineLoadMetric">
-              {{ engineLoadMetric.value.toFixed(1) }}
-            </template>
-            <template v-else>
-              —
-            </template>
-
-            <span
-              v-if="engineLoadMetric"
-              class="text-base text-muted"
-            >
-              %
-            </span>
-          </div>
-
-          <div
-            v-if="engineLoadMetric"
-            class="text-xs text-muted mt-2"
-          >
-            PID {{ engineLoadMetric.pid }}
-            · {{ engineLoadMetric.latencyMs }} ms
-          </div>
-        </UCard>
-
-        <UCard class="p-4">
-          <div class="text-sm text-muted mb-2">
-            Velocidad
-          </div>
-
-          <div class="text-3xl font-semibold">
-            <template v-if="vehicleSpeedMetric">
-              {{ Math.round(vehicleSpeedMetric.value) }}
-            </template>
-            <template v-else>
-              —
-            </template>
-
-            <span
-              v-if="vehicleSpeedMetric"
-              class="text-base text-muted"
-            >
-              km/h
-            </span>
-          </div>
-
-          <div
-            v-if="vehicleSpeedMetric"
-            class="text-xs text-muted mt-2"
-          >
-            PID {{ vehicleSpeedMetric.pid }}
-            · {{ vehicleSpeedMetric.latencyMs }} ms
-          </div>
-        </UCard>
-
-        <UCard class="p-4">
-          <div class="text-sm text-muted mb-2">
-            Acelerador
-          </div>
-
-          <div class="text-3xl font-semibold">
-            <template v-if="throttlePositionMetric">
-              {{ throttlePositionMetric.value.toFixed(1) }}
-            </template>
-            <template v-else>
-              —
-            </template>
-
-            <span
-              v-if="throttlePositionMetric"
-              class="text-base text-muted"
-            >
-              %
-            </span>
-          </div>
-
-          <div
-            v-if="throttlePositionMetric"
-            class="text-xs text-muted mt-2"
-          >
-            PID {{ throttlePositionMetric.pid }}
-            · {{ throttlePositionMetric.latencyMs }} ms
-          </div>
-        </UCard>
-      </div>
-
-      <UCard class="p-4 mb-4">
-        <div class="flex items-center gap-4">
-          <USelect
-            v-model="selectedCommand"
-            :items="commands"
-            class="w-48"
-          />
-
-          <UButton
-            color="primary"
-            size="md"
-            variant="subtle"
-            @click="sendCommand"
-          >
-            Enviar
-          </UButton>
-        </div>
-      </UCard>
-
-      <UCard class="p-4 mb-4">
-        <div class="flex justify-between items-center mb-2">
-          <div class="text-sm text-muted">
-            Logs
-          </div>
-          <UButton
-            color="neutral"
-            variant="ghost"
-            size="sm"
-            @click="clearLog"
-          >
-            Limpiar
-          </UButton>
-        </div>
-
-        <pre class="min-h-75 p-4 bg-elevated text-default rounded overflow-auto">{{ log.join('\n') }}</pre>
-      </UCard>
+      <SessionLogPanel
+        v-else
+        :events="sessionEvents"
+        :dropped-events="droppedEvents"
+        :truncated="logTruncated"
+        @export="downloadSessionLog"
+        @clear="clearLog"
+      />
     </UContainer>
+
+    <nav
+      class="fixed inset-x-0 bottom-0 z-40 border-t border-default bg-default/95 pb-[env(safe-area-inset-bottom)] backdrop-blur"
+      aria-label="Navegación principal del laboratorio"
+    >
+      <UContainer class="max-w-md p-2">
+        <div class="grid grid-cols-3 gap-2">
+          <UButton
+            v-for="view in mobileViews"
+            :key="view.value"
+            :color="activeView === view.value ? 'primary' : 'neutral'"
+            :variant="activeView === view.value ? 'soft' : 'ghost'"
+            :icon="view.icon"
+            size="lg"
+            class="min-h-14 flex-col justify-center gap-1 px-2 text-xs"
+            :aria-current="activeView === view.value ? 'page' : undefined"
+            @click="activeView = view.value"
+          >
+            {{ view.label }}
+          </UButton>
+        </div>
+      </UContainer>
+    </nav>
   </main>
 </template>
-
-<style scoped>
-.text-muted { color: rgba(107,114,128,1); }
-.bg-elevated { background-color: #0b1220; }
-.text-default { color: #e6eef8; }
-.bg-primary { background-color: #2563eb; }
-</style>

@@ -43,6 +43,31 @@ Start the development server on `http://localhost:3000`:
 pnpm dev
 ```
 
+## OBD-II Phase 0 lab
+
+The `/lab` route supports synthetic Mock data, recorded-session Replay, and a
+runtime-detected Web Serial/Bluetooth RFCOMM transport. The physical workflow
+remains read-only and has not been run against the vehicle.
+
+Before using real hardware, follow the
+[Step 18 physical test checklist](docs/STEP_18_PHYSICAL_TEST.md).
+
+## Android GATT inventory
+
+The Capacitor Android shell includes an isolated GATT inventory tool. It scans
+only advertised VEEPEAK devices and requires explicit selection before service
+discovery. It does not read or write characteristics, enable notifications, or
+send OBD commands.
+
+```bash
+pnpm build:android:web
+pnpm cap:sync:android
+pnpm android:open
+```
+
+Follow the [safe GATT inspection checklist](docs/STEP_19_GATT_INSPECTION.md)
+before using the Android build with the adapter.
+
 ## Production
 
 Build the application for production:

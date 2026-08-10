@@ -4,6 +4,10 @@
   "type": "module",
   "scripts": {
     "build": "nuxt build",
+    "build:android:web": "nuxt generate",
+    "cap:sync:android": "pnpm build:android:web && cap sync android",
+    "android:open": "cap open android",
+    "android:build:debug": "pnpm cap:sync:android && cd android && ./gradlew assembleDebug",
     "dev": "nuxt dev",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
@@ -12,6 +16,8 @@
     "test": "pnpm exec vitest run"
   },
   "dependencies": {
+    "@capacitor/android": "8.5.0",
+    "@capacitor/core": "8.5.0",
     "@iconify-json/lucide": "^1.2.121",
     "@iconify-json/simple-icons": "^1.2.92",
     "@nuxt/ui": "^4.10.0",
@@ -19,6 +25,7 @@
     "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
+    "@capacitor/cli": "8.5.0",
     "@nuxt/eslint": "^1.16.0",
     "eslint": "^10.8.0",
     "typescript": "^6.0.3",

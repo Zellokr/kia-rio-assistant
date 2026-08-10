@@ -9,7 +9,7 @@ export type ObdTransportState
     | 'error'
 
 export interface ObdTransportMetadata {
-  kind: 'mock' | 'web-serial-rfcomm'
+  kind: 'mock' | 'replay' | 'web-serial-rfcomm'
   name?: string
 }
 

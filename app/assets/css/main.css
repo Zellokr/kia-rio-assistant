@@ -4,6 +4,11 @@
 @theme static {
   --font-sans: 'Public Sans', sans-serif;
 
+  --color-terminal: #07111f;
+  --color-terminal-border: #334155;
+  --color-terminal-foreground: #e2e8f0;
+  --color-terminal-muted: #94a3b8;
+
   --color-green-50: #EFFDF5;
   --color-green-100: #D9FBE8;
   --color-green-200: #B3F5D1;

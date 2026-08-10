@@ -6,6 +6,66 @@ import {
 
 import { ElmCommandExecutor } from '../../core/obd/protocol/ElmCommandExecutor'
 import { MockObdTransport } from '../../core/obd/transport/MockObdTransport'
+import type {
+  ObdSessionEventInput
+} from '../../core/obd/logging/ObdSessionLog'
+import type {
+  ObdTransport,
+  ObdTransportMetadata,
+  ObdTransportState
+} from '../../core/obd/transport/ObdTransport'
+
+class ScriptedTransport implements ObdTransport {
+  readonly kind = 'mock' as const
+  state: ObdTransportState = 'connected'
+  private readonly listeners = new Set<
+    (data: Uint8Array) => void
+  >()
+
+  constructor(
+    private readonly responses: Record<
+      string,
+      string[] | undefined
+    >
+  ) {}
+
+  async select(): Promise<ObdTransportMetadata> {
+    return { kind: this.kind }
+  }
+
+  async connect(): Promise<ObdTransportMetadata> {
+    return { kind: this.kind }
+  }
+
+  async disconnect(): Promise<void> {
+    this.state = 'disconnected'
+  }
+
+  async write(data: Uint8Array): Promise<void> {
+    const command = new TextDecoder()
+      .decode(data)
+      .trim()
+      .toUpperCase()
+
+    for (const chunk of this.responses[command] ?? []) {
+      const bytes = new TextEncoder().encode(chunk)
+
+      for (const listener of this.listeners) {
+        listener(bytes)
+      }
+    }
+  }
+
+  subscribe(
+    listener: (data: Uint8Array) => void
+  ): () => void {
+    this.listeners.add(listener)
+
+    return () => {
+      this.listeners.delete(listener)
+    }
+  }
+}
 
 describe('ElmCommandExecutor', () => {
   it('executes commands sequentially', async () => {
@@ -131,5 +191,162 @@ describe('ElmCommandExecutor', () => {
 
     executor.dispose()
     await transport.disconnect()
+  })
+
+  it('observes correlated TX, RX chunks and the completed frame', async () => {
+    const events: ObdSessionEventInput[] = []
+    const transport = new ScriptedTransport({
+      '010C': ['41 0', 'C 1A', ' F8\r>']
+    })
+    const executor = new ElmCommandExecutor(
+      transport,
+      event => events.push(event)
+    )
+
+    await executor.execute(' 010c ')
+
+    expect(events.map(event => event.type)).toEqual([
+      'command-queued',
+      'tx',
+      'rx-chunk',
+      'rx-chunk',
+      'rx-chunk',
+      'rx-frame'
+    ])
+
+    expect(events).toEqual([
+      expect.objectContaining({
+        type: 'command-queued',
+        commandId: 'command-1',
+        command: '010C'
+      }),
+      expect.objectContaining({
+        type: 'tx',
+        direction: 'tx',
+        commandId: 'command-1',
+        command: '010C',
+        rawText: '010C\r',
+        normalizedText: '010C'
+      }),
+      expect.objectContaining({
+        type: 'rx-chunk',
+        commandId: 'command-1',
+        rawText: '41 0'
+      }),
+      expect.objectContaining({
+        type: 'rx-chunk',
+        commandId: 'command-1',
+        rawText: 'C 1A'
+      }),
+      expect.objectContaining({
+        type: 'rx-chunk',
+        commandId: 'command-1',
+        rawText: ' F8\r>'
+      }),
+      expect.objectContaining({
+        type: 'rx-frame',
+        direction: 'rx',
+        commandId: 'command-1',
+        command: '010C',
+        rawText: '41 0C 1A F8\r>',
+        normalizedText: '41 0C 1A F8',
+        responseKind: 'obd-data',
+        latencyMs: expect.any(Number)
+      })
+    ])
+
+    executor.dispose()
+  })
+
+  it('observes NO DATA as a frame and error before recovering', async () => {
+    const events: ObdSessionEventInput[] = []
+    const transport = new ScriptedTransport({
+      '0199': ['NO DATA\r>'],
+      '010D': ['41 0D 00\r>']
+    })
+    const executor = new ElmCommandExecutor(
+      transport,
+      event => events.push(event)
+    )
+
+    await expect(
+      executor.execute('0199')
+    ).rejects.toThrow('ELM327 no-data: NO DATA')
+
+    await expect(
+      executor.execute('010D')
+    ).resolves.toMatchObject({
+      normalizedText: '41 0D 00'
+    })
+
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: 'rx-frame',
+        commandId: 'command-1',
+        responseKind: 'no-data',
+        normalizedText: 'NO DATA'
+      })
+    )
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: 'error',
+        commandId: 'command-1',
+        responseKind: 'no-data',
+        normalizedText: 'NO DATA',
+        error: {
+          name: 'Error',
+          message: 'ELM327 no-data: NO DATA',
+          phase: 'response'
+        }
+      })
+    )
+
+    executor.dispose()
+  })
+
+  it('observes timeout recovery and ignores observer failures', async () => {
+    const events: ObdSessionEventInput[] = []
+    const transport = new ScriptedTransport({
+      '0198': undefined,
+      '010D': ['41 0D 00\r>']
+    })
+    const executor = new ElmCommandExecutor(
+      transport,
+      (event) => {
+        events.push(event)
+
+        if (event.type === 'tx') {
+          throw new Error('Broken log observer')
+        }
+      }
+    )
+
+    await expect(
+      executor.execute('0198', 5)
+    ).rejects.toThrow(
+      'Timeout waiting for ELM327 response to 0198'
+    )
+
+    await expect(
+      executor.execute('010D')
+    ).resolves.toMatchObject({
+      normalizedText: '41 0D 00'
+    })
+
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: 'error',
+        commandId: 'command-1',
+        command: '0198',
+        latencyMs: expect.any(Number),
+        error: {
+          name: 'Error',
+          message: 'Timeout waiting for ELM327 response to 0198',
+          phase: 'timeout'
+        }
+      })
+    )
+
+    executor.dispose()
   })
 })

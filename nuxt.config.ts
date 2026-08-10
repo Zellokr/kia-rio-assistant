@@ -12,7 +12,8 @@ export default defineNuxtConfig({
   css: ['~/assets/css/main.css'],
 
   routeRules: {
-    '/': { prerender: true }
+    '/': { prerender: true },
+    '/lab': { prerender: true }
   },
 
   compatibilityDate: '2026-06-30',
@@ -23,6 +24,13 @@ export default defineNuxtConfig({
         commaDangle: 'never',
         braceStyle: '1tbs'
       }
+    }
+  },
+
+  icon: {
+    provider: 'none',
+    clientBundle: {
+      scan: true
     }
   }
 })

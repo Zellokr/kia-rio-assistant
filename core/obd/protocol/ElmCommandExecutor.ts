@@ -8,6 +8,10 @@ import {
 import type {
   ElmResponseKind
 } from './classifyElmResponse'
+import type {
+  ObdErrorPhase,
+  ObdSessionEventInput
+} from '../logging/ObdSessionLog'
 
 export interface ElmCommandResult {
   command: string
@@ -20,6 +24,7 @@ export interface ElmCommandResult {
 }
 
 interface QueueItem {
+  commandId: string
   command: string
   timeoutMs: number
   resolve: (result: ElmCommandResult) => void
@@ -33,6 +38,8 @@ export class ElmCommandExecutor {
 
   private processing = false
 
+  private commandSequence = 0
+
   private current:
     | {
       item: QueueItem
@@ -44,7 +51,10 @@ export class ElmCommandExecutor {
   private readonly unsubscribe: () => void
 
   constructor(
-    private readonly transport: ObdTransport
+    private readonly transport: ObdTransport,
+    private readonly observer?: (
+      event: ObdSessionEventInput
+    ) => void
   ) {
     this.unsubscribe = this.transport.subscribe((chunk) => {
       this.handleChunk(chunk)
@@ -56,11 +66,24 @@ export class ElmCommandExecutor {
     timeoutMs = 3000
   ): Promise<ElmCommandResult> {
     return new Promise((resolve, reject) => {
+      const normalizedCommand = command
+        .trim()
+        .toUpperCase()
+      const commandId
+        = `command-${++this.commandSequence}`
+
       this.queue.push({
-        command: command.trim().toUpperCase(),
+        commandId,
+        command: normalizedCommand,
         timeoutMs,
         resolve,
         reject
+      })
+
+      this.observe({
+        type: 'command-queued',
+        commandId,
+        command: normalizedCommand
       })
 
       void this.processNext()
@@ -112,16 +135,24 @@ export class ElmCommandExecutor {
       }
 
       const timedOutItem = this.current.item
+      const latencyMs = Date.now()
+        - this.current.startedAt
+      const error = new Error(
+        `Timeout waiting for ELM327 response to ${timedOutItem.command}`
+      )
 
       this.current = undefined
       this.processing = false
       this.parser.reset()
 
-      timedOutItem.reject(
-        new Error(
-          `Timeout waiting for ELM327 response to ${timedOutItem.command}`
-        )
+      this.observeError(
+        error,
+        'timeout',
+        timedOutItem,
+        { latencyMs }
       )
+
+      timedOutItem.reject(error)
 
       void this.processNext()
     }, item.timeoutMs)
@@ -137,6 +168,15 @@ export class ElmCommandExecutor {
         `${item.command}\r`
       )
 
+      this.observe({
+        type: 'tx',
+        direction: 'tx',
+        commandId: item.commandId,
+        command: item.command,
+        rawText: `${item.command}\r`,
+        normalizedText: item.command
+      })
+
       await this.transport.write(bytes)
     } catch (error) {
       clearTimeout(timer)
@@ -144,17 +184,37 @@ export class ElmCommandExecutor {
       this.current = undefined
       this.processing = false
 
-      item.reject(
-        error instanceof Error
+      const normalizedError
+        = error instanceof Error
           ? error
           : new Error(String(error))
+
+      this.observeError(
+        normalizedError,
+        'transport-write',
+        item,
+        {
+          latencyMs: Date.now() - startedAt
+        }
       )
+
+      item.reject(normalizedError)
 
       void this.processNext()
     }
   }
 
   private handleChunk(chunk: Uint8Array): void {
+    const current = this.current
+
+    this.observe({
+      type: 'rx-chunk',
+      direction: 'rx',
+      commandId: current?.item.commandId,
+      command: current?.item.command,
+      rawText: new TextDecoder().decode(chunk)
+    })
+
     let responses
 
     try {
@@ -183,15 +243,41 @@ export class ElmCommandExecutor {
       const responseKind = classifyElmResponse(
         response.normalizedText
       )
+      const latencyMs
+        = completedAt - current.startedAt
+
+      this.observe({
+        type: 'rx-frame',
+        direction: 'rx',
+        commandId: current.item.commandId,
+        command: current.item.command,
+        rawText: response.rawText,
+        normalizedText: response.normalizedText,
+        responseKind,
+        latencyMs
+      })
 
       if (isElmErrorResponse(responseKind)) {
         clearTimeout(current.timer)
 
-        current.item.reject(
-          new Error(
-            `ELM327 ${responseKind}: ${response.normalizedText || '<empty>'}`
-          )
+        const error = new Error(
+          `ELM327 ${responseKind}: ${response.normalizedText || '<empty>'}`
         )
+
+        this.observeError(
+          error,
+          'response',
+          current.item,
+          {
+            direction: 'rx',
+            rawText: response.rawText,
+            normalizedText: response.normalizedText,
+            responseKind,
+            latencyMs
+          }
+        )
+
+        current.item.reject(error)
 
         this.current = undefined
         this.processing = false
@@ -212,8 +298,7 @@ export class ElmCommandExecutor {
         completedAt: new Date(
           completedAt
         ).toISOString(),
-        latencyMs:
-          completedAt - current.startedAt
+        latencyMs
       })
 
       this.current = undefined
@@ -225,10 +310,30 @@ export class ElmCommandExecutor {
 
   private failCurrent(error: Error): void {
     if (!this.current) {
+      this.observe({
+        type: 'error',
+        error: {
+          name: error.name,
+          message: error.message,
+          phase: 'parser'
+        }
+      })
+
+      this.parser.reset()
       return
     }
 
     clearTimeout(this.current.timer)
+
+    this.observeError(
+      error,
+      'parser',
+      this.current.item,
+      {
+        latencyMs: Date.now()
+          - this.current.startedAt
+      }
+    )
 
     this.current.item.reject(error)
 
@@ -237,5 +342,40 @@ export class ElmCommandExecutor {
     this.parser.reset()
 
     void this.processNext()
+  }
+
+  private observe(
+    event: ObdSessionEventInput
+  ): void {
+    try {
+      this.observer?.(event)
+    } catch {
+      // Diagnostic observers must never affect command execution.
+    }
+  }
+
+  private observeError(
+    error: Error,
+    phase: ObdErrorPhase,
+    item: QueueItem,
+    details: Partial<{
+      direction: 'tx' | 'rx'
+      rawText: string
+      normalizedText: string
+      responseKind: ElmResponseKind
+      latencyMs: number
+    }> = {}
+  ): void {
+    this.observe({
+      type: 'error',
+      commandId: item.commandId,
+      command: item.command,
+      error: {
+        name: error.name,
+        message: error.message,
+        phase
+      },
+      ...details
+    })
   }
 }
