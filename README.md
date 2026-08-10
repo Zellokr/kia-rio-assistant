@@ -1,63 +1,53 @@
-# Nuxt Starter Template
+# Kia Rio Assistant
 
-[![Nuxt UI](https://img.shields.io/badge/Made%20with-Nuxt%20UI-00DC82?logo=nuxt&labelColor=020420)](https://ui.nuxt.com)
+Read-only OBD-II lab for a Kia Rio YB 2019 1.2 MPI, targeting a Veepeak
+OBDCheck BLE+ adapter. Phase 0 focuses on transport, ELM framing, command
+queueing, and safe inspection — not AI, cloud sync, voice, or a production
+dashboard.
 
-Use this template to get started with [Nuxt UI](https://ui.nuxt.com) quickly.
+## Stack
 
-- [Live demo](https://starter-template.nuxt.dev/)
-- [Documentation](https://ui.nuxt.com/docs/getting-started/installation/nuxt)
-
-<a href="https://starter-template.nuxt.dev/" target="_blank">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://ui.nuxt.com/assets/templates/nuxt/starter-dark.png">
-    <source media="(prefers-color-scheme: light)" srcset="https://ui.nuxt.com/assets/templates/nuxt/starter-light.png">
-    <img alt="Nuxt Starter Template" src="https://ui.nuxt.com/assets/templates/nuxt/starter-light.png" width="830" height="466">
-  </picture>
-</a>
-
-> The starter template for Vue is on https://github.com/nuxt-ui-templates/starter-vue.
-
-## Quick Start
-
-```bash [Terminal]
-npm create nuxt@latest -- -t ui
-```
-
-## Deploy your own
-
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-name=starter&repository-url=https%3A%2F%2Fgithub.com%2Fnuxt-ui-templates%2Fstarter&demo-image=https%3A%2F%2Fui.nuxt.com%2Fassets%2Ftemplates%2Fnuxt%2Fstarter-dark.png&demo-url=https%3A%2F%2Fstarter-template.nuxt.dev%2F&demo-title=Nuxt%20Starter%20Template&demo-description=A%20minimal%20template%20to%20get%20started%20with%20Nuxt%20UI.)
+- Node.js 24 LTS, pnpm
+- Nuxt 4, Vue 3, TypeScript
+- Vitest, ESLint
+- Capacitor Android shell for GATT inventory (and a future BLE OBD bridge)
 
 ## Setup
-
-Make sure to install the dependencies:
 
 ```bash
 pnpm install
 ```
 
-## Development Server
-
-Start the development server on `http://localhost:3000`:
+## Development
 
 ```bash
 pnpm dev
 ```
 
-## OBD-II Phase 0 lab
+Open `http://localhost:3000/lab` for the OBD lab UI.
 
-The `/lab` route supports synthetic Mock data, recorded-session Replay, and a
-runtime-detected Web Serial/Bluetooth RFCOMM transport. The physical workflow
-remains read-only and has not been run against the vehicle.
+## OBD lab (`/lab`)
 
-Before using real hardware, follow the
-[Step 18 physical test checklist](docs/STEP_18_PHYSICAL_TEST.md).
+Supported transports today:
+
+| Transport | Purpose |
+|-----------|---------|
+| Mock | Synthetic ELM responses for UI and protocol work |
+| Replay | Replays a recorded schema-v1 session export |
+| Web Serial / RFCOMM | Browser serial path when the platform exposes `navigator.serial` |
+
+Physical Web Serial checks are documented in
+[docs/STEP_18_PHYSICAL_TEST.md](docs/STEP_18_PHYSICAL_TEST.md) and remain
+**NOT RUN** until executed against the real vehicle.
+
+The lab is read-only: Mode 04 and other ECU-writing operations are blocked at
+the physical transport boundary.
 
 ## Android GATT inventory
 
-The Capacitor Android shell includes an isolated GATT inventory tool. It scans
-only advertised VEEPEAK devices and requires explicit selection before service
-discovery. It does not read or write characteristics, enable notifications, or
-send OBD commands.
+The Capacitor Android app can scan advertised VEEPEAK devices and discover
+GATT structure only. It does **not** read or write characteristic values,
+enable notifications, or send OBD commands.
 
 ```bash
 pnpm build:android:web
@@ -65,25 +55,32 @@ pnpm cap:sync:android
 pnpm android:open
 ```
 
-Follow the [safe GATT inspection checklist](docs/STEP_19_GATT_INSPECTION.md)
-before using the Android build with the adapter.
+Follow [docs/STEP_19_GATT_INSPECTION.md](docs/STEP_19_GATT_INSPECTION.md)
+before using a phone with the adapter. Inventory status: **NOT RUN**.
 
-## Production
+## Android BLE OBD contract
 
-Build the application for production:
+The TypeScript contract for a future Android BLE `ObdTransport` is in place
+(`AndroidBleBridge` + `AndroidBleObdTransport`) and covered by unit tests
+with a **fake** native bridge.
 
-```bash
-pnpm build
-```
+Real UUID wiring, RX/TX characteristic I/O, and notifications are **not**
+implemented until a reviewed VEEPEAK GATT inventory exists. See
+[docs/ANDROID_BLE_CONTRACT.md](docs/ANDROID_BLE_CONTRACT.md).
 
-Locally preview production build:
+## Scripts
 
-```bash
-pnpm preview
-```
+| Script | Purpose |
+|--------|---------|
+| `pnpm dev` | Nuxt dev server |
+| `pnpm test` | Vitest unit suite |
+| `pnpm run typecheck` | Nuxt / `vue-tsc` typecheck |
+| `pnpm run lint` | ESLint |
+| `pnpm build` | Production web build |
+| `pnpm build:android:web` | Static web bundle for Capacitor |
+| `pnpm cap:sync:android` | Build web + `cap sync android` |
+| `pnpm android:open` | Open the Android project in Android Studio |
 
-Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
+## License
 
-## Renovate integration
-
-Install [Renovate GitHub app](https://github.com/apps/renovate/installations/select_target) on your repository and you are good to go.
+See [LICENSE](LICENSE).
