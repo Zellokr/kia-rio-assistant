@@ -221,8 +221,12 @@ describe('WebSerialRfcommTransport', () => {
     await transport.connect()
     port.writer.blockWrites = true
 
-    const first = transport.write(new Uint8Array([1, 2]))
-    const second = transport.write(new Uint8Array([3]))
+    const first = transport.write(
+      new TextEncoder().encode('ATZ\r')
+    )
+    const second = transport.write(
+      new TextEncoder().encode('ATE0\r')
+    )
 
     await vi.waitFor(() => {
       expect(port.writer.writes).toHaveLength(1)
@@ -231,15 +235,41 @@ describe('WebSerialRfcommTransport', () => {
     port.writer.pendingWrites[0]?.resolve()
     await first
     await vi.waitFor(() => {
-      expect(port.writer.writes.map(bytes => [...bytes])).toEqual([
-        [1, 2],
-        [3]
-      ])
+      expect(
+        port.writer.writes.map(bytes => new TextDecoder().decode(bytes))
+      ).toEqual(['ATZ\r', 'ATE0\r'])
     })
 
     port.writer.pendingWrites[1]?.resolve()
     await second
     expect(port.getWriterCalls).toBe(1)
+  })
+
+  it('rejects a physical command outside the Step 19 allowlist without touching the real writer', async () => {
+    const { port, transport } = connectedTransport()
+
+    await transport.select()
+    await transport.connect()
+
+    await expect(
+      transport.write(new TextEncoder().encode('0104\r'))
+    ).rejects.toThrow('not allowed')
+
+    expect(port.writer.writes).toHaveLength(0)
+    expect(transport.state).toBe('connected')
+  })
+
+  it('rejects Mode 04 even when the transport is otherwise connected and ready', async () => {
+    const { port, transport } = connectedTransport()
+
+    await transport.select()
+    await transport.connect()
+
+    await expect(
+      transport.write(new TextEncoder().encode('04\r'))
+    ).rejects.toThrow('not allowed')
+
+    expect(port.writer.writes).toHaveLength(0)
   })
 
   it('emits fragmented raw reads without decoding them', async () => {

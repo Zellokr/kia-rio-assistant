@@ -3,6 +3,7 @@ import type {
   ObdTransportMetadata,
   ObdTransportState
 } from './ObdTransport'
+import { assertPhysicalCommandAllowed } from '../policy/PhysicalObdCommandPolicy'
 
 export interface WebSerialPortInfo {
   usbVendorId?: number
@@ -77,8 +78,11 @@ function browserIsSecureContext(): boolean {
 
 /**
  * Raw Web Serial transport for an already paired serial/RFCOMM adapter.
- * Protocol parsing, command allowlisting and ELM initialization stay above
- * this boundary so this class remains vehicle-agnostic.
+ * Protocol parsing and ELM initialization stay above this boundary so this
+ * class remains vehicle-agnostic. The Step 19 physical read-only command
+ * policy is enforced here, in `write()`, so it applies to every caller
+ * (manual commands, initialization, discovery, polling, reconnection)
+ * regardless of UI state.
  */
 export class WebSerialRfcommTransport implements ObdTransport {
   readonly kind = 'web-serial-rfcomm' as const
@@ -249,6 +253,10 @@ export class WebSerialRfcommTransport implements ObdTransport {
     const task = this.writeTail
       .catch(() => undefined)
       .then(async () => {
+        const command = new TextDecoder().decode(bytes).trim()
+
+        assertPhysicalCommandAllowed(command)
+
         if (this.state !== 'connected' || !this.writer) {
           throw new Error('OBD transport is not connected')
         }

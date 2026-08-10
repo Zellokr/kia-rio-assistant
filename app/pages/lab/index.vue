@@ -33,6 +33,9 @@ import {
 import {
   ObdSessionLog
 } from '~~/core/obd/logging/ObdSessionLog'
+import {
+  PHYSICAL_ALLOWED_COMMANDS
+} from '~~/core/obd/policy/PhysicalObdCommandPolicy'
 import type {
   ObdErrorPhase
 } from '~~/core/obd/logging/ObdSessionLog'
@@ -338,18 +341,7 @@ const simulatedCommands = [
   '0111'
 ]
 
-const physicalCommands = [
-  'ATZ',
-  'ATE0',
-  'ATL0',
-  'ATS0',
-  'ATH0',
-  'ATSP0',
-  '0100',
-  '010C',
-  '0105',
-  '03'
-]
+const physicalCommands: string[] = [...PHYSICAL_ALLOWED_COMMANDS]
 
 const commands = computed(() => (
   transportChoice.value === 'web-serial-rfcomm'
