@@ -65,4 +65,15 @@ describe('decodeMode03Response', () => {
       )
     }).toThrow()
   })
+
+  it('decodes unspaced DTCs correctly', () => {
+    const result = decodeMode03Response(
+      '43030004200000'
+    )
+
+    expect(result.dtcs).toEqual([
+      'P0300',
+      'P0420'
+    ])
+  })
 })

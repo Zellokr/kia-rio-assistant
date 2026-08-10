@@ -1,24 +1,7 @@
+import { parseHexBytes } from './parseHexBytes'
+
 export interface DecodedDtcResult {
   dtcs: string[]
-}
-
-function parseHexBytes(
-  response: string
-): number[] {
-  const tokens = response
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-
-  return tokens.map((token) => {
-    if (!/^[0-9A-Fa-f]{2}$/.test(token)) {
-      throw new Error(
-        `Invalid OBD hex byte: ${token}`
-      )
-    }
-
-    return Number.parseInt(token, 16)
-  })
 }
 
 function decodeDtc(

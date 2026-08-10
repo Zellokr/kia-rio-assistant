@@ -21,6 +21,11 @@ export interface SupportedPidDiscoveryResult {
   ranges: SupportedPidRange[]
 }
 
+export interface DiscoverSupportedPidsOptions {
+  timeoutMs?: number
+  initialTimeoutMs?: number
+}
+
 const PID_RANGE_BASES = [
   0x00,
   0x20,
@@ -41,7 +46,8 @@ function createSupportedPidCommand(
 }
 
 export async function discoverSupportedPids(
-  executor: ElmCommandExecutor
+  executor: ElmCommandExecutor,
+  options?: DiscoverSupportedPidsOptions
 ): Promise<SupportedPidDiscoveryResult> {
   const ranges: SupportedPidRange[] = []
   const allPids = new Set<string>()
@@ -51,9 +57,14 @@ export async function discoverSupportedPids(
       basePid
     )
 
+    const isFirstRange = basePid === PID_RANGE_BASES[0]
+    const timeoutMs = isFirstRange
+      ? options?.initialTimeoutMs ?? 7000
+      : options?.timeoutMs ?? 3000
+
     const response = await executor.execute(
       command,
-      3000
+      timeoutMs
     )
 
     const decoded = decodeSupportedPids(

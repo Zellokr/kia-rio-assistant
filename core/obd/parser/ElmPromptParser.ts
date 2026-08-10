@@ -13,7 +13,7 @@ export class ElmPromptParser {
     private readonly maxBufferLength = 16_384
   ) {}
 
-  push(chunk: Uint8Array): ElmParsedResponse[] {
+  push(chunk: Uint8Array, echoCommand?: string): ElmParsedResponse[] {
     this.buffer += this.decoder.decode(chunk, {
       stream: true
     })
@@ -41,7 +41,7 @@ export class ElmPromptParser {
 
       responses.push({
         rawText: `${frame}>`,
-        normalizedText: normalizeElmResponse(frame)
+        normalizedText: normalizeElmResponse(frame, { echoCommand })
       })
     }
 

@@ -82,4 +82,58 @@ describe('ElmPromptParser', () => {
     expect(result[0]?.normalizedText)
       .toBe('41 0C 1A F8')
   })
+
+  it('strips the command echo when echoCommand is passed', () => {
+    const parser = new ElmPromptParser()
+
+    const result = parser.push(
+      encoder.encode(
+        '0100\r\rSEARCHING...\r41 00 BE 3F A8 13\r>'
+      ),
+      '0100'
+    )
+
+    expect(result).toHaveLength(1)
+
+    expect(result[0]?.normalizedText)
+      .toBe('41 00 BE 3F A8 13')
+  })
+
+  it('drops SEARCHING... arriving in a separate chunk from the data', () => {
+    const parser = new ElmPromptParser()
+
+    expect(
+      parser.push(encoder.encode('SEARCHING'))
+    ).toEqual([])
+
+    expect(
+      parser.push(encoder.encode('...\r41 00 BE'))
+    ).toEqual([])
+
+    const result = parser.push(
+      encoder.encode(' 3F A8 13\r>')
+    )
+
+    expect(result).toHaveLength(1)
+
+    expect(result[0]?.normalizedText)
+      .toBe('41 00 BE 3F A8 13')
+  })
+
+  it('reconstructs a CRLF pair split exactly across a chunk boundary', () => {
+    const parser = new ElmPromptParser()
+
+    expect(
+      parser.push(encoder.encode('41 0C\r'))
+    ).toEqual([])
+
+    const result = parser.push(
+      encoder.encode('\n1A F8\r\n>')
+    )
+
+    expect(result).toHaveLength(1)
+
+    expect(result[0]?.normalizedText)
+      .toBe('41 0C 1A F8')
+  })
 })

@@ -134,4 +134,18 @@ describe('decodeMode01Response', () => {
       )
     }
   )
+
+  it('decodes unspaced hex the same as spaced hex', () => {
+    const spaced = decodeMode01Response('41 0C 1A F8')
+    const unspaced = decodeMode01Response('410C1AF8')
+
+    expect(unspaced).toEqual(spaced)
+  })
+
+  it('decodes mixed/irregular whitespace the same as spaced hex', () => {
+    const spaced = decodeMode01Response('41 0C 1A F8')
+    const mixed = decodeMode01Response('41  0C1A F8')
+
+    expect(mixed).toEqual(spaced)
+  })
 })

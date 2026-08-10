@@ -52,13 +52,10 @@ export function classifyElmResponse(
     return 'adapter-id'
   }
 
-  const withoutSearching = upper
-    .replace(/SEARCHING\.{0,3}/g, '')
-    .trim()
-
+  // Expects already-normalized input (SEARCHING/echo already stripped upstream by normalizeElmResponse).
   if (
     /^(?:[0-9A-F]{2}\s+)*[0-9A-F]{2}$/
-      .test(withoutSearching)
+      .test(upper)
   ) {
     return 'obd-data'
   }

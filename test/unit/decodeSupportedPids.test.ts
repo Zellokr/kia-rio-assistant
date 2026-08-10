@@ -57,4 +57,19 @@ describe('decodeSupportedPids', () => {
     expect(result.pids).toContain('21')
     expect(result.hasNextRange).toBe(false)
   })
+
+  it('decodes an unspaced supported-PIDs response the same as the spaced fixture', () => {
+    const spaced = decodeSupportedPids('41 00 BE 3F A8 13')
+    const unspaced = decodeSupportedPids('4100BE3FA813')
+
+    expect(unspaced).toEqual(spaced)
+  })
+
+  it('rejects an unspaced incomplete response the same as the spaced case', () => {
+    expect(() => {
+      decodeSupportedPids('4100BE3F')
+    }).toThrow(
+      'Incomplete supported PIDs response'
+    )
+  })
 })

@@ -1,3 +1,5 @@
+import { parseHexBytes } from './parseHexBytes'
+
 export interface SupportedPidResult {
   rangeStart: number
   rangeEnd: number
@@ -5,31 +7,16 @@ export interface SupportedPidResult {
   hasNextRange: boolean
 }
 
-function parseHexByte(token: string): number {
-  if (!/^[0-9A-Fa-f]{2}$/.test(token)) {
-    throw new Error(
-      `Invalid OBD hex byte: ${token}`
-    )
-  }
-
-  return Number.parseInt(token, 16)
-}
-
 export function decodeSupportedPids(
   response: string
 ): SupportedPidResult {
-  const tokens = response
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
+  const bytes = parseHexBytes(response)
 
-  if (tokens.length < 6) {
+  if (bytes.length < 6) {
     throw new Error(
       'Incomplete supported PIDs response'
     )
   }
-
-  const bytes = tokens.map(parseHexByte)
 
   if (bytes[0] !== 0x41) {
     throw new Error(

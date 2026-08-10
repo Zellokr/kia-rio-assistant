@@ -349,4 +349,25 @@ describe('ElmCommandExecutor', () => {
 
     executor.dispose()
   })
+
+  it('strips a leading command echo from the resolved response (ATZ before ATE0 runs)', async () => {
+    const transport = new ScriptedTransport({
+      ATZ: ['ATZ\r\rELM327 v1.5\r\r>']
+    })
+    const executor = new ElmCommandExecutor(transport)
+    const result = await executor.execute('ATZ', 5000)
+    expect(result.normalizedText).toBe('ELM327 v1.5')
+    executor.dispose()
+  })
+
+  it('strips SEARCHING... from the resolved normalizedText, not just from classification', async () => {
+    const transport = new ScriptedTransport({
+      '0100': ['0100\r\rSEARCHING...\r41 00 BE 3F A8 13\r\r>']
+    })
+    const executor = new ElmCommandExecutor(transport)
+    const result = await executor.execute('0100')
+    expect(result.normalizedText).toBe('41 00 BE 3F A8 13')
+    expect(result.responseKind).toBe('obd-data')
+    executor.dispose()
+  })
 })

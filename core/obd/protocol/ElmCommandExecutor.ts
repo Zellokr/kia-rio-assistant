@@ -218,7 +218,7 @@ export class ElmCommandExecutor {
     let responses
 
     try {
-      responses = this.parser.push(chunk)
+      responses = this.parser.push(chunk, current?.item.command)
     } catch (error) {
       this.failCurrent(
         error instanceof Error
