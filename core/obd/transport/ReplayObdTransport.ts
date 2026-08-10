@@ -312,6 +312,10 @@ export class ReplayObdTransport implements ObdTransport {
     (data: Uint8Array) => void
   >()
 
+  private readonly stateListeners = new Set<
+    (state: ObdTransportState) => void
+  >()
+
   private cursor = 0
 
   private generation = 0
@@ -336,7 +340,7 @@ export class ReplayObdTransport implements ObdTransport {
   async select(): Promise<ObdTransportMetadata> {
     this.generation++
     this.cursor = 0
-    this.state = 'selected'
+    this.setState('selected')
 
     return this.metadata()
   }
@@ -346,15 +350,15 @@ export class ReplayObdTransport implements ObdTransport {
       throw new Error('Replay transport must be selected before connecting')
     }
 
-    this.state = 'connected'
+    this.setState('connected')
 
     return this.metadata()
   }
 
   async disconnect(): Promise<void> {
-    this.state = 'disconnecting'
+    this.setState('disconnecting')
     this.generation++
-    this.state = 'disconnected'
+    this.setState('disconnected')
   }
 
   async write(data: Uint8Array): Promise<void> {
@@ -408,6 +412,32 @@ export class ReplayObdTransport implements ObdTransport {
 
     return () => {
       this.listeners.delete(listener)
+    }
+  }
+
+  subscribeState(
+    listener: (state: ObdTransportState) => void
+  ): () => void {
+    this.stateListeners.add(listener)
+
+    return () => {
+      this.stateListeners.delete(listener)
+    }
+  }
+
+  private setState(next: ObdTransportState): void {
+    if (this.state === next) {
+      return
+    }
+
+    this.state = next
+
+    for (const listener of this.stateListeners) {
+      try {
+        listener(next)
+      } catch {
+        // State observers must not break transport transitions.
+      }
     }
   }
 

@@ -26,4 +26,21 @@ export interface ObdTransport {
   subscribe(
     listener: (data: Uint8Array) => void,
   ): () => void
+
+  /**
+   * Notifies listeners whenever `state` changes. Used by ElmCommandExecutor
+   * to fail in-flight commands immediately on disconnect/error instead of
+   * waiting for the per-command timeout.
+   */
+  subscribeState(
+    listener: (state: ObdTransportState) => void,
+  ): () => void
+}
+
+export function isObdTransportUnavailable(
+  state: ObdTransportState
+): boolean {
+  return state === 'disconnecting'
+    || state === 'disconnected'
+    || state === 'error'
 }

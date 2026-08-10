@@ -93,6 +93,10 @@ export class WebSerialRfcommTransport implements ObdTransport {
     (data: Uint8Array) => void
   >()
 
+  private readonly stateListeners = new Set<
+    (state: ObdTransportState) => void
+  >()
+
   private readonly baudRate: number
 
   private port: WebSerialPort | undefined
@@ -130,7 +134,7 @@ export class WebSerialRfcommTransport implements ObdTransport {
       throw new Error('Disconnect the current Web Serial port before selecting another')
     }
 
-    this.state = 'selecting'
+    this.setState('selecting')
 
     try {
       this.assertSupported()
@@ -144,11 +148,11 @@ export class WebSerialRfcommTransport implements ObdTransport {
       }
 
       this.port = await provider.requestPort()
-      this.state = 'selected'
+      this.setState('selected')
 
       return this.metadata()
     } catch (error) {
-      this.state = 'error'
+      this.setState('error')
       throw this.toError(error)
     }
   }
@@ -161,7 +165,7 @@ export class WebSerialRfcommTransport implements ObdTransport {
       throw new Error('Web Serial transport must be selected before connecting')
     }
 
-    this.state = 'connecting'
+    this.setState('connecting')
     this.disconnectRequested = false
 
     try {
@@ -185,12 +189,12 @@ export class WebSerialRfcommTransport implements ObdTransport {
 
       this.reader = this.port.readable.getReader()
       this.writer = this.port.writable.getWriter()
-      this.state = 'connected'
+      this.setState('connected')
       this.readLoop = this.pumpReads(this.reader)
 
       return this.metadata()
     } catch (error) {
-      this.state = 'error'
+      this.setState('error')
       await this.cleanupAfterConnectFailure()
       throw this.toError(error)
     }
@@ -213,7 +217,7 @@ export class WebSerialRfcommTransport implements ObdTransport {
   }
 
   private async performDisconnect(): Promise<void> {
-    this.state = 'disconnecting'
+    this.setState('disconnecting')
     this.disconnectRequested = true
     const reader = this.reader
 
@@ -238,9 +242,9 @@ export class WebSerialRfcommTransport implements ObdTransport {
         this.portOpen = false
       }
 
-      this.state = 'disconnected'
+      this.setState('disconnected')
     } catch (error) {
-      this.state = 'error'
+      this.setState('error')
       throw this.toError(error)
     } finally {
       this.readLoop = undefined
@@ -265,7 +269,7 @@ export class WebSerialRfcommTransport implements ObdTransport {
           await this.writer.write(bytes)
         } catch (error) {
           if (!this.disconnectRequested) {
-            this.state = 'error'
+            this.setState('error')
           }
 
           throw this.toError(error)
@@ -283,6 +287,32 @@ export class WebSerialRfcommTransport implements ObdTransport {
 
     return () => {
       this.listeners.delete(listener)
+    }
+  }
+
+  subscribeState(
+    listener: (state: ObdTransportState) => void
+  ): () => void {
+    this.stateListeners.add(listener)
+
+    return () => {
+      this.stateListeners.delete(listener)
+    }
+  }
+
+  private setState(next: ObdTransportState): void {
+    if (this.state === next) {
+      return
+    }
+
+    this.state = next
+
+    for (const listener of this.stateListeners) {
+      try {
+        listener(next)
+      } catch {
+        // State observers must not break transport transitions.
+      }
     }
   }
 
@@ -305,7 +335,7 @@ export class WebSerialRfcommTransport implements ObdTransport {
 
         if (done) {
           if (!this.disconnectRequested) {
-            this.state = 'error'
+            this.setState('error')
           }
 
           return
@@ -317,7 +347,7 @@ export class WebSerialRfcommTransport implements ObdTransport {
       }
     } catch {
       if (!this.disconnectRequested) {
-        this.state = 'error'
+        this.setState('error')
       }
     } finally {
       if (this.reader === reader) {

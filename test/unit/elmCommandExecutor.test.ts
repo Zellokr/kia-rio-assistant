@@ -22,6 +22,10 @@ class ScriptedTransport implements ObdTransport {
     (data: Uint8Array) => void
   >()
 
+  private readonly stateListeners = new Set<
+    (state: ObdTransportState) => void
+  >()
+
   constructor(
     private readonly responses: Record<
       string,
@@ -38,7 +42,7 @@ class ScriptedTransport implements ObdTransport {
   }
 
   async disconnect(): Promise<void> {
-    this.state = 'disconnected'
+    this.setState('disconnected')
   }
 
   async write(data: Uint8Array): Promise<void> {
@@ -63,6 +67,28 @@ class ScriptedTransport implements ObdTransport {
 
     return () => {
       this.listeners.delete(listener)
+    }
+  }
+
+  subscribeState(
+    listener: (state: ObdTransportState) => void
+  ): () => void {
+    this.stateListeners.add(listener)
+
+    return () => {
+      this.stateListeners.delete(listener)
+    }
+  }
+
+  private setState(next: ObdTransportState): void {
+    if (this.state === next) {
+      return
+    }
+
+    this.state = next
+
+    for (const listener of this.stateListeners) {
+      listener(next)
     }
   }
 }
@@ -368,6 +394,47 @@ describe('ElmCommandExecutor', () => {
     const result = await executor.execute('0100')
     expect(result.normalizedText).toBe('41 00 BE 3F A8 13')
     expect(result.responseKind).toBe('obd-data')
+    executor.dispose()
+  })
+
+  it('rejects the in-flight command and queued work immediately on transport disconnect', async () => {
+    const events: ObdSessionEventInput[] = []
+    const transport = new ScriptedTransport({
+      // No terminating prompt — keeps the first command in flight.
+      '010C': ['41 0'],
+      '0105': ['41 05 5A\r>']
+    })
+    const executor = new ElmCommandExecutor(
+      transport,
+      (event) => {
+        events.push(event)
+      }
+    )
+
+    const inFlight = executor.execute('010C', 5000)
+    const queued = executor.execute('0105', 5000)
+
+    await transport.disconnect()
+
+    await expect(inFlight).rejects.toThrow(
+      'OBD transport is not connected'
+    )
+    await expect(queued).rejects.toThrow(
+      'OBD transport is not connected'
+    )
+
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: 'error',
+        command: '010C',
+        error: {
+          name: 'Error',
+          message: 'OBD transport is not connected',
+          phase: 'disconnect'
+        }
+      })
+    )
+
     executor.dispose()
   })
 })

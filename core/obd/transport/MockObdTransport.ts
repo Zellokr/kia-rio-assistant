@@ -11,12 +11,23 @@ export class MockObdTransport implements ObdTransport {
 
   private listeners = new Set<(data: Uint8Array) => void>()
 
+  private stateListeners = new Set<
+    (state: ObdTransportState) => void
+  >()
+
+  /**
+   * Bumped on select/disconnect so delayed fragment emits from an interrupted
+   * write cannot leak into a later reconnect cycle (same pattern as Replay).
+   */
+  private generation = 0
+
   async select(): Promise<ObdTransportMetadata> {
-    this.state = 'selecting'
+    this.generation++
+    this.setState('selecting')
 
     await this.delay(200)
 
-    this.state = 'selected'
+    this.setState('selected')
 
     return {
       kind: this.kind,
@@ -25,11 +36,11 @@ export class MockObdTransport implements ObdTransport {
   }
 
   async connect(): Promise<ObdTransportMetadata> {
-    this.state = 'connecting'
+    this.setState('connecting')
 
     await this.delay(300)
 
-    this.state = 'connected'
+    this.setState('connected')
 
     return {
       kind: this.kind,
@@ -38,11 +49,12 @@ export class MockObdTransport implements ObdTransport {
   }
 
   async disconnect(): Promise<void> {
-    this.state = 'disconnecting'
+    this.setState('disconnecting')
+    this.generation++
 
     await this.delay(150)
 
-    this.state = 'disconnected'
+    this.setState('disconnected')
   }
 
   async write(data: Uint8Array): Promise<void> {
@@ -54,8 +66,13 @@ export class MockObdTransport implements ObdTransport {
       .decode(data)
       .trim()
       .toUpperCase()
+    const generation = this.generation
 
     await this.delay(150)
+
+    if (!this.isLiveWrite(generation)) {
+      return
+    }
 
     const response = this.getResponse(command)
 
@@ -73,6 +90,10 @@ export class MockObdTransport implements ObdTransport {
 
       for (const fragment of fragments) {
         await this.delay(60)
+
+        if (!this.isLiveWrite(generation)) {
+          return
+        }
 
         this.emit(
           new TextEncoder().encode(fragment)
@@ -97,10 +118,41 @@ export class MockObdTransport implements ObdTransport {
     }
   }
 
+  subscribeState(
+    listener: (state: ObdTransportState) => void
+  ): () => void {
+    this.stateListeners.add(listener)
+
+    return () => {
+      this.stateListeners.delete(listener)
+    }
+  }
+
+  private setState(next: ObdTransportState): void {
+    if (this.state === next) {
+      return
+    }
+
+    this.state = next
+
+    for (const listener of this.stateListeners) {
+      try {
+        listener(next)
+      } catch {
+        // State observers must not break transport transitions.
+      }
+    }
+  }
+
   private emit(data: Uint8Array) {
     for (const listener of this.listeners) {
       listener(data)
     }
+  }
+
+  private isLiveWrite(generation: number): boolean {
+    return generation === this.generation
+      && this.state === 'connected'
   }
 
   private getResponse(command: string): string {

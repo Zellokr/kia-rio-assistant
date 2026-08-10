@@ -1,4 +1,10 @@
-import type { ObdTransport } from '../transport/ObdTransport'
+import {
+  isObdTransportUnavailable
+} from '../transport/ObdTransport'
+import type {
+  ObdTransport,
+  ObdTransportState
+} from '../transport/ObdTransport'
 import { ElmPromptParser } from '../parser/ElmPromptParser'
 import {
   classifyElmResponse,
@@ -31,6 +37,9 @@ interface QueueItem {
   reject: (error: Error) => void
 }
 
+const TRANSPORT_UNAVAILABLE_MESSAGE
+  = 'OBD transport is not connected'
+
 export class ElmCommandExecutor {
   private readonly parser = new ElmPromptParser()
 
@@ -48,7 +57,9 @@ export class ElmCommandExecutor {
     }
     | undefined
 
-  private readonly unsubscribe: () => void
+  private readonly unsubscribeData: () => void
+
+  private readonly unsubscribeState: () => void
 
   constructor(
     private readonly transport: ObdTransport,
@@ -56,8 +67,11 @@ export class ElmCommandExecutor {
       event: ObdSessionEventInput
     ) => void
   ) {
-    this.unsubscribe = this.transport.subscribe((chunk) => {
+    this.unsubscribeData = this.transport.subscribe((chunk) => {
       this.handleChunk(chunk)
+    })
+    this.unsubscribeState = this.transport.subscribeState((state) => {
+      this.handleTransportState(state)
     })
   }
 
@@ -91,7 +105,8 @@ export class ElmCommandExecutor {
   }
 
   dispose(): void {
-    this.unsubscribe()
+    this.unsubscribeData()
+    this.unsubscribeState()
 
     if (this.current) {
       clearTimeout(this.current.timer)
@@ -111,6 +126,51 @@ export class ElmCommandExecutor {
       )
     }
 
+    this.processing = false
+    this.parser.reset()
+  }
+
+  private handleTransportState(state: ObdTransportState): void {
+    if (!isObdTransportUnavailable(state)) {
+      return
+    }
+
+    this.failUnavailable(
+      new Error(TRANSPORT_UNAVAILABLE_MESSAGE)
+    )
+  }
+
+  private failUnavailable(error: Error): void {
+    const current = this.current
+
+    if (current) {
+      clearTimeout(current.timer)
+
+      this.observeError(
+        error,
+        'disconnect',
+        current.item,
+        {
+          latencyMs: Date.now() - current.startedAt
+        }
+      )
+
+      current.item.reject(error)
+      this.current = undefined
+    }
+
+    while (this.queue.length > 0) {
+      const item = this.queue.shift()
+
+      if (!item) {
+        continue
+      }
+
+      this.observeError(error, 'disconnect', item)
+      item.reject(error)
+    }
+
+    this.processing = false
     this.parser.reset()
   }
 
@@ -125,12 +185,23 @@ export class ElmCommandExecutor {
       return
     }
 
+    if (this.transport.state !== 'connected') {
+      this.observeError(
+        new Error(TRANSPORT_UNAVAILABLE_MESSAGE),
+        'disconnect',
+        item
+      )
+      item.reject(new Error(TRANSPORT_UNAVAILABLE_MESSAGE))
+      void this.processNext()
+      return
+    }
+
     this.processing = true
 
     const startedAt = Date.now()
 
     const timer = setTimeout(() => {
-      if (!this.current) {
+      if (!this.current || this.current.item !== item) {
         return
       }
 
@@ -179,6 +250,10 @@ export class ElmCommandExecutor {
 
       await this.transport.write(bytes)
     } catch (error) {
+      if (!this.current || this.current.item !== item) {
+        return
+      }
+
       clearTimeout(timer)
 
       this.current = undefined
