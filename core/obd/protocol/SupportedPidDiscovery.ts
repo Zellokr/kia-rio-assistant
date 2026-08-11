@@ -6,6 +6,9 @@ import type {
 import {
   decodeSupportedPids
 } from '../decoder/decodeSupportedPids'
+import {
+  PhysicalCommandRejectedError
+} from '../policy/PhysicalObdCommandPolicy'
 
 export interface SupportedPidRange {
   command: string
@@ -62,10 +65,23 @@ export async function discoverSupportedPids(
       ? options?.initialTimeoutMs ?? 7000
       : options?.timeoutMs ?? 3000
 
-    const response = await executor.execute(
-      command,
-      timeoutMs
-    )
+    let response: ElmCommandResult
+
+    try {
+      response = await executor.execute(
+        command,
+        timeoutMs
+      )
+    } catch (error) {
+      // The physical read-only policy only allows the base range (0100).
+      // A vehicle advertising further ranges must not fail the whole
+      // session — stop discovery with whatever ranges were already read.
+      if (error instanceof PhysicalCommandRejectedError) {
+        break
+      }
+
+      throw error
+    }
 
     const decoded = decodeSupportedPids(
       response.normalizedText

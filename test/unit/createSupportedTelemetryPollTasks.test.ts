@@ -67,4 +67,15 @@ describe('createSupportedTelemetryPollTasks', () => {
       createSupportedTelemetryPollTasks(['01', '03', 'FF'])
     ).toEqual([])
   })
+
+  it('restricts tasks to the physical read-only allowlist when physicalOnly is set', () => {
+    const tasks = createSupportedTelemetryPollTasks(
+      ['04', '05', '0C', '0D', '11'],
+      { physicalOnly: true }
+    )
+
+    expect(
+      tasks.map(task => task.command)
+    ).toEqual(['010C', '0105'])
+  })
 })

@@ -1,6 +1,9 @@
 import type {
   ObdPollTask
 } from '../polling/ObdPollScheduler'
+import {
+  isPhysicalCommandAllowed
+} from '../policy/PhysicalObdCommandPolicy'
 
 interface TelemetryPollDefinition {
   pid: string
@@ -50,13 +53,27 @@ const TELEMETRY_POLL_DEFINITIONS: readonly TelemetryPollDefinition[] = [
   }
 ]
 
+export interface CreateSupportedTelemetryPollTasksOptions {
+  /**
+   * Restricts tasks to commands allowed by the physical read-only policy.
+   * Must be set for real (non-mock/replay) transports, otherwise polling
+   * repeatedly retries commands the transport rejects on every interval.
+   */
+  physicalOnly?: boolean
+}
+
 export function createSupportedTelemetryPollTasks(
-  supportedPids: readonly string[]
+  supportedPids: readonly string[],
+  options?: CreateSupportedTelemetryPollTasksOptions
 ): ObdPollTask[] {
   const supported = new Set(supportedPids)
 
   return TELEMETRY_POLL_DEFINITIONS
     .filter(definition => supported.has(definition.pid))
+    .filter(definition =>
+      !options?.physicalOnly
+      || isPhysicalCommandAllowed(definition.task.command)
+    )
     .map(definition => ({
       ...definition.task
     }))

@@ -205,6 +205,28 @@ describe('physical read-only command policy — integration', () => {
     executor.dispose()
   })
 
+  it('stops discovery after the base range when the vehicle advertises an extended range', async () => {
+    const { port, transport } = await connectedPhysicalTransport()
+    const executor = new ElmCommandExecutor(transport)
+
+    const discoveryPromise = discoverSupportedPids(executor)
+
+    await waitForWrite(port, 1)
+    // PID 20 supported (last data bit set) signals hasNextRange, which
+    // would normally trigger 0120 — a command outside the physical
+    // allowlist.
+    respond(port, 0, '41 00 00 00 00 01\r>')
+
+    const discovery = await discoveryPromise
+
+    expect(discovery.ranges).toHaveLength(1)
+    expect(discovery.ranges[0]?.command).toBe('0100')
+    expect(discovery.ranges[0]?.hasNextRange).toBe(true)
+    expect(port.writer.writes).toHaveLength(1)
+
+    executor.dispose()
+  })
+
   it('never sends unauthorized telemetry PIDs during physical polling', async () => {
     const { port, transport } = await connectedPhysicalTransport()
     const executor = new ElmCommandExecutor(transport)

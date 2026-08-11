@@ -419,7 +419,11 @@ function startTelemetry() {
   pollScheduler.clearTasks()
 
   const tasks = createSupportedTelemetryPollTasks(
-    supportedPids.value
+    supportedPids.value,
+    {
+      physicalOnly: transport.kind === 'web-serial-rfcomm'
+        || transport.kind === 'android-ble'
+    }
   )
 
   for (const task of tasks) {
