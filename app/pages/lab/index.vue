@@ -786,7 +786,7 @@ onBeforeUnmount(() => {
         @run-queue-test="runQueueTest"
       />
 
-      <SessionLogPanel
+      <LogView
         v-else
         :events="sessionEvents"
         :dropped-events="droppedEvents"
