@@ -1,8 +1,9 @@
 <script setup lang="ts">
+const colorMode = useColorMode()
+
 useHead({
   meta: [
-    { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-    { name: 'theme-color', content: '#0f172a' }
+    { name: 'viewport', content: 'width=device-width, initial-scale=1' }
   ],
   link: [
     { rel: 'icon', href: '/favicon.ico' }
@@ -11,6 +12,12 @@ useHead({
     lang: 'es'
   }
 })
+
+useHead(() => ({
+  meta: [
+    { name: 'theme-color', content: colorMode.value === 'dark' ? '#0f172a' : '#ffffff' }
+  ]
+}))
 
 const title = 'Kia Rio Assistant'
 const description = 'Área de diagnóstico local y seguro para Kia Rio.'
