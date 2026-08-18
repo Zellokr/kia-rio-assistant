@@ -43,6 +43,8 @@ import type {
   ObdTransport,
   ObdTransportMetadata
 } from '~~/core/obd/transport/ObdTransport'
+import { labViews } from '~/utils/labNav'
+import type { LabViewId } from '~/utils/labNav'
 
 definePageMeta({
   alias: ['/']
@@ -84,23 +86,9 @@ const {
   downloadJson: downloadSessionLog
 } = useObdSessionLog(sessionLog)
 
-const mobileViews = [
-  {
-    value: 'connection' as const,
-    label: 'Conexión',
-    icon: 'i-lucide-plug-zap'
-  },
-  {
-    value: 'data' as const,
-    label: 'Datos',
-    icon: 'i-lucide-gauge'
-  },
-  {
-    value: 'log' as const,
-    label: 'Registro',
-    icon: 'i-lucide-scroll-text'
-  }
-]
+function setActiveView(view: LabViewId): void {
+  activeView.value = view
+}
 
 const sessionStateLabel = computed(() => {
   const labels: Record<string, string> = {
@@ -722,101 +710,92 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <main class="pb-[calc(7rem+env(safe-area-inset-bottom))] pt-4 sm:pt-6">
-    <UContainer class="flex max-w-3xl flex-col gap-4">
-      <div class="flex items-center justify-between gap-3 rounded-xl border border-success/30 bg-success/5 px-4 py-3">
-        <div class="flex min-w-0 items-center gap-3">
-          <UIcon
-            name="i-lucide-shield-check"
-            class="size-5 shrink-0 text-success"
-            aria-hidden="true"
-          />
-          <div class="min-w-0">
-            <p class="font-semibold text-highlighted">
-              Diagnóstico · Solo lectura
-            </p>
-            <p class="text-xs text-muted">
-              Sin Mode 04, programación ni escritura en ECU
-            </p>
+  <main class="pt-4 sm:pt-6 md:flex md:items-start">
+    <NavRail
+      :views="labViews"
+      :active="activeView"
+      @select="setActiveView"
+    />
+
+    <div class="min-w-0 flex-1 md:pr-[env(safe-area-inset-right)]">
+      <UContainer class="flex max-w-3xl flex-col gap-4 pb-[calc(7rem+env(safe-area-inset-bottom))] md:pb-0">
+        <div class="flex items-center justify-between gap-3 rounded-xl border border-success/30 bg-success/5 px-4 py-3">
+          <div class="flex min-w-0 items-center gap-3">
+            <UIcon
+              name="i-lucide-shield-check"
+              class="size-5 shrink-0 text-success"
+              aria-hidden="true"
+            />
+            <div class="min-w-0">
+              <p class="font-semibold text-highlighted">
+                Diagnóstico · Solo lectura
+              </p>
+              <p class="text-xs text-muted">
+                Sin Mode 04, programación ni escritura en ECU
+              </p>
+            </div>
           </div>
-        </div>
-        <UBadge
-          :color="sessionBadgeColor"
-          variant="subtle"
-          class="shrink-0"
-        >
-          {{ sessionStateLabel }}
-        </UBadge>
-      </div>
-
-      <ConnectionView
-        v-if="activeView === 'connection'"
-        v-model:transport-choice="transportChoice"
-        :session-state="sessionState"
-        :session-state-label="sessionStateLabel"
-        :transport-state="transportState"
-        :transport-error="transportError"
-        :replay-filename="replayFilename"
-        :replay-import-error="replayImportError"
-        :session-busy="sessionBusy"
-        :session-badge-color="sessionBadgeColor"
-        @select-device="selectDevice"
-        @connect="connect"
-        @disconnect="disconnect"
-        @import-replay="importReplayFile"
-      />
-
-      <DataView
-        v-else-if="activeView === 'data'"
-        v-model:selected-command="selectedCommand"
-        :session-state="sessionState"
-        :telemetry-running="telemetryRunning"
-        :engine-rpm-metric="engineRpmMetric"
-        :vehicle-speed-metric="vehicleSpeedMetric"
-        :coolant-temperature-metric="coolantTemperatureMetric"
-        :engine-load-metric="engineLoadMetric"
-        :throttle-position-metric="throttlePositionMetric"
-        :supported-pids="supportedPids"
-        :commands="commands"
-        :transport-choice="transportChoice"
-        @back-to-connection="activeView = 'connection'"
-        @start-telemetry="startTelemetry"
-        @stop-telemetry="stopTelemetry"
-        @send-command="sendCommand"
-        @run-queue-test="runQueueTest"
-      />
-
-      <LogView
-        v-else
-        :events="sessionEvents"
-        :dropped-events="droppedEvents"
-        :truncated="logTruncated"
-        @export="downloadSessionLog"
-        @clear="clearLog"
-      />
-    </UContainer>
-
-    <nav
-      class="fixed inset-x-0 bottom-0 z-40 border-t border-default bg-default/95 pb-[env(safe-area-inset-bottom)] backdrop-blur"
-      aria-label="Navegación principal del laboratorio"
-    >
-      <UContainer class="max-w-md p-2">
-        <div class="grid grid-cols-3 gap-2">
-          <UButton
-            v-for="view in mobileViews"
-            :key="view.value"
-            :color="activeView === view.value ? 'primary' : 'neutral'"
-            :variant="activeView === view.value ? 'soft' : 'ghost'"
-            :icon="view.icon"
-            size="lg"
-            class="min-h-14 flex-col justify-center gap-1 px-2 text-xs"
-            :aria-current="activeView === view.value ? 'page' : undefined"
-            @click="activeView = view.value"
+          <UBadge
+            :color="sessionBadgeColor"
+            variant="subtle"
+            class="shrink-0"
           >
-            {{ view.label }}
-          </UButton>
+            {{ sessionStateLabel }}
+          </UBadge>
         </div>
+
+        <ConnectionView
+          v-if="activeView === 'connection'"
+          v-model:transport-choice="transportChoice"
+          :session-state="sessionState"
+          :session-state-label="sessionStateLabel"
+          :transport-state="transportState"
+          :transport-error="transportError"
+          :replay-filename="replayFilename"
+          :replay-import-error="replayImportError"
+          :session-busy="sessionBusy"
+          :session-badge-color="sessionBadgeColor"
+          @select-device="selectDevice"
+          @connect="connect"
+          @disconnect="disconnect"
+          @import-replay="importReplayFile"
+        />
+
+        <DataView
+          v-else-if="activeView === 'data'"
+          v-model:selected-command="selectedCommand"
+          :session-state="sessionState"
+          :telemetry-running="telemetryRunning"
+          :engine-rpm-metric="engineRpmMetric"
+          :vehicle-speed-metric="vehicleSpeedMetric"
+          :coolant-temperature-metric="coolantTemperatureMetric"
+          :engine-load-metric="engineLoadMetric"
+          :throttle-position-metric="throttlePositionMetric"
+          :supported-pids="supportedPids"
+          :commands="commands"
+          :transport-choice="transportChoice"
+          @back-to-connection="activeView = 'connection'"
+          @start-telemetry="startTelemetry"
+          @stop-telemetry="stopTelemetry"
+          @send-command="sendCommand"
+          @run-queue-test="runQueueTest"
+        />
+
+        <LogView
+          v-else
+          :events="sessionEvents"
+          :dropped-events="droppedEvents"
+          :truncated="logTruncated"
+          @export="downloadSessionLog"
+          @clear="clearLog"
+        />
       </UContainer>
-    </nav>
+    </div>
+
+    <BottomTabBar
+      :views="labViews"
+      :active="activeView"
+      @select="setActiveView"
+    />
   </main>
 </template>

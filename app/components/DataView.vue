@@ -121,7 +121,7 @@ const emit = defineEmits<{
         </div>
       </UCard>
 
-      <div class="grid grid-cols-2 gap-3">
+      <div class="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
         <UCard>
           <div class="flex min-h-36 flex-col justify-between gap-3">
             <div class="flex items-center justify-between">
