@@ -34,7 +34,10 @@ export default defineNuxtConfig({
   icon: {
     provider: 'none',
     clientBundle: {
-      scan: true
+      scan: true,
+      // labNav.ts binds these dynamically (:icon="view.icon"), so the
+      // template scanner can't detect them statically — list explicitly.
+      icons: ['lucide:plug-zap', 'lucide:gauge', 'lucide:scroll-text']
     }
   }
 })
