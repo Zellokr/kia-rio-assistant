@@ -67,6 +67,19 @@ describe('OBD laboratory visual shell', () => {
     expect(cssSource).toContain('--color-terminal-foreground:')
   })
 
+  it('reacts to an unexpected transport drop instead of showing a stale ready badge', () => {
+    const shellSource = readProjectFile('app/pages/lab/index.vue')
+
+    // The page must observe raw transport state, not only its own operations.
+    expect(shellSource).toContain('transport.subscribeState(')
+    expect(shellSource).toContain('isObdTransportUnavailable')
+    // An unexpected loss while connected must fail the session and stop polling.
+    expect(shellSource).toContain('sessionState.value !== \'ready\'')
+    expect(shellSource).toContain('failSession()')
+    // The subscription must be released when the transport is swapped/unmounted.
+    expect(shellSource).toContain('unsubscribeTransportState()')
+  })
+
   it('exposes a visible keyboard focus ring and current-page state on both navs', () => {
     const navRailSource = readProjectFile('app/components/NavRail.vue')
     const bottomTabSource = readProjectFile('app/components/BottomTabBar.vue')

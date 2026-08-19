@@ -39,9 +39,11 @@ import {
 import type {
   ObdErrorPhase
 } from '~~/core/obd/logging/ObdSessionLog'
+import { isObdTransportUnavailable } from '~~/core/obd/transport/ObdTransport'
 import type {
   ObdTransport,
-  ObdTransportMetadata
+  ObdTransportMetadata,
+  ObdTransportState
 } from '~~/core/obd/transport/ObdTransport'
 import { labViews } from '~/utils/labNav'
 import type { LabViewId } from '~/utils/labNav'
@@ -189,6 +191,35 @@ const sessionBadgeColor = computed(() => {
 let unsubscribePollResult = () => {}
 let unsubscribePollError = () => {}
 let unsubscribePollHalt = () => {}
+let unsubscribeTransportState = () => {}
+
+/**
+ * Reacts to an unexpected transport drop (e.g. a lost Bluetooth link) while
+ * the session sits connected. Our own disconnect() has already left 'ready'
+ * before it stops the transport, and connect()/select() failures are handled
+ * by their awaited catch, so gating on 'ready' targets only the uncovered
+ * case: the link dies while idle-connected or mid-telemetry.
+ */
+function handleTransportStateChange(state: ObdTransportState): void {
+  transportState.value = transport.state
+
+  if (
+    !isObdTransportUnavailable(state)
+    || sessionState.value !== 'ready'
+  ) {
+    return
+  }
+
+  stopTelemetry()
+  clearTelemetryState()
+  supportedPids.value = []
+  failSession()
+
+  recordError(
+    new Error('Transport link lost unexpectedly'),
+    'disconnect'
+  )
+}
 
 function attachPollObservers(): void {
   unsubscribePollResult = pollScheduler.onResult(({ result }) => {
@@ -241,6 +272,10 @@ function attachPollObservers(): void {
       state: 'stopped'
     })
   })
+
+  unsubscribeTransportState = transport.subscribeState(
+    handleTransportStateChange
+  )
 }
 
 attachPollObservers()
@@ -250,6 +285,7 @@ function replaceTransport(next: ObdTransport): void {
   unsubscribePollResult()
   unsubscribePollError()
   unsubscribePollHalt()
+  unsubscribeTransportState()
   executor.dispose()
 
   transport = next
@@ -727,6 +763,7 @@ onBeforeUnmount(() => {
   unsubscribePollResult()
   unsubscribePollError()
   unsubscribePollHalt()
+  unsubscribeTransportState()
 
   executor.dispose()
 
