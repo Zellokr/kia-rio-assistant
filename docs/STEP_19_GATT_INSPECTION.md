@@ -56,7 +56,9 @@ Provide:
 - Confirmation that **Desconectar** completed.
 
 Do not send an OBD command yet. The inventory must be reviewed before a BLE
-transport is designed or connected to the ELM command pipeline.
+transport is designed or connected to the ELM command pipeline. Review the
+copied JSON against the schema and objective pass/fail checklist in
+[GATT_INVENTORY_SCHEMA.md](GATT_INVENTORY_SCHEMA.md).
 
 ## Stop conditions
 
