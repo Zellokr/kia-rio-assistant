@@ -136,4 +136,71 @@ describe('ElmPromptParser', () => {
     expect(result[0]?.normalizedText)
       .toBe('41 0C 1A F8')
   })
+
+  it('reconstructs a full response delivered one byte at a time', () => {
+    const parser = new ElmPromptParser()
+    const bytes = encoder.encode('41 00 BE 3F A8 13\r>')
+
+    let responses: ReturnType<ElmPromptParser['push']> = []
+
+    for (const byte of bytes) {
+      responses = parser.push(Uint8Array.of(byte))
+    }
+
+    expect(responses).toHaveLength(1)
+
+    expect(responses[0]?.normalizedText)
+      .toBe('41 00 BE 3F A8 13')
+
+    expect(parser.getPendingBuffer()).toBe('')
+  })
+
+  it('completes the frame when the prompt arrives alone in its own chunk', () => {
+    const parser = new ElmPromptParser()
+
+    expect(
+      parser.push(encoder.encode('41 05 5A\r'))
+    ).toEqual([])
+
+    const result = parser.push(encoder.encode('>'))
+
+    expect(result).toHaveLength(1)
+
+    expect(result[0]?.normalizedText)
+      .toBe('41 05 5A')
+  })
+
+  it('drops NUL bytes fragmented into the middle of the stream', () => {
+    const parser = new ElmPromptParser()
+
+    expect(
+      parser.push(encoder.encode('41 05'))
+    ).toEqual([])
+
+    // Marginal BLE link injects a NUL byte between chunks.
+    expect(
+      parser.push(Uint8Array.of(0x00))
+    ).toEqual([])
+
+    const result = parser.push(encoder.encode(' 5A\r>'))
+
+    expect(result).toHaveLength(1)
+
+    expect(result[0]?.normalizedText)
+      .toBe('41 05 5A')
+  })
+
+  it('strips the ATZ banner NUL padding but keeps the version line', () => {
+    const parser = new ElmPromptParser()
+
+    const result = parser.push(
+      encoder.encode('ATZ\r\r\x00ELM327 v1.5\r\x00>'),
+      'ATZ'
+    )
+
+    expect(result).toHaveLength(1)
+
+    expect(result[0]?.normalizedText)
+      .toBe('ELM327 v1.5')
+  })
 })

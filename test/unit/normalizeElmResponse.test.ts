@@ -80,4 +80,34 @@ describe('normalizeElmResponse', () => {
       normalizeElmResponse('41 0C\r\r\n\n1A F8')
     ).toBe('41 0C 1A F8')
   })
+
+  it('strips a trailing NUL byte emitted by a marginal adapter', () => {
+    expect(
+      normalizeElmResponse('41 05 5A\x00')
+    ).toBe('41 05 5A')
+  })
+
+  it('strips NUL padding around a noisy ATZ reset banner', () => {
+    expect(
+      normalizeElmResponse('ATZ\r\r\x00ELM327 v1.5\r', { echoCommand: 'ATZ' })
+    ).toBe('ELM327 v1.5')
+  })
+
+  it('strips leading NUL bytes before the payload', () => {
+    expect(
+      normalizeElmResponse('\x00\x00ELM327 v1.5')
+    ).toBe('ELM327 v1.5')
+  })
+
+  it('strips trailing BEL and DEL control bytes while keeping the hex payload', () => {
+    expect(
+      normalizeElmResponse('41 05 5A\x07\x7f')
+    ).toBe('41 05 5A')
+  })
+
+  it('drops a frame that is only control-byte noise', () => {
+    expect(
+      normalizeElmResponse('\x00\x01\x02')
+    ).toBe('')
+  })
 })
