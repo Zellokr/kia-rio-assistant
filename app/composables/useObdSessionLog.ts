@@ -141,7 +141,11 @@ export function useObdSessionLog(log: ObdSessionLog) {
     anchor.href = url
     anchor.download = createFilename(session)
     anchor.click()
-    URL.revokeObjectURL(url)
+
+    // Revoke on the next macrotask, not synchronously: a large session export
+    // may still be streaming to disk when click() returns, and revoking the
+    // object URL immediately can truncate or cancel the download.
+    setTimeout(() => URL.revokeObjectURL(url), 0)
   }
 
   return {
