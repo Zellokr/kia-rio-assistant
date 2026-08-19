@@ -89,6 +89,10 @@ class FakePort implements WebSerialPort {
 
   readonly openCalls: unknown[] = []
 
+  readonly pendingOpens: Array<Deferred<void>> = []
+
+  blockOpen = false
+
   closeCalls = 0
 
   getReaderCalls = 0
@@ -115,6 +119,13 @@ class FakePort implements WebSerialPort {
 
   async open(options: unknown): Promise<void> {
     this.openCalls.push(options)
+
+    if (this.blockOpen) {
+      const deferred = new Deferred<void>()
+
+      this.pendingOpens.push(deferred)
+      await deferred.promise
+    }
   }
 
   async close(): Promise<void> {
@@ -347,6 +358,72 @@ describe('WebSerialRfcommTransport', () => {
     expect(provider.requestCalls).toBe(1)
     expect(port.openCalls).toHaveLength(2)
     expect(transport.state).toBe('connected')
+  })
+
+  it('rejects connecting before an adapter is selected', async () => {
+    const { transport } = connectedTransport()
+
+    await expect(transport.connect()).rejects.toThrow(
+      'Select a Web Serial adapter before connecting'
+    )
+    expect(transport.state).toBe('idle')
+  })
+
+  it('rejects selecting another adapter while one is connected', async () => {
+    const { transport } = connectedTransport()
+
+    await transport.select()
+    await transport.connect()
+
+    await expect(transport.select()).rejects.toThrow(
+      'Disconnect the current Web Serial port before selecting another'
+    )
+    expect(transport.state).toBe('connected')
+  })
+
+  it('rejects a second connect while the first is still opening the port', async () => {
+    const { port, transport } = connectedTransport()
+
+    await transport.select()
+    port.blockOpen = true
+
+    const first = transport.connect()
+
+    await vi.waitFor(() => {
+      expect(transport.state).toBe('connecting')
+    })
+
+    await expect(transport.connect()).rejects.toThrow(
+      'Web Serial transport must be selected before connecting'
+    )
+
+    port.pendingOpens[0]?.resolve()
+    await expect(first).resolves.toMatchObject({
+      kind: 'web-serial-rfcomm'
+    })
+    expect(port.openCalls).toHaveLength(1)
+  })
+
+  it('lets a disconnect requested during an in-flight connect settle to disconnected', async () => {
+    const { port, transport } = connectedTransport()
+
+    await transport.select()
+    port.blockOpen = true
+
+    const connecting = transport.connect()
+
+    await vi.waitFor(() => {
+      expect(transport.state).toBe('connecting')
+    })
+
+    const disconnecting = transport.disconnect()
+
+    port.pendingOpens[0]?.resolve()
+
+    await connecting.catch(() => undefined)
+    await disconnecting
+
+    expect(transport.state).toBe('disconnected')
   })
 
   it('feeds fragmented bytes through the unchanged ElmCommandExecutor', async () => {

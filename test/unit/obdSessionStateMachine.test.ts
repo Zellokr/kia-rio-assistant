@@ -59,4 +59,58 @@ describe('ObdSessionStateMachine', () => {
 
     expect(machine.state).toBe('selecting')
   })
+
+  it('rejects a double connect started before the first reaches ready', () => {
+    const machine = new ObdSessionStateMachine()
+
+    machine.transition('selecting')
+    machine.transition('selected')
+    machine.transition('connecting')
+
+    expect(() => {
+      machine.transition('connecting')
+    }).toThrow(
+      'Invalid OBD session transition: connecting -> connecting'
+    )
+  })
+
+  it('rejects reconnecting from ready without disconnecting first', () => {
+    const machine = new ObdSessionStateMachine()
+
+    machine.transition('selecting')
+    machine.transition('selected')
+    machine.transition('connecting')
+    machine.transition('initializing')
+    machine.transition('discovering')
+    machine.transition('ready')
+
+    expect(() => {
+      machine.transition('connecting')
+    }).toThrow(
+      'Invalid OBD session transition: ready -> connecting'
+    )
+  })
+
+  it('allows disconnecting a selected adapter before a connection begins', () => {
+    const machine = new ObdSessionStateMachine()
+
+    machine.transition('selecting')
+    machine.transition('selected')
+    machine.transition('disconnecting')
+    machine.transition('disconnected')
+
+    expect(machine.state).toBe('disconnected')
+  })
+
+  it('allows reconnecting straight from disconnected without reselecting', () => {
+    const machine = new ObdSessionStateMachine()
+
+    machine.transition('selecting')
+    machine.transition('selected')
+    machine.transition('disconnecting')
+    machine.transition('disconnected')
+    machine.transition('connecting')
+
+    expect(machine.state).toBe('connecting')
+  })
 })

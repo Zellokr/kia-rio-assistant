@@ -181,6 +181,19 @@ export class WebSerialRfcommTransport implements ObdTransport {
       })
       this.portOpen = true
 
+      // A disconnect requested while the port was opening (slow Bluetooth
+      // link) already moved us out of 'connecting'. Honour it instead of
+      // clobbering its terminal state with a phantom 'connected' session.
+      // The local annotation restores the full union: TS narrows this.state
+      // from the connect() guard and cannot see setState() mutate it.
+      const stateAfterOpen = this.state as ObdTransportState
+
+      if (stateAfterOpen !== 'connecting') {
+        throw new Error(
+          'Web Serial connect was cancelled by a concurrent disconnect'
+        )
+      }
+
       if (!this.port.readable || !this.port.writable) {
         throw new Error(
           'The selected serial port did not expose readable and writable streams'
@@ -194,7 +207,14 @@ export class WebSerialRfcommTransport implements ObdTransport {
 
       return this.metadata()
     } catch (error) {
-      this.setState('error')
+      // Preserve a concurrent disconnect's state; only a genuine connect
+      // failure (still 'connecting') escalates to 'error'.
+      const stateOnFailure = this.state as ObdTransportState
+
+      if (stateOnFailure === 'connecting') {
+        this.setState('error')
+      }
+
       await this.cleanupAfterConnectFailure()
       throw this.toError(error)
     }
