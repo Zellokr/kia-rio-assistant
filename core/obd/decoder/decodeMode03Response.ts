@@ -36,6 +36,22 @@ function decodeDtc(
   return `${system}${digit1}${digit2}${digit3}${digit4}`
 }
 
+/**
+ * Decodes a Mode 03 (stored DTCs) response.
+ *
+ * VALIDATED SCOPE: a single-frame SAE J1979 / ISO 15765-4 response, where up
+ * to three 2-byte DTC pairs follow 0x43 directly, unused slots padded with
+ * 0x00, and there is NO leading DTC-count byte. This matches the documented
+ * single-frame format and is exercised by the unit tests.
+ *
+ * NOT YET VALIDATED: multi-frame responses (more than three DTCs), where CAN
+ * ISO-TP framing and a possible DTC-count byte change the byte layout. Some
+ * stacks (e.g. python-OBD) strip a count byte after 0x43; whether the target
+ * adapter/vehicle emits one is unconfirmed until the physical Mode 03 check in
+ * docs/STEP_18_PHYSICAL_TEST.md is run with more than three stored codes. Do
+ * not widen this decoder to strip a count byte without that real evidence — it
+ * would corrupt the common single-frame case.
+ */
 export function decodeMode03Response(
   response: string
 ): DecodedDtcResult {

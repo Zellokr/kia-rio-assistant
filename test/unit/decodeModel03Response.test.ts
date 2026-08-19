@@ -76,4 +76,33 @@ describe('decodeMode03Response', () => {
       'P0420'
     ])
   })
+
+  // Regression lock for the validated envelope: a single-frame SAE J1979
+  // response carries up to three DTC pairs directly after 0x43, with no DTC
+  // count byte (per the ISO 15765-4 single-frame format). This is the exact
+  // worked example from the SAE J1979 Service 03 documentation.
+  it('decodes three DTCs from a single-frame response with no count byte', () => {
+    const result = decodeMode03Response(
+      '43 01 43 01 96 02 34'
+    )
+
+    expect(result.dtcs).toEqual([
+      'P0143',
+      'P0196',
+      'P0234'
+    ])
+  })
+
+  it('decodes a full type across P, C, B and U systems', () => {
+    const result = decodeMode03Response(
+      '43 03 00 43 00 83 00 C3 00'
+    )
+
+    expect(result.dtcs).toEqual([
+      'P0300',
+      'C0300',
+      'B0300',
+      'U0300'
+    ])
+  })
 })

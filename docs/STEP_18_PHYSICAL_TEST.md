@@ -36,6 +36,12 @@ y [serial Bluetooth RFCOMM en Chrome](https://developer.chrome.com/blog/serial-o
    inicialización ELM327 y el descubrimiento de PIDs.
 5. Con la sesión en `ready`, prueba solo lecturas permitidas: `010C`, `0105` y
    `03`. No uses Mode 04, borrado de DTC, codificación ni adaptación.
+   - **Validación pendiente de Mode 03 multi-trama:** el decoder de DTC solo
+     está validado para una respuesta de una sola trama con hasta tres códigos
+     y sin byte de conteo. Si el vehículo tiene más de tres DTC almacenados,
+     guarda la respuesta `03` sin editar (todas las líneas) y compárala con los
+     códigos que muestre una herramienta de referencia. Confirma si tras `43`
+     aparece un byte de conteo o framing ISO-TP antes de fiarte de la salida.
 6. Inicia telemetría durante un intervalo corto. Comprueba que los valores y
    latencias se actualizan sin bloquear la interfaz.
 7. Detén la telemetría, pulsa **Desconectar** y confirma `disconnected`.
