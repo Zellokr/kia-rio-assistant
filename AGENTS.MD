@@ -22,7 +22,6 @@ dashboard definitivo.
 - Vue 3
 - TypeScript estricto
 - Vitest
-- Playwright
 
 ## Reglas no negociables
 
