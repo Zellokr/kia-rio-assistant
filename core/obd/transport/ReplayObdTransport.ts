@@ -63,6 +63,22 @@ function requireString(
   return value
 }
 
+/**
+ * Validates recorded rx-chunk payloads. Unlike identifiers, a byte-at-a-time
+ * BLE stream legitimately delivers a lone whitespace byte (0x20) or a control
+ * byte as its own chunk, so only a truly empty string is rejected here.
+ */
+function requireRawText(
+  value: unknown,
+  path: string
+): string {
+  if (typeof value !== 'string' || value.length === 0) {
+    fail(path, 'must be a non-empty string')
+  }
+
+  return value
+}
+
 function requireNonNegativeNumber(
   value: unknown,
   path: string
@@ -132,7 +148,7 @@ function parseEvents(value: unknown): ReplayEvent[] {
       )
     }
     if (candidate.rawText !== undefined) {
-      event.rawText = requireString(
+      event.rawText = requireRawText(
         candidate.rawText,
         `${path}.rawText`
       )
@@ -231,7 +247,7 @@ export function buildReplayTranscript(
       }
 
       if (event.type === 'rx-chunk') {
-        const rawText = requireString(
+        const rawText = requireRawText(
           event.rawText,
           `events[${cursor}].rawText`
         )
