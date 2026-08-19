@@ -582,6 +582,16 @@ async function connect() {
 
     supportedPids.value = discovery.pids
 
+    if (discovery.decodeError) {
+      recordError(
+        new Error(
+          `Supported PID discovery stopped: ${discovery.decodeError.message}`
+        ),
+        'decode',
+        discovery.decodeError.command
+      )
+    }
+
     for (const range of discovery.ranges) {
       sessionLog.record({
         type: 'capability-discovery',

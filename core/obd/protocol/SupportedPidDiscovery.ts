@@ -22,6 +22,15 @@ export interface SupportedPidRange {
 export interface SupportedPidDiscoveryResult {
   pids: string[]
   ranges: SupportedPidRange[]
+  /**
+   * Present when a capability frame could not be decoded (a truncated or
+   * garbled response from a marginal link). Discovery stops at that range and
+   * returns what it already gathered instead of aborting the whole session.
+   */
+  decodeError?: {
+    command: string
+    message: string
+  }
 }
 
 export interface DiscoverSupportedPidsOptions {
@@ -83,9 +92,27 @@ export async function discoverSupportedPids(
       throw error
     }
 
-    const decoded = decodeSupportedPids(
-      response.normalizedText
-    )
+    let decoded
+
+    try {
+      decoded = decodeSupportedPids(
+        response.normalizedText
+      )
+    } catch (error) {
+      // A garbled or truncated capability frame must not abort the whole
+      // connect. Stop discovery and report what was already gathered so the
+      // session can still reach ready for manual reads and DTCs.
+      return {
+        pids: [...allPids],
+        ranges,
+        decodeError: {
+          command,
+          message: error instanceof Error
+            ? error.message
+            : String(error)
+        }
+      }
+    }
 
     for (const pid of decoded.pids) {
       allPids.add(pid)
