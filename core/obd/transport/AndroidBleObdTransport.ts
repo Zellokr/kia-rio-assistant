@@ -106,6 +106,18 @@ export class AndroidBleObdTransport implements ObdTransport {
         profile
       })
 
+      // A disconnect requested while the BLE link was opening (pairing + GATT
+      // discovery are slow) already moved us out of 'connecting'. Honour it
+      // instead of resurrecting a phantom 'connected' session with a live
+      // bridge subscription.
+      const stateAfterConnect = this.state as ObdTransportState
+
+      if (stateAfterConnect !== 'connecting') {
+        throw new Error(
+          'Android BLE connect was cancelled by a concurrent disconnect'
+        )
+      }
+
       this.unsubscribeBridge?.()
       this.unsubscribeBridge = this.bridge.subscribe((chunk) => {
         if (this.state !== 'connected') {
@@ -119,7 +131,14 @@ export class AndroidBleObdTransport implements ObdTransport {
 
       return this.metadata()
     } catch (error) {
-      this.setState('error')
+      // Preserve a concurrent disconnect's terminal state; only a genuine
+      // connect failure (still 'connecting') escalates to 'error'.
+      const stateOnFailure = this.state as ObdTransportState
+
+      if (stateOnFailure === 'connecting') {
+        this.setState('error')
+      }
+
       await this.cleanupBridgeSubscription()
       throw this.toError(error)
     }

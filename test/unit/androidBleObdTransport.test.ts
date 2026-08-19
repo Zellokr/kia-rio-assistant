@@ -14,6 +14,21 @@ import type {
 import { ElmCommandExecutor } from '../../core/obd/protocol/ElmCommandExecutor'
 import { AndroidBleObdTransport } from '../../core/obd/transport/AndroidBleObdTransport'
 
+class Deferred<T> {
+  readonly promise: Promise<T>
+
+  resolve!: (value: T) => void
+
+  reject!: (reason: unknown) => void
+
+  constructor() {
+    this.promise = new Promise<T>((resolve, reject) => {
+      this.resolve = resolve
+      this.reject = reject
+    })
+  }
+}
+
 /** Synthetic UUIDs for unit tests only — not VEEPEAK inventory values. */
 const SYNTHETIC_PROFILE: AndroidBleProfile = {
   serviceUuid: '0000fff0-0000-1000-8000-00805f9b34fb',
@@ -37,6 +52,10 @@ class FakeAndroidBleBridge implements AndroidBleBridge {
 
   requestCalls = 0
 
+  blockConnect = false
+
+  readonly pendingConnects: Array<Deferred<void>> = []
+
   private readonly listeners = new Set<
     (data: Uint8Array) => void
   >()
@@ -54,6 +73,14 @@ class FakeAndroidBleBridge implements AndroidBleBridge {
 
   async connect(options: AndroidBleConnectOptions): Promise<void> {
     this.connectCalls.push(options)
+
+    if (this.blockConnect) {
+      const deferred = new Deferred<void>()
+
+      this.pendingConnects.push(deferred)
+      await deferred.promise
+    }
+
     this.connected = true
   }
 
@@ -213,6 +240,36 @@ describe('AndroidBleObdTransport', () => {
     expect(bridge.connectCalls).toHaveLength(2)
     expect(bridge.writes).toHaveLength(2)
     expect(transport.state).toBe('connected')
+  })
+
+  it('honors a disconnect requested during an in-flight BLE connect', async () => {
+    const { bridge, transport } = createTransport()
+
+    await transport.select()
+    bridge.blockConnect = true
+
+    const connecting = transport.connect()
+
+    await vi.waitFor(() => {
+      expect(transport.state).toBe('connecting')
+    })
+
+    // Let the disconnect fully complete while the connect is still blocked,
+    // so resuming the connect afterwards must not resurrect the session.
+    await transport.disconnect()
+    expect(transport.state).toBe('disconnected')
+
+    bridge.pendingConnects[0]?.resolve()
+    await connecting.catch(() => undefined)
+
+    // The late connect must not clobber the disconnect into a phantom session.
+    expect(transport.state).toBe('disconnected')
+
+    // And it must not have left a live bridge subscription behind.
+    const chunks: string[] = []
+    transport.subscribe(chunk => chunks.push(new TextDecoder().decode(chunk)))
+    bridge.emit('41 0C 1A F8\r>')
+    expect(chunks).toEqual([])
   })
 
   it('rejects in-flight executor commands immediately when the transport disconnects', async () => {
