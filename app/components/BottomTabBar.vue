@@ -25,7 +25,7 @@ const emit = defineEmits<{
           :variant="active === view.value ? 'soft' : 'ghost'"
           :icon="view.icon"
           size="lg"
-          class="min-h-14 flex-col justify-center gap-1 px-2 text-xs"
+          class="min-h-14 flex-col justify-center gap-1 px-2 text-xs focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset"
           :aria-current="active === view.value ? 'page' : undefined"
           @click="emit('select', view.value)"
         >

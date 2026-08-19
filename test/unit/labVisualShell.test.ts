@@ -67,6 +67,20 @@ describe('OBD laboratory visual shell', () => {
     expect(cssSource).toContain('--color-terminal-foreground:')
   })
 
+  it('exposes a visible keyboard focus ring and current-page state on both navs', () => {
+    const navRailSource = readProjectFile('app/components/NavRail.vue')
+    const bottomTabSource = readProjectFile('app/components/BottomTabBar.vue')
+
+    for (const source of [navRailSource, bottomTabSource]) {
+      // Keyboard focus must stay obvious for a glance-and-go, engine-on read.
+      expect(source).toContain('focus-visible:ring-2')
+      expect(source).toContain('focus-visible:ring-primary')
+      // Screen readers must know which destination is active.
+      expect(source).toContain('aria-current')
+      expect(source).toContain('aria-label')
+    }
+  })
+
   it('uses three focused mobile destinations without losing the active session', () => {
     const shellSource = readProjectFile('app/pages/lab/index.vue')
     const navConfigSource = readProjectFile('app/utils/labNav.ts')
