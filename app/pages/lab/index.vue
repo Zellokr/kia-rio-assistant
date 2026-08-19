@@ -50,6 +50,10 @@ definePageMeta({
   alias: ['/']
 })
 
+// A dropped adapter makes every poll reject; halt telemetry after this many
+// consecutive failures instead of flooding the log until the user reacts.
+const MAX_CONSECUTIVE_POLL_ERRORS = 5
+
 let transport: ObdTransport = new MockObdTransport()
 const sessionLog = new ObdSessionLog({
   transport: { kind: transport.kind }
@@ -59,7 +63,10 @@ let executor = new ElmCommandExecutor(
   event => sessionLog.record(event)
 )
 const session = new ObdSessionStateMachine()
-let pollScheduler = new ObdPollScheduler(executor)
+let pollScheduler = new ObdPollScheduler(
+  executor,
+  { maxConsecutiveErrors: MAX_CONSECUTIVE_POLL_ERRORS }
+)
 const supportedPids = ref<string[]>([])
 const telemetryRunning = ref(false)
 const sessionState = ref(session.state)
@@ -181,6 +188,7 @@ const sessionBadgeColor = computed(() => {
 
 let unsubscribePollResult = () => {}
 let unsubscribePollError = () => {}
+let unsubscribePollHalt = () => {}
 
 function attachPollObservers(): void {
   unsubscribePollResult = pollScheduler.onResult(({ result }) => {
@@ -216,6 +224,23 @@ function attachPollObservers(): void {
   unsubscribePollError = pollScheduler.onError(({ task, error }) => {
     recordError(error, 'poll', task.command)
   })
+
+  unsubscribePollHalt = pollScheduler.onHalt(({ task }) => {
+    // The scheduler already stopped itself; reflect the lost link in the UI
+    // and seal the telemetry run so it does not look like it is still polling.
+    telemetryRunning.value = false
+
+    recordError(
+      new Error('Telemetry stopped after repeated poll failures'),
+      'poll',
+      task.command
+    )
+
+    sessionLog.record({
+      type: 'telemetry-state',
+      state: 'stopped'
+    })
+  })
 }
 
 attachPollObservers()
@@ -224,6 +249,7 @@ function replaceTransport(next: ObdTransport): void {
   pollScheduler.stop()
   unsubscribePollResult()
   unsubscribePollError()
+  unsubscribePollHalt()
   executor.dispose()
 
   transport = next
@@ -231,7 +257,10 @@ function replaceTransport(next: ObdTransport): void {
     transport,
     event => sessionLog.record(event)
   )
-  pollScheduler = new ObdPollScheduler(executor)
+  pollScheduler = new ObdPollScheduler(
+    executor,
+    { maxConsecutiveErrors: MAX_CONSECUTIVE_POLL_ERRORS }
+  )
   attachPollObservers()
   transportState.value = transport.state
 }
@@ -697,6 +726,7 @@ onBeforeUnmount(() => {
 
   unsubscribePollResult()
   unsubscribePollError()
+  unsubscribePollHalt()
 
   executor.dispose()
 

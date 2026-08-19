@@ -31,6 +31,17 @@ interface ScheduledTask {
   nextRunAt: number
 }
 
+export interface ObdPollSchedulerOptions {
+  /**
+   * Stops the loop after this many consecutive failed polls and notifies
+   * `onHalt`. A real BLE adapter drop otherwise makes every poll reject, and
+   * without a limit the scheduler would flood error listeners forever. A
+   * successful poll resets the streak. Omitted means unlimited (legacy
+   * behavior).
+   */
+  maxConsecutiveErrors?: number
+}
+
 export class ObdPollScheduler {
   private readonly tasks = new Map<
     string,
@@ -45,11 +56,31 @@ export class ObdPollScheduler {
     (event: ObdPollError) => void
   >()
 
+  private readonly haltListeners = new Set<
+    (event: ObdPollError) => void
+  >()
+
   private running = false
   private generation = 0
+  private consecutiveErrors = 0
+  private readonly maxConsecutiveErrors?: number
+
   constructor(
-    private readonly executor: ObdPollExecutor
-  ) {}
+    private readonly executor: ObdPollExecutor,
+    options: ObdPollSchedulerOptions = {}
+  ) {
+    const limit = options.maxConsecutiveErrors
+
+    if (limit !== undefined) {
+      if (!Number.isInteger(limit) || limit <= 0) {
+        throw new Error(
+          'maxConsecutiveErrors must be a positive integer'
+        )
+      }
+
+      this.maxConsecutiveErrors = limit
+    }
+  }
 
   addTask(task: ObdPollTask): void {
     if (task.intervalMs <= 0) {
@@ -79,6 +110,7 @@ export class ObdPollScheduler {
 
     this.running = true
     this.generation++
+    this.consecutiveErrors = 0
 
     const generation = this.generation
     const now = Date.now()
@@ -120,6 +152,21 @@ export class ObdPollScheduler {
 
     return () => {
       this.errorListeners.delete(listener)
+    }
+  }
+
+  /**
+   * Fires once when the consecutive-failure limit stops the loop, carrying the
+   * failure that tripped it. Lets the UI reflect the lost link (stop telemetry,
+   * surface the error) instead of silently going quiet.
+   */
+  onHalt(
+    listener: (event: ObdPollError) => void
+  ): () => void {
+    this.haltListeners.add(listener)
+
+    return () => {
+      this.haltListeners.delete(listener)
     }
   }
 
@@ -187,6 +234,8 @@ export class ObdPollScheduler {
         return
       }
 
+      this.consecutiveErrors = 0
+
       for (const listener of this.resultListeners) {
         listener({
           task,
@@ -207,12 +256,23 @@ export class ObdPollScheduler {
         = error instanceof Error
           ? error
           : new Error(String(error))
+      const event: ObdPollError = {
+        task,
+        error: normalizedError
+      }
 
       for (const listener of this.errorListeners) {
-        listener({
-          task,
-          error: normalizedError
-        })
+        listener(event)
+      }
+
+      this.consecutiveErrors++
+
+      if (
+        this.maxConsecutiveErrors !== undefined
+        && this.consecutiveErrors >= this.maxConsecutiveErrors
+      ) {
+        this.haltAfterFailures(event)
+        return
       }
     } finally {
       if (
@@ -222,6 +282,15 @@ export class ObdPollScheduler {
         scheduled.nextRunAt
           = Date.now() + task.intervalMs
       }
+    }
+  }
+
+  private haltAfterFailures(event: ObdPollError): void {
+    this.running = false
+    this.generation++
+
+    for (const listener of this.haltListeners) {
+      listener(event)
     }
   }
 
