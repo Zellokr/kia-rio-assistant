@@ -9,8 +9,11 @@ It is **not** a claim that VEEPEAK BLE OBD works in the app today.
 
 - Contract + unit tests with a **fake native bridge**: implemented.
 - Real native UUID wiring, characteristic writes, and notifications:
-  **blocked** until a Step 19 GATT inventory is captured and reviewed.
-- Physical validation against a vehicle: **NOT RUN**.
+  implemented in `BleObdBridgePlugin` and confirmed on hardware (2026-08-24).
+  An ATZ round trip over the reviewed profile answered `ELM327 v2.2`.
+- Physical validation **against a vehicle**: still **NOT RUN**. ATZ is answered
+  by the ELM327 chip and never reaches the bus, so a working byte pipe is not
+  evidence that any vehicle communication works.
 
 ## Layers
 

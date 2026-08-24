@@ -4,7 +4,11 @@ This first Capacitor Android slice discovers only the BLE structure advertised
 by the VEEPEAK. It does **not** read or write characteristic values, subscribe
 to notifications, send ELM commands, or use `ObdTransport`.
 
-Physical inspection status: **NOT RUN**.
+Physical inspection status: **COMPLETE** (2026-08-24, Google Pixel 9A /
+Android 17). The captured inventory was reviewed against
+[GATT_INVENTORY_SCHEMA.md](GATT_INVENTORY_SCHEMA.md) and the resulting serial
+pipe was confirmed by an ATZ round trip answering `ELM327 v2.2`. Re-run this
+procedure for any other adapter, or after a firmware change.
 
 ## Prepare the Android build
 

@@ -60,8 +60,15 @@ describe('VEEPEAK_BLE_PROFILE', () => {
   it('records the capture this profile was reviewed from', () => {
     expect(VEEPEAK_INVENTORY_PROVENANCE).toMatchObject({
       capturedOn: '2026-08-24',
-      advertisedName: 'VEEPEAK',
-      roundTripConfirmed: false
+      advertisedName: 'VEEPEAK'
+    })
+  })
+
+  it('records the ATZ round trip that proved the pipe', () => {
+    expect(VEEPEAK_INVENTORY_PROVENANCE).toMatchObject({
+      roundTripConfirmed: true,
+      confirmedOn: '2026-08-24',
+      adapterFirmware: 'ELM327 v2.2'
     })
   })
 })

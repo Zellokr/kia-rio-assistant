@@ -4,21 +4,26 @@ import type { AndroidBleProfile } from '~~/core/bluetooth/AndroidBleBridge'
  * Where this profile comes from, so a reader never has to guess whether the
  * UUIDs below were reviewed or invented.
  *
- * `roundTripConfirmed` stays false until a real ATZ write is answered by the
- * adapter over the notify channel. Reviewed is not the same as proven.
+ * `roundTripConfirmed` means an ATZ written to the TX characteristic came back
+ * over the notify characteristic. It says nothing about vehicle communication:
+ * ATZ is answered by the ELM327 chip and never reaches the bus.
  */
 export interface VeepeakInventoryProvenance {
   capturedOn: string
   advertisedName: string
   capturedWith: string
   roundTripConfirmed: boolean
+  confirmedOn?: string
+  adapterFirmware?: string
 }
 
 export const VEEPEAK_INVENTORY_PROVENANCE: VeepeakInventoryProvenance = {
   capturedOn: '2026-08-24',
   advertisedName: 'VEEPEAK',
   capturedWith: 'Google Pixel 9A, Android 17',
-  roundTripConfirmed: false
+  roundTripConfirmed: true,
+  confirmedOn: '2026-08-24',
+  adapterFirmware: 'ELM327 v2.2'
 }
 
 /**
@@ -36,6 +41,9 @@ export const VEEPEAK_INVENTORY_PROVENANCE: VeepeakInventoryProvenance = {
  *    cannot be the command channel.
  * 2. An independent ELM327-over-BLE implementation documents this exact
  *    triple as its Veepeak "Variant B".
+ * 3. A physical ATZ round trip on 2026-08-24 answered `ELM327 v2.2` over the
+ *    notify channel, which also settled the open write-type question: the
+ *    adapter accepts acknowledged writes on `fff2`.
  *
  * Rejected during review, and why:
  *
