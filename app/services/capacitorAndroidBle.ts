@@ -1,38 +1,80 @@
 import {
-  Capacitor
+  Capacitor,
+  registerPlugin
 } from '@capacitor/core'
 import type {
-  AndroidBleBridge
+  AndroidBleBridge,
+  AndroidBleConnectOptions,
+  AndroidBleDevice
 } from '~~/core/bluetooth/AndroidBleBridge'
+import {
+  base64ToBytes,
+  bytesToBase64
+} from '~~/core/bluetooth/base64Bytes'
 
-const PENDING_INVENTORY_MESSAGE
-  = 'Android BLE OBD native bridge is not implemented yet. Capture and review a VEEPEAK GATT inventory (Step 19) before enabling real UUID, RX/TX, or notifications.'
+interface NativeBleObdBridgePlugin {
+  requestDevice(): Promise<AndroidBleDevice>
+  connect(options: {
+    deviceId: string
+    serviceUuid: string
+    writeCharacteristicUuid: string
+    notifyCharacteristicUuid: string
+  }): Promise<void>
+  write(options: { data: string }): Promise<void>
+  disconnect(): Promise<void>
+  addListener(
+    event: 'rx',
+    listener: (payload: { data: string }) => void
+  ): Promise<{ remove: () => Promise<void> }>
+}
+
+const NativeBleObdBridge
+  = registerPlugin<NativeBleObdBridgePlugin>('BleObdBridge')
 
 /**
- * Capacitor-facing stub for the Android BLE OBD bridge.
+ * Capacitor-facing Android BLE OBD bridge.
  *
- * `isSupported()` is true only on native Android so the contract surface can
- * be detected, but every I/O method throws until a real plugin exists after
- * Step 19 inventory review. Unit tests inject a fake bridge instead.
+ * The profile UUIDs are flattened here because Capacitor marshals plugin
+ * options as plain JSON; the native side re-validates that all three are
+ * present rather than trusting this layer.
  */
 export const capacitorAndroidBle: AndroidBleBridge = {
   isSupported: () => (
     Capacitor.isNativePlatform()
     && Capacitor.getPlatform() === 'android'
   ),
-  async requestDevice() {
-    throw new Error(PENDING_INVENTORY_MESSAGE)
-  },
-  async connect() {
-    throw new Error(PENDING_INVENTORY_MESSAGE)
+  requestDevice: () => NativeBleObdBridge.requestDevice(),
+  async connect(options: AndroidBleConnectOptions) {
+    await NativeBleObdBridge.connect({
+      deviceId: options.deviceId,
+      serviceUuid: options.profile.serviceUuid,
+      writeCharacteristicUuid: options.profile.writeCharacteristicUuid,
+      notifyCharacteristicUuid: options.profile.notifyCharacteristicUuid
+    })
   },
   async disconnect() {
-    throw new Error(PENDING_INVENTORY_MESSAGE)
+    await NativeBleObdBridge.disconnect()
   },
-  async write() {
-    throw new Error(PENDING_INVENTORY_MESSAGE)
+  async write(data: Uint8Array) {
+    await NativeBleObdBridge.write({ data: bytesToBase64(data) })
   },
-  subscribe() {
-    throw new Error(PENDING_INVENTORY_MESSAGE)
+  subscribe(listener: (data: Uint8Array) => void) {
+    // addListener resolves asynchronously but the transport contract is
+    // synchronous, so the handle is awaited inside the returned disposer. A
+    // disconnect that lands before registration completes must still remove
+    // the listener, otherwise a stale subscription survives the session.
+    let removed = false
+    const handle = NativeBleObdBridge.addListener('rx', (payload) => {
+      if (removed) {
+        return
+      }
+
+      listener(base64ToBytes(payload.data))
+    })
+
+    return () => {
+      removed = true
+      void handle.then(subscription => subscription.remove()).catch(() => undefined)
+    }
   }
 }
