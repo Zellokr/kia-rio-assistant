@@ -13,6 +13,26 @@ export interface ObdTransportMetadata {
   name?: string
 }
 
+/**
+ * Transports whose bytes reach real hardware.
+ *
+ * This is the single predicate every physical safety gate keys on: the command
+ * allowlist offered in the UI, the write guard, and physical-only telemetry
+ * tasks. Keeping it in one place is deliberate — the same check was previously
+ * spelled out at each call site, and one of them had already drifted out of
+ * sync with the others.
+ */
+export const PHYSICAL_TRANSPORT_KINDS = [
+  'web-serial-rfcomm',
+  'android-ble'
+] as const satisfies readonly ObdTransportMetadata['kind'][]
+
+export function isPhysicalTransportKind(
+  kind: ObdTransportMetadata['kind']
+): boolean {
+  return (PHYSICAL_TRANSPORT_KINDS as readonly string[]).includes(kind)
+}
+
 export interface ObdTransport {
   readonly kind: ObdTransportMetadata['kind']
   readonly state: ObdTransportState
