@@ -11,9 +11,16 @@ It is **not** a claim that VEEPEAK BLE OBD works in the app today.
 - Real native UUID wiring, characteristic writes, and notifications:
   implemented in `BleObdBridgePlugin` and confirmed on hardware (2026-08-24).
   An ATZ round trip over the reviewed profile answered `ELM327 v2.2`.
-- Physical validation **against a vehicle**: still **NOT RUN**. ATZ is answered
-  by the ELM327 chip and never reaches the bus, so a working byte pipe is not
-  evidence that any vehicle communication works.
+- Physical validation **against a vehicle**: **COMPLETE** (2026-08-24, Kia Rio
+  YB 2019 1.2 MPI, parked, engine idling). `ATSP0` negotiated automatically and
+  `0100` answered `4100BE3EB813` after one `SEARCHING...`, yielding 18 supported
+  PIDs in range 01-20. Live telemetry decoded `410C0C4C` -> 787 rpm and
+  `410571` -> 73 degrees C, both verified by hand against the OBD formulas.
+- Discovery stops at PID `0x20`. The `0100` bitmask sets PID 20, meaning the ECU
+  has further ranges, but `0120` is not in `PHYSICAL_ALLOWED_COMMANDS`, so
+  `discoverSupportedPids` catches `PhysicalCommandRejectedError` and ends the
+  loop cleanly. This is the read-only policy working as designed, not a defect.
+  Widening the range is a deliberate policy decision, never an incidental fix.
 
 ## Layers
 
