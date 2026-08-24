@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import type { ObdSessionState } from '~~/core/obd/session/ObdSessionStateMachine'
 import type { ObdTelemetryMetric } from '~~/core/obd/telemetry/ObdTelemetryStore'
+import { isPhysicalTransportKind } from '~~/core/obd/transport/ObdTransport'
 
-export type DataViewTransportChoice = 'mock' | 'replay' | 'web-serial-rfcomm'
+export type DataViewTransportChoice
+  = 'mock' | 'replay' | 'web-serial-rfcomm' | 'android-ble'
 
 defineProps<{
   sessionState: ObdSessionState
@@ -275,7 +277,7 @@ const emit = defineEmits<{
               Enviar
             </UButton>
             <UButton
-              v-if="transportChoice !== 'web-serial-rfcomm'"
+              v-if="!isPhysicalTransportKind(transportChoice)"
               color="warning"
               variant="soft"
               size="lg"

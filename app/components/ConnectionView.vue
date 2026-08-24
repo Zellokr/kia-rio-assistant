@@ -4,7 +4,8 @@ import { ref, watch } from 'vue'
 import type { ObdSessionState } from '~~/core/obd/session/ObdSessionStateMachine'
 import type { ObdTransportState } from '~~/core/obd/transport/ObdTransport'
 
-export type ConnectionTransportChoice = 'mock' | 'replay' | 'web-serial-rfcomm'
+export type ConnectionTransportChoice
+  = 'mock' | 'replay' | 'web-serial-rfcomm' | 'android-ble'
 
 export type ConnectionBadgeColor
   = | 'neutral'
@@ -133,6 +134,9 @@ watch(
             <option value="web-serial-rfcomm">
               Real · Web Serial / RFCOMM
             </option>
+            <option value="android-ble">
+              Real · VEEPEAK Bluetooth LE
+            </option>
           </select>
           <p class="text-sm text-muted">
             <template v-if="transportChoice === 'mock'">
@@ -140,6 +144,10 @@ watch(
             </template>
             <template v-else-if="transportChoice === 'replay'">
               Reproduce localmente una sesión estructurada.
+            </template>
+            <template v-else-if="transportChoice === 'android-ble'">
+              Habla con el VEEPEAK por Bluetooth LE. Solo en la aplicación
+              Android, y únicamente con comandos de lectura.
             </template>
             <template v-else>
               Requiere una plataforma con Web Serial y RFCOMM.

@@ -8,6 +8,11 @@ import {
 import {
   WebSerialRfcommTransport
 } from '~~/core/obd/transport/WebSerialRfcommTransport'
+import {
+  AndroidBleObdTransport
+} from '~~/core/obd/transport/AndroidBleObdTransport'
+import { capacitorAndroidBle } from '~/services/capacitorAndroidBle'
+import { VEEPEAK_BLE_PROFILE } from '~/services/veepeakBleProfile'
 import { ElmCommandExecutor } from '~~/core/obd/protocol/ElmCommandExecutor'
 import { decodeMode01Response } from '~~/core/obd/decoder/decodeMode01Response'
 import { decodeSupportedPids } from '~~/core/obd/decoder/decodeSupportedPids'
@@ -39,7 +44,10 @@ import {
 import type {
   ObdErrorPhase
 } from '~~/core/obd/logging/ObdSessionLog'
-import { isObdTransportUnavailable } from '~~/core/obd/transport/ObdTransport'
+import {
+  isObdTransportUnavailable,
+  isPhysicalTransportKind
+} from '~~/core/obd/transport/ObdTransport'
 import type {
   ObdTransport,
   ObdTransportMetadata,
@@ -75,7 +83,7 @@ const sessionState = ref(session.state)
 const transportState = ref(transport.state)
 const activeView = ref<'connection' | 'data' | 'log'>('connection')
 const transportChoice = ref<
-  'mock' | 'replay' | 'web-serial-rfcomm'
+  'mock' | 'replay' | 'web-serial-rfcomm' | 'android-ble'
 >('mock')
 const replayFilename = ref('')
 const replayImportError = ref('')
@@ -318,6 +326,17 @@ function prepareSelectedTransport(): void {
     return
   }
 
+  if (transportChoice.value === 'android-ble') {
+    if (transport.kind !== 'android-ble') {
+      replaceTransport(new AndroidBleObdTransport({
+        bridge: capacitorAndroidBle,
+        profile: VEEPEAK_BLE_PROFILE
+      }))
+    }
+
+    return
+  }
+
   if (replaySessionExport === undefined) {
     throw new Error(
       'Importa una sesión OBD antes de seleccionar Replay'
@@ -389,7 +408,7 @@ const simulatedCommands = [
 const physicalCommands: string[] = [...PHYSICAL_ALLOWED_COMMANDS]
 
 const commands = computed(() => (
-  transportChoice.value === 'web-serial-rfcomm'
+  isPhysicalTransportKind(transportChoice.value)
     ? physicalCommands
     : simulatedCommands
 ))
@@ -466,8 +485,7 @@ function startTelemetry() {
   const tasks = createSupportedTelemetryPollTasks(
     supportedPids.value,
     {
-      physicalOnly: transport.kind === 'web-serial-rfcomm'
-        || transport.kind === 'android-ble'
+      physicalOnly: isPhysicalTransportKind(transport.kind)
     }
   )
 
@@ -659,7 +677,7 @@ async function sendCommand() {
   const command = selectedCommand.value
 
   if (
-    transport.kind === 'web-serial-rfcomm'
+    isPhysicalTransportKind(transport.kind)
     && !physicalCommands.includes(command)
   ) {
     recordError(
