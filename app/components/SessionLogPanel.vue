@@ -16,10 +16,12 @@ const props = defineProps<{
   events: ObdSessionEvent[]
   droppedEvents: number
   truncated: boolean
+  copyStatus?: string
 }>()
 
 const emit = defineEmits<{
   export: []
+  copy: []
   clear: []
 }>()
 
@@ -87,6 +89,22 @@ const hiddenByLimit = computed(() => {
       </div>
 
       <div class="grid grid-cols-2 gap-2 sm:flex">
+        <UButton
+          color="primary"
+          size="lg"
+          icon="i-lucide-clipboard-copy"
+          class="min-h-12 justify-center"
+          @click="emit('copy')"
+        >
+          Copiar registro
+        </UButton>
+        <p
+          v-if="props.copyStatus"
+          class="col-span-2 text-sm text-muted sm:order-last sm:w-full"
+          role="status"
+        >
+          {{ props.copyStatus }}
+        </p>
         <UButton
           color="primary"
           variant="soft"

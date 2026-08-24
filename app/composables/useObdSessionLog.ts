@@ -148,6 +148,33 @@ export function useObdSessionLog(log: ObdSessionLog) {
     setTimeout(() => URL.revokeObjectURL(url), 0)
   }
 
+  /**
+   * Copies the same export to the clipboard, returning whether it worked.
+   *
+   * The Android WebView ignores `<a download>` on a blob: URL, so downloadJson
+   * silently does nothing on the phone — which is exactly where a physical
+   * session is recorded. This is the path that gets the evidence out of the
+   * car, so it must report failure rather than fail silently the way the
+   * download does.
+   */
+  async function copyJson(): Promise<boolean> {
+    const clipboard = globalThis.navigator?.clipboard
+
+    if (!clipboard) {
+      return false
+    }
+
+    try {
+      await clipboard.writeText(
+        JSON.stringify(log.getExport(), null, 2)
+      )
+
+      return true
+    } catch {
+      return false
+    }
+  }
+
   return {
     events,
     lines,
@@ -155,6 +182,7 @@ export function useObdSessionLog(log: ObdSessionLog) {
     droppedEvents,
     truncated,
     clearDisplay,
-    downloadJson
+    downloadJson,
+    copyJson
   }
 }

@@ -7,10 +7,12 @@ defineProps<{
   events: ObdSessionEvent[]
   droppedEvents: number
   truncated: boolean
+  copyStatus?: string
 }>()
 
 const emit = defineEmits<{
   export: []
+  copy: []
   clear: []
 }>()
 </script>
@@ -20,7 +22,9 @@ const emit = defineEmits<{
     :events="events"
     :dropped-events="droppedEvents"
     :truncated="truncated"
+    :copy-status="copyStatus"
     @export="emit('export')"
+    @copy="emit('copy')"
     @clear="emit('clear')"
   />
 </template>

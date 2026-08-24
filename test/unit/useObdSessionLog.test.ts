@@ -82,3 +82,50 @@ describe('useObdSessionLog downloadJson', () => {
     scope.stop()
   })
 })
+
+describe('useObdSessionLog copyJson', () => {
+  /**
+   * The Android WebView ignores `<a download>` on a blob: URL, so downloadJson
+   * silently does nothing there. The clipboard is the path that actually works
+   * on the phone, and it is how the session evidence leaves the car.
+   */
+  it('writes the full session export to the clipboard', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('navigator', { clipboard: { writeText } })
+
+    const log = new ObdSessionLog({ transport: { kind: 'android-ble' } })
+    log.start({ kind: 'android-ble' })
+    const { scope, api } = runComposable(log)
+
+    await expect(api.copyJson()).resolves.toBe(true)
+
+    expect(writeText).toHaveBeenCalledTimes(1)
+    const written = writeText.mock.calls[0]![0] as string
+    expect(JSON.parse(written)).toEqual(log.getExport())
+
+    scope.stop()
+  })
+
+  it('reports failure instead of throwing when the clipboard is denied', async () => {
+    const writeText = vi.fn().mockRejectedValue(new Error('denied'))
+    vi.stubGlobal('navigator', { clipboard: { writeText } })
+
+    const log = new ObdSessionLog({ transport: { kind: 'android-ble' } })
+    const { scope, api } = runComposable(log)
+
+    await expect(api.copyJson()).resolves.toBe(false)
+
+    scope.stop()
+  })
+
+  it('reports failure when no clipboard exists at all', async () => {
+    vi.stubGlobal('navigator', {})
+
+    const log = new ObdSessionLog({ transport: { kind: 'android-ble' } })
+    const { scope, api } = runComposable(log)
+
+    await expect(api.copyJson()).resolves.toBe(false)
+
+    scope.stop()
+  })
+})

@@ -100,8 +100,19 @@ const {
   droppedEvents,
   truncated: logTruncated,
   clearDisplay: clearLog,
-  downloadJson: downloadSessionLog
+  downloadJson: downloadSessionLog,
+  copyJson: copySessionLog
 } = useObdSessionLog(sessionLog)
+
+const logCopyStatus = ref('')
+
+async function copyLog(): Promise<void> {
+  const copied = await copySessionLog()
+
+  logCopyStatus.value = copied
+    ? 'Registro copiado al portapapeles'
+    : 'No se pudo copiar. Concede acceso al portapapeles e inténtalo de nuevo.'
+}
 
 function setActiveView(view: LabViewId): void {
   activeView.value = view
@@ -881,7 +892,9 @@ onBeforeUnmount(() => {
           :events="sessionEvents"
           :dropped-events="droppedEvents"
           :truncated="logTruncated"
+          :copy-status="logCopyStatus"
           @export="downloadSessionLog"
+          @copy="copyLog"
           @clear="clearLog"
         />
       </UContainer>
