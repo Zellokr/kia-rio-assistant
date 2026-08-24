@@ -38,6 +38,25 @@ describe('PhysicalObdCommandPolicy', () => {
     }).toThrow(PhysicalCommandRejectedError)
   })
 
+  /**
+   * Discovery walks every Mode 01 capability range. Allowing only `0100` moved
+   * the wall to `0120` and stopped discovery at PID 0x20 on a real vehicle, so
+   * the whole probe set is approved together — they are all capability-bitmask
+   * reads, and cutting the walk at an arbitrary range was an accident, not a
+   * safety boundary.
+   */
+  it.each(['0100', '0120', '0140', '0160', '0180', '01A0', '01C0'])(
+    'allows the capability probe %s so discovery can finish',
+    (command) => {
+      expect(isPhysicalCommandAllowed(command)).toBe(true)
+    }
+  )
+
+  it('still rejects a Mode 01 read that is not a capability probe', () => {
+    expect(isPhysicalCommandAllowed('0121')).toBe(false)
+    expect(isPhysicalCommandAllowed('01E0')).toBe(false)
+  })
+
   it('rejects telemetry PIDs outside the approved set', () => {
     expect(isPhysicalCommandAllowed('010D')).toBe(false)
     expect(isPhysicalCommandAllowed('0111')).toBe(false)

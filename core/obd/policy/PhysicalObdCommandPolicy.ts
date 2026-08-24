@@ -17,7 +17,17 @@ export const PHYSICAL_ALLOWED_COMMANDS = [
   'ATS0',
   'ATH0',
   'ATSP0',
+  // Mode 01 capability probes. Discovery walks every range, so approving only
+  // `0100` stopped it at PID 0x20 against a real vehicle on 2026-08-24. These
+  // return support bitmasks and write nothing; the walk must not end at an
+  // arbitrary range that was never a deliberate safety boundary.
   '0100',
+  '0120',
+  '0140',
+  '0160',
+  '0180',
+  '01A0',
+  '01C0',
   '010C',
   '0105',
   '03'
