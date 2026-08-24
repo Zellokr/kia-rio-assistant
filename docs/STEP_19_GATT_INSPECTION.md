@@ -29,9 +29,13 @@ Physical inspection status: **NOT RUN**.
 2. Keep the engine off. Plug the VEEPEAK into the OBD-II port only to power it.
 3. Completely close every other OBD or Bluetooth scanner application. Only one
    application may hold the adapter connection.
-4. Open **Kia Rio Assistant**, navigate to `/lab`, and locate
-   **Inspección GATT — NO ENVÍA COMANDOS OBD**.
-5. Confirm that the panel does not show the web/PWA unsupported message.
+4. Open **Kia Rio Assistant**, navigate to `/lab`, and select the **Conexión**
+   tab, which is the view the lab opens on. Locate the **Inventario Bluetooth**
+   card, badged *No lee ni escribe datos del vehículo*.
+5. Confirm that the card does not show the *Abre esta sección desde la
+   aplicación Android* notice. That notice means the inspector is running in a
+   browser instead of the native Android application, and no inventory can be
+   captured there.
 6. Tap **Buscar VEEPEAK** and grant the nearby-device permission. Android 11 or
    older may show the legacy location permission required by BLE scanning; the
    application does not read or store GPS location.
@@ -40,9 +44,9 @@ Physical inspection status: **NOT RUN**.
    as VEEPEAK.
 8. Select that device yourself. The application never selects or connects to the
    first scan result automatically.
-9. Tap **Descubrir inventario GATT** once. Wait for the structured JSON.
+9. Tap **Descubrir inventario** once. Wait for the structured JSON.
 10. Tap **Copiar inventario** and save the result locally.
-11. Tap **Desconectar** and confirm the disconnected status.
+11. Tap **Desconectar Bluetooth** and confirm the disconnected status.
 12. Unplug the adapter when finished.
 
 ## Return this evidence
@@ -53,7 +57,7 @@ Provide:
 - Advertised device name.
 - The complete copied JSON inventory.
 - Any permission, scan, connection, or discovery error shown exactly as written.
-- Confirmation that **Desconectar** completed.
+- Confirmation that **Desconectar Bluetooth** completed.
 
 Do not send an OBD command yet. The inventory must be reviewed before a BLE
 transport is designed or connected to the ELM command pipeline. Review the
