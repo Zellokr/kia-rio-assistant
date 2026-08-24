@@ -83,6 +83,8 @@ watch(
 
     <GattInspectorPanel />
 
+    <ElmPipeProbePanel />
+
     <details class="group rounded-xl border border-default bg-default">
       <summary class="flex min-h-16 cursor-pointer list-none items-center gap-3 px-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
         <span class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-elevated text-muted">
