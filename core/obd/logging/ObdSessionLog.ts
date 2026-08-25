@@ -136,6 +136,10 @@ export interface ObdActivityEvent
     | 'discovery-completed'
     | 'queue-test-started'
     | 'queue-test-completed'
+    | 'reconnect-started'
+    | 'reconnect-attempt'
+    | 'reconnected'
+    | 'reconnect-failed'
 }
 
 export type ObdSessionEvent

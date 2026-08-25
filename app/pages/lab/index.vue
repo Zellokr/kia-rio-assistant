@@ -24,6 +24,9 @@ import {
   ObdSessionStateMachine
 } from '~~/core/obd/session/ObdSessionStateMachine'
 import {
+  ObdReconnectionController
+} from '~~/core/obd/session/ObdReconnectionController'
+import {
   ObdPollScheduler
 } from '~~/core/obd/polling/ObdPollScheduler'
 import {
@@ -230,15 +233,12 @@ function handleTransportStateChange(state: ObdTransportState): void {
     return
   }
 
-  stopTelemetry()
-  clearTelemetryState()
-  supportedPids.value = []
-  failSession()
-
   recordError(
     new Error('Transport link lost unexpectedly'),
     'disconnect'
   )
+
+  notifyLinkSuspect('transport-state')
 }
 
 function attachPollObservers(): void {
@@ -291,6 +291,8 @@ function attachPollObservers(): void {
       type: 'telemetry-state',
       state: 'stopped'
     })
+
+    notifyLinkSuspect('poll-halt')
   })
 
   unsubscribeTransportState = transport.subscribeState(
@@ -395,6 +397,89 @@ function failSession() {
     type: 'session-state',
     state: session.state
   })
+}
+
+async function reconnectAttempt(): Promise<void> {
+  pollScheduler.stop()
+  pollScheduler.clearTasks()
+  telemetryRunning.value = false
+
+  sessionLog.record({
+    type: 'activity',
+    activity: 'reconnect-attempt'
+  })
+
+  try {
+    await transport.disconnect()
+  } catch (error) {
+    recordError(error, 'disconnect')
+  }
+
+  selectedTransport = await transport.connect()
+  transportState.value = transport.state
+  sessionLog.updateTransport(selectedTransport)
+  await initializeElm327(executor)
+}
+
+const reconnectionController = new ObdReconnectionController({
+  onEnter: () => {
+    transitionSession('reconnecting')
+    sessionLog.record({
+      type: 'activity',
+      activity: 'reconnect-started'
+    })
+  },
+  attempt: reconnectAttempt,
+  onRecovered: () => {
+    transitionSession('initializing')
+    sessionLog.record({
+      type: 'activity',
+      activity: 'initialization-completed'
+    })
+
+    transitionSession('discovering')
+    sessionLog.record({
+      type: 'activity',
+      activity: 'discovery-completed'
+    })
+
+    transitionSession('ready')
+    sessionLog.record({
+      type: 'activity',
+      activity: 'reconnected'
+    })
+  },
+  onAttemptFailed: (_, error) => {
+    recordError(error, 'disconnect')
+  },
+  onFailed: ({ error }) => {
+    failSession()
+    sessionLog.record({
+      type: 'activity',
+      activity: 'reconnect-failed'
+    })
+    recordError(
+      error ?? new Error('Reconnect attempts exhausted'),
+      'disconnect'
+    )
+  },
+  onSignalSuppressed: (reason) => {
+    recordError(
+      new Error(`Reconnect signal suppressed: ${reason}`),
+      'disconnect'
+    )
+  }
+})
+
+function notifyLinkSuspect(
+  reason: 'transport-state' | 'poll-halt'
+): void {
+  if (
+    sessionState.value === 'ready'
+    || reconnectionController.active
+  ) {
+    reconnectionController.notifyLinkSuspect(reason)
+  }
 }
 
 const simulatedCommands = [
@@ -654,6 +739,7 @@ async function connect() {
 }
 
 async function disconnect() {
+  reconnectionController.abort('user-disconnect')
   transportError.value = ''
 
   try {
@@ -798,6 +884,7 @@ async function sendCommand() {
 }
 
 onBeforeUnmount(() => {
+  reconnectionController.dispose()
   pollScheduler.stop()
 
   unsubscribePollResult()

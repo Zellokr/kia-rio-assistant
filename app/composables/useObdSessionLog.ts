@@ -52,7 +52,11 @@ function formatEvent(event: ObdSessionEvent): string {
         'discovery-started': '--- PID DISCOVERY START ---',
         'discovery-completed': '--- PID DISCOVERY END ---',
         'queue-test-started': '--- QUEUE TEST START ---',
-        'queue-test-completed': '--- QUEUE TEST END ---'
+        'queue-test-completed': '--- QUEUE TEST END ---',
+        'reconnect-started': '--- RECONNECT START ---',
+        'reconnect-attempt': '--- RECONNECT ATTEMPT ---',
+        'reconnected': '--- RECONNECTED ---',
+        'reconnect-failed': '--- RECONNECT FAILED ---'
       }
 
       return labels[event.activity]

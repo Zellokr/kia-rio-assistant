@@ -133,7 +133,7 @@ export class ObdReconnectionController {
     let lastError: Error | undefined
 
     for (let index = 0; index < attempts; index++) {
-      const delayMs = this.delaysMs[index]
+      const delayMs = this.delaysMs[index]!
 
       await this.delay(delayMs)
 

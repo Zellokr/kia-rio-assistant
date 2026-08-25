@@ -197,7 +197,11 @@ export function presentSessionEvent(
         'discovery-started': 'Descubrimiento de PIDs iniciado',
         'discovery-completed': 'Descubrimiento de PIDs completado',
         'queue-test-started': 'Prueba de cola iniciada',
-        'queue-test-completed': 'Prueba de cola completada'
+        'queue-test-completed': 'Prueba de cola completada',
+        'reconnect-started': 'Reconexión iniciada',
+        'reconnect-attempt': 'Intento de reconexión',
+        'reconnected': 'Reconexión completada',
+        'reconnect-failed': 'Reconexión agotada'
       }
 
       return {
@@ -209,6 +213,7 @@ export function presentSessionEvent(
           || event.activity === 'initialization-completed'
           || event.activity === 'discovery-completed'
           || event.activity === 'queue-test-completed'
+          || event.activity === 'reconnected'
           ? 'success'
           : 'neutral',
         icon: 'i-lucide-info'

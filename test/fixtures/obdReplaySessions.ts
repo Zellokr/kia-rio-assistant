@@ -273,3 +273,39 @@ export function buildMidResponseDisconnectSession() {
     '41 0C 1A F8'
   ))
 }
+
+/**
+ * A complete connection followed by a second ELM initialization sequence.
+ * Replay keeps its cursor across disconnect -> connect, so reconnect tests
+ * must consume a second transcript segment instead of calling select().
+ */
+export function buildReconnectSession() {
+  const commands = [
+    ['ATZ', 'ELM327 v1.5'],
+    ['ATE0', 'OK'],
+    ['ATL0', 'OK'],
+    ['ATS0', 'OK'],
+    ['ATH0', 'OK'],
+    ['ATSP0', 'OK']
+  ] as const
+
+  return createSession(commands.flatMap(([
+    command,
+    response
+  ], index) => responseEvents(
+    `initial-${index + 1}`,
+    command,
+    [`${response}\r>`],
+    response,
+    'text'
+  )).concat(commands.flatMap(([
+    command,
+    response
+  ], index) => responseEvents(
+    `reconnect-${index + 1}`,
+    command,
+    [`${response}\r>`],
+    response,
+    'text'
+  ))))
+}
