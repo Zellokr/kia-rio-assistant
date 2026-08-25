@@ -127,6 +127,7 @@ const sessionStateLabel = computed(() => {
     initializing: 'Inicializando ELM327',
     discovering: 'Descubriendo PIDs',
     ready: 'Preparado',
+    reconnecting: 'Reconectando',
     disconnecting: 'Desconectando',
     disconnected: 'Desconectado',
     error: 'Necesita atención'

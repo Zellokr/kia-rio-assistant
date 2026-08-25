@@ -113,4 +113,127 @@ describe('ObdSessionStateMachine', () => {
 
     expect(machine.state).toBe('connecting')
   })
+
+  it('allows entering reconnecting from ready', () => {
+    const machine = new ObdSessionStateMachine()
+
+    machine.transition('selecting')
+    machine.transition('selected')
+    machine.transition('connecting')
+    machine.transition('initializing')
+    machine.transition('discovering')
+    machine.transition('ready')
+    machine.transition('reconnecting')
+
+    expect(machine.state).toBe('reconnecting')
+  })
+
+  it('allows a recovered reconnect to resume the init sequence', () => {
+    const machine = new ObdSessionStateMachine()
+
+    machine.transition('selecting')
+    machine.transition('selected')
+    machine.transition('connecting')
+    machine.transition('initializing')
+    machine.transition('discovering')
+    machine.transition('ready')
+    machine.transition('reconnecting')
+    machine.transition('initializing')
+
+    expect(machine.state).toBe('initializing')
+  })
+
+  it('allows a reconnect attempt budget to be exhausted into error', () => {
+    const machine = new ObdSessionStateMachine()
+
+    machine.transition('selecting')
+    machine.transition('selected')
+    machine.transition('connecting')
+    machine.transition('initializing')
+    machine.transition('discovering')
+    machine.transition('ready')
+    machine.transition('reconnecting')
+    machine.transition('error')
+
+    expect(machine.state).toBe('error')
+  })
+
+  it('allows disconnecting while a reconnect is in flight', () => {
+    const machine = new ObdSessionStateMachine()
+
+    machine.transition('selecting')
+    machine.transition('selected')
+    machine.transition('connecting')
+    machine.transition('initializing')
+    machine.transition('discovering')
+    machine.transition('ready')
+    machine.transition('reconnecting')
+    machine.transition('disconnecting')
+
+    expect(machine.state).toBe('disconnecting')
+  })
+
+  it('rejects entering reconnecting from idle', () => {
+    const machine = new ObdSessionStateMachine()
+
+    expect(() => {
+      machine.transition('reconnecting')
+    }).toThrow(
+      'Invalid OBD session transition: idle -> reconnecting'
+    )
+  })
+
+  it('rejects a reconnecting self-transition', () => {
+    const machine = new ObdSessionStateMachine()
+
+    machine.transition('selecting')
+    machine.transition('selected')
+    machine.transition('connecting')
+    machine.transition('initializing')
+    machine.transition('discovering')
+    machine.transition('ready')
+    machine.transition('reconnecting')
+
+    expect(() => {
+      machine.transition('reconnecting')
+    }).toThrow(
+      'Invalid OBD session transition: reconnecting -> reconnecting'
+    )
+  })
+
+  it('rejects reconnecting routing back through discovering', () => {
+    const machine = new ObdSessionStateMachine()
+
+    machine.transition('selecting')
+    machine.transition('selected')
+    machine.transition('connecting')
+    machine.transition('initializing')
+    machine.transition('discovering')
+    machine.transition('ready')
+    machine.transition('reconnecting')
+
+    expect(() => {
+      machine.transition('discovering')
+    }).toThrow(
+      'Invalid OBD session transition: reconnecting -> discovering'
+    )
+  })
+
+  it('rejects reconnecting transitioning to connecting', () => {
+    const machine = new ObdSessionStateMachine()
+
+    machine.transition('selecting')
+    machine.transition('selected')
+    machine.transition('connecting')
+    machine.transition('initializing')
+    machine.transition('discovering')
+    machine.transition('ready')
+    machine.transition('reconnecting')
+
+    expect(() => {
+      machine.transition('connecting')
+    }).toThrow(
+      'Invalid OBD session transition: reconnecting -> connecting'
+    )
+  })
 })

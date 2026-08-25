@@ -6,6 +6,7 @@ export type ObdSessionState
     | 'initializing'
     | 'discovering'
     | 'ready'
+    | 'reconnecting'
     | 'disconnecting'
     | 'disconnected'
     | 'error'
@@ -47,7 +48,14 @@ const transitions: Record<
 
   ready: [
     'disconnecting',
+    'reconnecting',
     'error'
+  ],
+
+  reconnecting: [
+    'initializing',
+    'error',
+    'disconnecting'
   ],
 
   disconnecting: [
