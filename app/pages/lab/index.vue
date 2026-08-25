@@ -19,9 +19,6 @@ import {
   ObdSessionStateMachine
 } from '~~/core/obd/session/ObdSessionStateMachine'
 import {
-  ObdReconnectionController
-} from '~~/core/obd/session/ObdReconnectionController'
-import {
   ObdPollScheduler
 } from '~~/core/obd/polling/ObdPollScheduler'
 import {
@@ -42,6 +39,7 @@ import {
   PHYSICAL_ALLOWED_COMMANDS
 } from '~~/core/obd/policy/PhysicalObdCommandPolicy'
 import type {
+  ObdActivityEvent,
   ObdErrorPhase
 } from '~~/core/obd/logging/ObdSessionLog'
 import {
@@ -282,7 +280,7 @@ function handleTransportStateChange(state: ObdTransportState): void {
     'disconnect'
   )
 
-  notifyLinkSuspect('transport-state')
+  reconnection.notifyLinkSuspect('transport-state')
 }
 
 function attachPollObservers(): void {
@@ -336,7 +334,7 @@ function attachPollObservers(): void {
       state: 'stopped'
     })
 
-    notifyLinkSuspect('poll-halt')
+    reconnection.notifyLinkSuspect('poll-halt')
   })
 
   unsubscribeTransportState = transport.subscribeState(
@@ -435,92 +433,39 @@ function failSession() {
   })
 }
 
-async function reconnectAttempt(): Promise<void> {
-  pollScheduler.stop()
-  pollScheduler.clearTasks()
-  telemetryRunning.value = false
-
-  sessionLog.record({
-    type: 'activity',
-    activity: 'reconnect-attempt'
-  })
-
-  try {
-    await transport.disconnect()
-  } catch (error) {
-    recordError(error, 'disconnect')
-  }
-
-  selectedTransport = await transport.connect()
-  transportState.value = transport.state
-  sessionLog.updateTransport(selectedTransport)
-  await initializeElm327(executor)
-  supportedPids.value = (await resolveSupportedPids(executor, selectedTransport, {
-    reconnect: true,
-    supportedPids: supportedPids.value
-  })).pids
+function recordActivity(
+  activity: ObdActivityEvent['activity']
+): void {
+  sessionLog.record({ type: 'activity', activity })
 }
 
-const reconnectionController = new ObdReconnectionController({
-  onEnter: () => {
-    transitionSession('reconnecting')
-    sessionLog.record({
-      type: 'activity',
-      activity: 'reconnect-started'
-    })
+// The composable never receives replaceTransport: it has no way to swap the
+// live transport, so "reconnection never replaces the transport" holds by
+// construction rather than by assertion. transport/executor/pollScheduler
+// are read late through these accessors because replaceTransport reassigns
+// all three; capturing them here would silently reconnect a stale transport.
+const reconnection = useObdReconnection({
+  sessionState,
+  transitionSession,
+  failSession,
+  recordActivity,
+  recordError,
+  getTransport: () => transport,
+  getExecutor: () => executor,
+  getPollScheduler: () => pollScheduler,
+  getSupportedPids: () => supportedPids.value,
+  onTelemetryStopped: () => {
+    telemetryRunning.value = false
   },
-  attempt: reconnectAttempt,
-  onRecovered: () => {
-    transitionSession('initializing')
-    sessionLog.record({
-      type: 'activity',
-      activity: 'initialization-completed'
-    })
-
-    transitionSession('discovering')
-    sessionLog.record({
-      type: 'activity',
-      activity: 'discovery-completed'
-    })
-
-    transitionSession('ready')
-    sessionLog.record({
-      type: 'activity',
-      activity: 'reconnected'
-    })
+  onTransportConnected: (metadata) => {
+    selectedTransport = metadata
+    transportState.value = transport.state
+    sessionLog.updateTransport(metadata)
   },
-  onAttemptFailed: (_, error) => {
-    recordError(error, 'disconnect')
-  },
-  onFailed: ({ error }) => {
-    failSession()
-    sessionLog.record({
-      type: 'activity',
-      activity: 'reconnect-failed'
-    })
-    recordError(
-      error ?? new Error('Reconnect attempts exhausted'),
-      'disconnect'
-    )
-  },
-  onSignalSuppressed: (reason) => {
-    recordError(
-      new Error(`Reconnect signal suppressed: ${reason}`),
-      'disconnect'
-    )
+  onSupportedPidsResolved: (pids) => {
+    supportedPids.value = pids
   }
 })
-
-function notifyLinkSuspect(
-  reason: 'transport-state' | 'poll-halt'
-): void {
-  if (
-    sessionState.value === 'ready'
-    || reconnectionController.active
-  ) {
-    reconnectionController.notifyLinkSuspect(reason)
-  }
-}
 
 const simulatedCommands = [
   'ATZ',
@@ -781,7 +726,6 @@ async function connect() {
 }
 
 async function disconnect() {
-  reconnectionController.abort('user-disconnect')
   transportError.value = ''
 
   try {
@@ -936,7 +880,7 @@ async function sendCommand() {
 }
 
 onBeforeUnmount(() => {
-  reconnectionController.dispose()
+  reconnection.dispose()
   pollScheduler.stop()
 
   unsubscribePollResult()
