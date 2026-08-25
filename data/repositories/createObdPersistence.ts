@@ -1,0 +1,17 @@
+import type {
+  DtcRepository,
+  ObdSessionRepository,
+  SupportedPidCacheRepository
+} from '~~/core/obd/persistence/ports'
+
+export type ObdPersistence = ObdSessionRepository
+  & DtcRepository
+  & SupportedPidCacheRepository
+
+export function createObdPersistence(adapter: ObdPersistence): ObdPersistence {
+  if (typeof indexedDB === 'undefined') {
+    throw new Error('IndexedDB is not available in this environment')
+  }
+
+  return adapter
+}
