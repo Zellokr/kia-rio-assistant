@@ -10,7 +10,7 @@ dashboard.
 - Node.js 24 LTS, pnpm
 - Nuxt 4, Vue 3, TypeScript
 - Vitest, ESLint
-- Capacitor Android shell for GATT inventory (and a future BLE OBD bridge)
+- Capacitor Android shell for GATT inventory and the BLE OBD bridge
 
 ## Setup
 
@@ -35,19 +35,29 @@ Supported transports today:
 | Mock | Synthetic ELM responses for UI and protocol work |
 | Replay | Replays a recorded schema-v1 session export |
 | Web Serial / RFCOMM | Browser serial path when the platform exposes `navigator.serial` |
+| VEEPEAK Bluetooth LE | Native Android transport (`android-ble`); confirmed against the vehicle |
 
-Physical Web Serial checks are documented in
-[docs/STEP_18_PHYSICAL_TEST.md](docs/STEP_18_PHYSICAL_TEST.md) and remain
-**NOT RUN** until executed against the real vehicle.
+The Bluetooth LE path is proven end to end: on 2026-08-24 the Kia Rio answered
+over it while parked and idling, returning live RPM and coolant temperature.
+See [docs/ANDROID_BLE_CONTRACT.md](docs/ANDROID_BLE_CONTRACT.md).
 
-The lab is read-only: Mode 04 and other ECU-writing operations are blocked at
-the physical transport boundary.
+Physical **Web Serial** checks are a different path and are documented in
+[docs/STEP_18_PHYSICAL_TEST.md](docs/STEP_18_PHYSICAL_TEST.md). They remain
+**NOT RUN**: no Web Serial session has ever reached the vehicle.
+
+The lab is read-only. Only a closed allowlist of commands may reach a physical
+transport; Mode 04 and every other ECU-writing operation is blocked in
+`core/obd/policy/PhysicalObdCommandPolicy.ts`, below the UI, so no caller can
+bypass it by skipping a disabled control.
 
 ## Android GATT inventory
 
-The Capacitor Android app can scan advertised VEEPEAK devices and discover
-GATT structure only. It does **not** read or write characteristic values,
-enable notifications, or send OBD commands.
+The Android app ships two deliberately separate Bluetooth surfaces. The **GATT
+inspector** scans advertised VEEPEAK devices and discovers GATT structure only:
+it never reads or writes characteristic values, enables notifications, or sends
+OBD commands. The **OBD byte pipe** described in the next section is what
+actually carries commands. Keeping them apart is intentional — do not merge the
+inspect-only API into the bridge.
 
 ```bash
 pnpm build:android:web
@@ -56,17 +66,21 @@ pnpm android:open
 ```
 
 Follow [docs/STEP_19_GATT_INSPECTION.md](docs/STEP_19_GATT_INSPECTION.md)
-before using a phone with the adapter. Inventory status: **NOT RUN**.
+before using a phone with a new adapter. Inventory status for the current
+VEEPEAK: **COMPLETE** (2026-08-24, reviewed against
+[docs/GATT_INVENTORY_SCHEMA.md](docs/GATT_INVENTORY_SCHEMA.md)).
 
 ## Android BLE OBD contract
 
-The TypeScript contract for a future Android BLE `ObdTransport` is in place
-(`AndroidBleBridge` + `AndroidBleObdTransport`) and covered by unit tests
-with a **fake** native bridge.
+`AndroidBleBridge` + `AndroidBleObdTransport` define the transport contract and
+are covered by unit tests against a fake native bridge. The native byte pipe is
+implemented in `BleObdBridgePlugin.kt` and confirmed on hardware: an `ATZ` round
+trip answered `ELM327 v2.2`, and a full session reached the vehicle.
 
-Real UUID wiring, RX/TX characteristic I/O, and notifications are **not**
-implemented until a reviewed VEEPEAK GATT inventory exists. See
-[docs/ANDROID_BLE_CONTRACT.md](docs/ANDROID_BLE_CONTRACT.md).
+The service and characteristic UUIDs live in `app/services/veepeakBleProfile.ts`,
+derived from a reviewed inventory. Nothing under `core/` ships a vendor default —
+the profile is injected, so an unreviewed adapter cannot silently acquire one.
+See [docs/ANDROID_BLE_CONTRACT.md](docs/ANDROID_BLE_CONTRACT.md).
 
 ## Scripts
 

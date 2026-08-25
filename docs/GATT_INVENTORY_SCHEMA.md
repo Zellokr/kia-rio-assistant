@@ -7,8 +7,12 @@ acceptance checklist instead of a subjective "paste the JSON here".
 
 The authoritative source of truth is the TypeScript type `GattInventory` in
 `core/bluetooth/GattInspectorController.ts`. This document must stay in sync
-with it. Inventory capture status remains **NOT RUN**; nothing here asserts a
-confirmed VEEPEAK UUID.
+with it.
+
+Inventory capture status: **COMPLETE** for the current VEEPEAK (2026-08-24). The
+reviewed result is recorded in `app/services/veepeakBleProfile.ts`. This document
+still asserts no UUID of its own: the checklist below is what a capture must pass,
+and a capture from any other adapter starts again from **NOT RUN**.
 
 ## Schema
 
