@@ -1,5 +1,6 @@
 import type { ObdSessionEvent } from '../logging/ObdSessionLog'
 import type { ObdSessionRepository } from './ports'
+import type { PersistableObdSessionEvent } from './persistedEventAllowlist'
 import { isPersistableEvent } from './persistedEventAllowlist'
 
 export const PERSISTENCE_FLUSH_INTERVAL_MS = 2_000
@@ -16,7 +17,10 @@ export class BufferedObdSessionRecorder {
 
   private readonly clearTimer: typeof clearTimeout
 
-  private events: ObdSessionEvent[] = []
+  // Narrowed by the `isPersistableEvent` guard in `record()`. Keeping the
+  // narrow type here is what lets `flush()` build `PersistedObdSessionEventRecord`
+  // without a cast, so the allowlist is enforced by the compiler downstream.
+  private events: PersistableObdSessionEvent[] = []
 
   private timer: ReturnType<typeof setTimeout> | undefined
 

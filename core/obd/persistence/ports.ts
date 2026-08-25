@@ -1,4 +1,4 @@
-import type { ObdSessionEvent } from '../logging/ObdSessionLog'
+import type { PersistableObdSessionEvent } from './persistedEventAllowlist'
 import type { ObdTransportMetadata } from '../transport/ObdTransport'
 
 export interface PersistedObdSessionRecord {
@@ -14,7 +14,18 @@ export interface PersistedObdSessionRecord {
 export interface PersistedObdSessionEventRecord {
   schemaVersion: 1
   sessionId: string
-  event: ObdSessionEvent
+  /**
+   * Narrowed to the allowlisted subset on purpose.
+   *
+   * Raw byte events (`rx-chunk`, `tx`, `command-queued`, `rx-frame`) and
+   * telemetry-sourced `decoded-value` are what RF-017's "la base local no
+   * crece sin control" targets, so they must never reach storage. Enforcing
+   * that here means every adapter — present and future — is safe by
+   * construction, instead of each one re-implementing `isPersistableEvent`
+   * and eventually drifting apart. The only way to build one of these is to
+   * pass through that type guard.
+   */
+  event: PersistableObdSessionEvent
 }
 
 export interface PersistedDtcObservation {

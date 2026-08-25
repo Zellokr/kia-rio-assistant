@@ -53,7 +53,12 @@ describe('in-memory OBD persistence adapter', () => {
     const events = [event({ type: 'session-state', state: 'ready' }), event({ type: 'decoded-value', source: 'manual', command: '010C', latencyMs: 1, decoded: { kind: 'pid', pid: '0C', key: 'rpm', label: 'RPM', value: 1, unit: 'rpm' } }), ...(['rx-chunk', 'tx', 'command-queued', 'rx-frame'] as const).map(type => event({ type } as never)), event({ type: 'decoded-value', source: 'telemetry', command: '010C', latencyMs: 1, decoded: { kind: 'pid', pid: '0C', key: 'rpm', label: 'RPM', value: 1, unit: 'rpm' } })]
     for (const value of events) expect(isPersistableEvent(value)).toBe(value !== events.at(-1) && !['rx-chunk', 'tx', 'command-queued', 'rx-frame'].includes(value.type))
     await adapter.startSession(session('one'))
-    await adapter.appendEvents(events.map(event => ({ schemaVersion: 1 as const, sessionId: 'one', event })))
+    // The `event` field is typed to the allowlisted subset, so this batch cannot
+    // be built without defeating the type. That is the point: the cast simulates a
+    // caller that bypasses the compiler, proving the in-memory adapter's runtime
+    // filter is a real backstop and not dead code. Production callers go through
+    // BufferedObdSessionRecorder, where the type guard makes the cast impossible.
+    await adapter.appendEvents(events.map(event => ({ schemaVersion: 1 as const, sessionId: 'one', event })) as unknown as Parameters<typeof adapter.appendEvents>[0])
     expect((await adapter.loadSession('one'))?.events.map(record => record.event)).toEqual(events.slice(0, 2))
   })
 
