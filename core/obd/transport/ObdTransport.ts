@@ -9,7 +9,7 @@ export type ObdTransportState
     | 'error'
 
 export interface ObdTransportMetadata {
-  kind: 'mock' | 'replay' | 'web-serial-rfcomm' | 'android-ble'
+  kind: 'mock' | 'replay' | 'android-ble'
   name?: string
 }
 
@@ -23,7 +23,6 @@ export interface ObdTransportMetadata {
  * sync with the others.
  */
 export const PHYSICAL_TRANSPORT_KINDS = [
-  'web-serial-rfcomm',
   'android-ble'
 ] as const satisfies readonly ObdTransportMetadata['kind'][]
 

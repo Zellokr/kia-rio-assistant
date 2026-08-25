@@ -11,13 +11,11 @@ type Kind = ObdTransportMetadata['kind']
 const ALL_KINDS: Kind[] = [
   'mock',
   'replay',
-  'web-serial-rfcomm',
   'android-ble'
 ]
 
 describe('isPhysicalTransportKind', () => {
   it('treats every transport that reaches real hardware as physical', () => {
-    expect(isPhysicalTransportKind('web-serial-rfcomm')).toBe(true)
     expect(isPhysicalTransportKind('android-ble')).toBe(true)
   })
 
@@ -38,5 +36,9 @@ describe('isPhysicalTransportKind', () => {
 
     expect(ALL_KINDS.filter(isPhysicalTransportKind).sort())
       .toEqual([...PHYSICAL_TRANSPORT_KINDS].sort())
+  })
+
+  it('exposes exactly the expected physical transport kinds', () => {
+    expect(PHYSICAL_TRANSPORT_KINDS).toEqual(['android-ble'])
   })
 })

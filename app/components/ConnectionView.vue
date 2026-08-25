@@ -5,7 +5,7 @@ import type { ObdSessionState } from '~~/core/obd/session/ObdSessionStateMachine
 import type { ObdTransportState } from '~~/core/obd/transport/ObdTransport'
 
 export type ConnectionTransportChoice
-  = 'mock' | 'replay' | 'web-serial-rfcomm' | 'android-ble'
+  = 'mock' | 'replay' | 'android-ble'
 
 export type ConnectionBadgeColor
   = | 'neutral'
@@ -130,9 +130,6 @@ watch(
             </option>
             <option value="replay">
               Replay · sesión grabada
-            </option>
-            <option value="web-serial-rfcomm">
-              Real · Web Serial / RFCOMM
             </option>
             <option value="android-ble">
               Real · VEEPEAK Bluetooth LE

@@ -6,114 +6,17 @@ import {
 } from 'vitest'
 
 import type {
-  AndroidBleBridge,
-  AndroidBleConnectOptions,
-  AndroidBleDevice,
   AndroidBleProfile
 } from '../../core/bluetooth/AndroidBleBridge'
 import { ElmCommandExecutor } from '../../core/obd/protocol/ElmCommandExecutor'
 import { AndroidBleObdTransport } from '../../core/obd/transport/AndroidBleObdTransport'
-
-class Deferred<T> {
-  readonly promise: Promise<T>
-
-  resolve!: (value: T) => void
-
-  reject!: (reason: unknown) => void
-
-  constructor() {
-    this.promise = new Promise<T>((resolve, reject) => {
-      this.resolve = resolve
-      this.reject = reject
-    })
-  }
-}
+import { FakeAndroidBleBridge } from './support/FakeAndroidBleBridge'
 
 /** Synthetic UUIDs for unit tests only — not VEEPEAK inventory values. */
 const SYNTHETIC_PROFILE: AndroidBleProfile = {
   serviceUuid: '0000fff0-0000-1000-8000-00805f9b34fb',
   writeCharacteristicUuid: '0000fff2-0000-1000-8000-00805f9b34fb',
   notifyCharacteristicUuid: '0000fff1-0000-1000-8000-00805f9b34fb'
-}
-
-class FakeAndroidBleBridge implements AndroidBleBridge {
-  supported = true
-
-  device: AndroidBleDevice = {
-    id: 'ble-device-1',
-    name: 'Synthetic BLE adapter'
-  }
-
-  connectCalls: AndroidBleConnectOptions[] = []
-
-  writes: Uint8Array[] = []
-
-  disconnectCalls = 0
-
-  requestCalls = 0
-
-  blockConnect = false
-
-  readonly pendingConnects: Array<Deferred<void>> = []
-
-  private readonly listeners = new Set<
-    (data: Uint8Array) => void
-  >()
-
-  private connected = false
-
-  isSupported(): boolean {
-    return this.supported
-  }
-
-  async requestDevice(): Promise<AndroidBleDevice> {
-    this.requestCalls++
-    return this.device
-  }
-
-  async connect(options: AndroidBleConnectOptions): Promise<void> {
-    this.connectCalls.push(options)
-
-    if (this.blockConnect) {
-      const deferred = new Deferred<void>()
-
-      this.pendingConnects.push(deferred)
-      await deferred.promise
-    }
-
-    this.connected = true
-  }
-
-  async disconnect(): Promise<void> {
-    this.disconnectCalls++
-    this.connected = false
-  }
-
-  async write(data: Uint8Array): Promise<void> {
-    if (!this.connected) {
-      throw new Error('Fake Android BLE bridge is not connected')
-    }
-
-    this.writes.push(data.slice())
-  }
-
-  subscribe(
-    listener: (data: Uint8Array) => void
-  ): () => void {
-    this.listeners.add(listener)
-
-    return () => {
-      this.listeners.delete(listener)
-    }
-  }
-
-  emit(rawText: string): void {
-    const bytes = new TextEncoder().encode(rawText)
-
-    for (const listener of this.listeners) {
-      listener(bytes)
-    }
-  }
 }
 
 function createTransport(

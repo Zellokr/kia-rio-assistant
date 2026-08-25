@@ -4,7 +4,7 @@ import type { ObdTelemetryMetric } from '~~/core/obd/telemetry/ObdTelemetryStore
 import { isPhysicalTransportKind } from '~~/core/obd/transport/ObdTransport'
 
 export type DataViewTransportChoice
-  = 'mock' | 'replay' | 'web-serial-rfcomm' | 'android-ble'
+  = 'mock' | 'replay' | 'android-ble'
 
 defineProps<{
   sessionState: ObdSessionState

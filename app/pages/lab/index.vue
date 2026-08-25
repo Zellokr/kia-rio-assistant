@@ -6,9 +6,6 @@ import {
   ReplayObdTransport
 } from '~~/core/obd/transport/ReplayObdTransport'
 import {
-  WebSerialRfcommTransport
-} from '~~/core/obd/transport/WebSerialRfcommTransport'
-import {
   AndroidBleObdTransport
 } from '~~/core/obd/transport/AndroidBleObdTransport'
 import { capacitorAndroidBle } from '~/services/capacitorAndroidBle'
@@ -86,7 +83,7 @@ const sessionState = ref(session.state)
 const transportState = ref(transport.state)
 const activeView = ref<'connection' | 'data' | 'log'>('connection')
 const transportChoice = ref<
-  'mock' | 'replay' | 'web-serial-rfcomm' | 'android-ble'
+  'mock' | 'replay' | 'android-ble'
 >('mock')
 const replayFilename = ref('')
 const replayImportError = ref('')
@@ -374,14 +371,6 @@ function prepareSelectedTransport(): void {
   if (transportChoice.value === 'mock') {
     if (transport.kind !== 'mock') {
       replaceTransport(new MockObdTransport())
-    }
-
-    return
-  }
-
-  if (transportChoice.value === 'web-serial-rfcomm') {
-    if (transport.kind !== 'web-serial-rfcomm') {
-      replaceTransport(new WebSerialRfcommTransport())
     }
 
     return

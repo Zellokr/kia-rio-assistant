@@ -76,3 +76,44 @@ and mock transports.
 - This ADR does not claim RFCOMM does not work — only that it was never
   tested. Do not restate the untested status as a proven failure in later
   documents.
+
+## Amendment (2026-08-25): `WebSerialRfcommTransport` deleted
+
+**What changed**: `core/obd/transport/WebSerialRfcommTransport.ts` and its
+test suite were removed from the repository. The "stays in the codebase as a
+dormant, unproven alternative" consequence above is superseded — the
+transport no longer exists. `PHYSICAL_TRANSPORT_KINDS`
+(`core/obd/transport/ObdTransport.ts`) now holds exactly one entry,
+`'android-ble'`.
+
+**Why this is not "BLE won"**: primacy was already decided above on vehicle
+evidence. The reason for outright deletion is different and stronger — the
+transport cannot run at all on the app's actual target platform:
+
+- The app ships as a Capacitor Android app, not a desktop browser.
+- Official Chrome documentation limits native Web Serial to desktop
+  platforms. On Android, Chrome offers only USB serial through WebUSB plus a
+  polyfill; Chrome's RFCOMM support announcement is explicitly
+  desktop-only. `WebSerialRfcommTransport`'s own error string already said
+  this (`"current Chrome documentation limits native Web Serial to desktop
+  platforms"`) — the code recognized the gap it could not close.
+- Independently, the VEEPEAK OBDCheck BLE+ adapter this project owns is a
+  BLE device. RFCOMM is classic Bluetooth, a different protocol from BLE
+  GATT. Even on a platform where Web Serial worked, this transport could
+  not talk to the owned adapter.
+
+Given both, keeping the code "dormant" was not preserving a real future
+option — it was bundling unreachable code that could only ever surface a
+platform error to a user picking it from the lab transport selector.
+
+**What this amendment does NOT claim**: this is still not a claim that
+RFCOMM does not work as a protocol, or that a future non-Capacitor,
+desktop-targeted build could not use it. It is a claim that this transport
+could never execute inside this app on this platform, with this adapter —
+and was never tested on the vehicle before removal.
+
+**Read-only safety net preserved**: the transport-boundary integration test
+that proves the physical read-only policy is enforced at the transport
+(`test/unit/physicalReadOnlyPolicyIntegration.test.ts`) was rehomed onto
+`AndroidBleObdTransport` rather than deleted, so this removal does not
+reduce that coverage.
