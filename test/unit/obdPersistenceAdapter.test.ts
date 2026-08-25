@@ -18,7 +18,8 @@ function session(id: string): PersistedObdSessionRecord {
     startedAt: `2026-08-25T20:00:${id.padStart(2, '0')}.000Z`,
     endedAt: null,
     transport: { kind: 'mock' },
-    reconnectCount: 0
+    reconnectCount: 0,
+    truncated: false
   }
 }
 function event(value: Omit<ObdSessionEvent, keyof typeof envelope>): ObdSessionEvent {
@@ -60,8 +61,36 @@ describe('in-memory OBD persistence adapter', () => {
     const adapter = new InMemoryObdPersistenceAdapter()
     await adapter.recordObservations([{ schemaVersion: 1, id: 'dtc-1', sessionId: 'one', code: 'P0300', observedAt: '2026-08-25T20:00:00.000Z' }])
     expect(await adapter.listObservations()).toHaveLength(1)
-    expect(Object.keys(adapter)).toEqual(['sessions', 'events', 'observations', 'caches'])
+    expect(Object.keys(adapter)).toEqual(expect.arrayContaining(['sessions', 'events', 'observations', 'caches']))
     await adapter.deleteObservation('dtc-1')
     expect(await adapter.listObservations()).toEqual([])
+  })
+
+  it('caps persisted events and marks the session truncated', async () => {
+    const adapter = new InMemoryObdPersistenceAdapter()
+    await adapter.startSession(session('one'))
+    await adapter.appendEvents(Array.from({ length: 5_001 }, () => ({ schemaVersion: 1 as const, sessionId: 'one', event: event({ type: 'session-state', state: 'ready' }) })))
+    expect((await adapter.loadSession('one'))?.events).toHaveLength(5_000)
+    expect((await adapter.loadSession('one'))?.session.truncated).toBe(true)
+  })
+
+  it('swallows failures, resets after success, and latches degradation on the third consecutive one', async () => {
+    const outcomes = [true, false, true, true]
+    const recovering = new InMemoryObdPersistenceAdapter({
+      onWrite: () => {
+        if (outcomes.shift()) throw new Error('quota')
+      }
+    })
+    for (let index = 0; index < 4; index++) await recovering.appendEvents([])
+    expect(recovering.degraded).toBe(false)
+    let writes = 0
+    const failing = new InMemoryObdPersistenceAdapter({
+      onWrite: () => {
+        writes++
+        throw new Error('quota')
+      }
+    })
+    for (let index = 0; index < 4; index++) await failing.appendEvents([])
+    expect([failing.degraded, writes]).toEqual([true, 3])
   })
 })

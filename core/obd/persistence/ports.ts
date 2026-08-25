@@ -8,6 +8,7 @@ export interface PersistedObdSessionRecord {
   endedAt: string | null
   transport: ObdTransportMetadata
   reconnectCount: number
+  truncated: boolean
 }
 
 export interface PersistedObdSessionEventRecord {
