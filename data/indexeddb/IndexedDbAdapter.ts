@@ -32,8 +32,13 @@ export class IndexedDbAdapter implements
   SupportedPidCacheRepository {
   private readonly database: Promise<IDBDatabase>
 
-  constructor(factory: IDBFactory = indexedDB) {
-    this.database = openObdDatabase(factory)
+  constructor(factory?: IDBFactory) {
+    const resolvedFactory = factory
+      ?? (typeof indexedDB === 'undefined' ? undefined : indexedDB)
+    if (!resolvedFactory) {
+      throw new Error('IndexedDB is not available in this environment')
+    }
+    this.database = openObdDatabase(resolvedFactory)
   }
 
   async startSession(session: PersistedObdSessionRecord): Promise<void> {
