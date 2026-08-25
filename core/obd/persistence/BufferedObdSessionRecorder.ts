@@ -8,6 +8,7 @@ export const PERSISTENCE_FLUSH_EVENT_LIMIT = 200
 export interface BufferedObdSessionRecorderOptions {
   setTimeout?: typeof setTimeout
   clearTimeout?: typeof clearTimeout
+  onError?: (error: unknown) => void
 }
 
 export class BufferedObdSessionRecorder {
@@ -22,7 +23,7 @@ export class BufferedObdSessionRecorder {
   constructor(
     private readonly sessionId: string,
     private readonly repository: Pick<ObdSessionRepository, 'appendEvents'>,
-    options: BufferedObdSessionRecorderOptions = {}
+    private readonly options: BufferedObdSessionRecorderOptions = {}
   ) {
     this.setTimer = options.setTimeout ?? setTimeout
     this.clearTimer = options.clearTimeout ?? clearTimeout
@@ -57,8 +58,9 @@ export class BufferedObdSessionRecorder {
         schemaVersion: 1 as const,
         sessionId: this.sessionId,
         event
-      }))).catch(() => {})
-    } catch {
+      }))).catch(error => this.options.onError?.(error))
+    } catch (error) {
+      this.options.onError?.(error)
       // Persistence must never affect OBD execution.
     }
   }

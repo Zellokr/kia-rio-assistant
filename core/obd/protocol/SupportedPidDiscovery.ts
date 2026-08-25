@@ -36,6 +36,7 @@ export interface SupportedPidDiscoveryResult {
 export interface DiscoverSupportedPidsOptions {
   timeoutMs?: number
   initialTimeoutMs?: number
+  seed?: SupportedPidRange
 }
 
 const PID_RANGE_BASES = [
@@ -64,7 +65,14 @@ export async function discoverSupportedPids(
   const ranges: SupportedPidRange[] = []
   const allPids = new Set<string>()
 
+  if (options?.seed) {
+    ranges.push(options.seed)
+    options.seed.pids.forEach(pid => allPids.add(pid))
+    if (!options.seed.hasNextRange) return { pids: [...allPids], ranges }
+  }
+
   for (const basePid of PID_RANGE_BASES) {
+    if (basePid === 0x00 && options?.seed) continue
     const command = createSupportedPidCommand(
       basePid
     )

@@ -17,9 +17,7 @@ import { ElmCommandExecutor } from '~~/core/obd/protocol/ElmCommandExecutor'
 import { decodeMode01Response } from '~~/core/obd/decoder/decodeMode01Response'
 import { decodeSupportedPids } from '~~/core/obd/decoder/decodeSupportedPids'
 import { initializeElm327 } from '~~/core/obd/protocol/Elm327Initializer'
-import {
-  discoverSupportedPids
-} from '~~/core/obd/protocol/SupportedPidDiscovery'
+import { resolveSupportedPids } from '~~/core/obd/capability/resolveSupportedPids'
 import {
   ObdSessionStateMachine
 } from '~~/core/obd/session/ObdSessionStateMachine'
@@ -41,6 +39,8 @@ import {
 import {
   ObdSessionLog
 } from '~~/core/obd/logging/ObdSessionLog'
+import { BufferedObdSessionRecorder } from '~~/core/obd/persistence/BufferedObdSessionRecorder'
+import type { ObdPersistence } from '~~/data/repositories/createObdPersistence'
 import {
   PHYSICAL_ALLOWED_COMMANDS
 } from '~~/core/obd/policy/PhysicalObdCommandPolicy'
@@ -97,6 +97,11 @@ const telemetryDomainStore
 let selectedTransport: ObdTransportMetadata = {
   kind: transport.kind
 }
+const persistence = import.meta.client
+  ? (useNuxtApp() as { $obdPersistence?: ObdPersistence }).$obdPersistence
+  : undefined
+let recorder: BufferedObdSessionRecorder | undefined
+let reconnectCount = 0
 
 const {
   events: sessionEvents,
@@ -194,6 +199,48 @@ function recordError(
     }
   })
 }
+
+function recordPersistenceError(error: unknown): void {
+  console.warn('OBD persistence failed without affecting the active session', error)
+}
+
+function persist(operation: Promise<void>): void {
+  void operation.catch(recordPersistenceError)
+}
+
+function persistedSession() {
+  const exported = sessionLog.getExport()
+  return {
+    schemaVersion: 1 as const,
+    sessionId: exported.sessionId,
+    startedAt: exported.startedAt,
+    endedAt: exported.endedAt,
+    transport: exported.transport,
+    reconnectCount,
+    truncated: false
+  }
+}
+
+sessionLog.subscribe((change) => {
+  if (!persistence) return
+  if (change.type === 'started') {
+    recorder?.finish()
+    reconnectCount = 0
+    recorder = new BufferedObdSessionRecorder(change.session.sessionId, persistence, {
+      onError: recordPersistenceError
+    })
+    persist(persistence.startSession(persistedSession()))
+  } else if (change.type === 'event-recorded') {
+    recorder?.record(change.event)
+    if (change.event.type === 'activity' && change.event.activity === 'reconnected') {
+      reconnectCount++
+      persist(persistence.updateSession(persistedSession()))
+    }
+  } else if (change.type === 'finished') {
+    recorder?.finish()
+    persist(persistence.updateSession(persistedSession()))
+  }
+})
 
 const sessionBadgeColor = computed(() => {
   switch (String(sessionState.value)) {
@@ -419,6 +466,10 @@ async function reconnectAttempt(): Promise<void> {
   transportState.value = transport.state
   sessionLog.updateTransport(selectedTransport)
   await initializeElm327(executor)
+  supportedPids.value = (await resolveSupportedPids(executor, selectedTransport, {
+    reconnect: true,
+    supportedPids: supportedPids.value
+  })).pids
 }
 
 const reconnectionController = new ObdReconnectionController({
@@ -692,8 +743,10 @@ async function connect() {
       activity: 'discovery-started'
     })
 
-    const discovery
-      = await discoverSupportedPids(executor)
+    const discovery = await resolveSupportedPids(executor, selectedTransport, {
+      cache: persistence,
+      onCacheError: recordPersistenceError
+    })
 
     supportedPids.value = discovery.pids
 
@@ -845,6 +898,16 @@ async function sendCommand() {
             dtcs: dtcResult.dtcs
           }
         })
+        if (persistence) {
+          const sessionId = sessionLog.getExport().sessionId
+          persist(persistence.recordObservations(dtcResult.dtcs.map((code, index) => ({
+            schemaVersion: 1 as const,
+            id: `${sessionId}:${code}:${Date.now()}:${index}`,
+            sessionId,
+            code,
+            observedAt: new Date().toISOString()
+          }))))
+        }
       } catch (error) {
         recordError(error, 'decode', result.command)
       }
