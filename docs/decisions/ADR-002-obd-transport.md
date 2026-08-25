@@ -1,0 +1,78 @@
+# ADR-002: Android BLE is the primary OBD transport
+
+**Status**: Accepted
+**Date**: 2026-08-25
+**Supersedes**: ADR-002 in the v2.0 spec (`docs/Especificacion_Final_Asistente_Kia_Rio_v2.0.pdf`, Annex A), which named Web Serial/RFCOMM as the primary Android transport
+**Related**: `docs/ANDROID_BLE_CONTRACT.md`, `docs/SPEC_DEVIATIONS.md`, Sprint 0 task 10 (spec Annex B.1)
+
+## Decision
+
+`AndroidBleObdTransport` (the Capacitor Android BLE bridge, configured with
+`VEEPEAK_BLE_PROFILE`) is the only transport implementation validated against
+the real vehicle, and is the transport this project builds on going forward.
+
+`WebSerialRfcommTransport` exists in the repository
+(`core/obd/transport/WebSerialRfcommTransport.ts`) and has unit test coverage
+against a fake serial port, but **it has never been run against the
+vehicle**. Its validation status is unknown, not failing — it was simply
+never exercised on hardware.
+
+## Context
+
+The v2.0 spec bet on Web Serial over Bluetooth RFCOMM as the primary Android
+transport (spec sections 5.2, 13.1, 17, and Annex A ADR-002), with BLE/GATT
+kept as an "optional, experimental" fallback. That bet predates any hardware
+test. Sprint 0 task 10 (Annex B.1) explicitly asks for this ADR to be
+rewritten once a transport is proven: "Redactar ADR de transporte
+definitivo. Continuar con RFCOMM, cambiar adaptador o evaluar contenedor
+nativo."
+
+Vehicle testing went the other way. The BLE path was implemented, wired into
+the native Capacitor bridge (`BleObdBridgePlugin`), and run against a real
+Kia Rio. The RFCOMM path was never attempted on the vehicle at all.
+
+## Evidence
+
+- `docs/ANDROID_BLE_CONTRACT.md` records real native UUID wiring,
+  characteristic writes, and notifications as "confirmed on hardware
+  (2026-08-24)", with an `ATZ` round trip answering `ELM327 v2.2`.
+- Commit `87f11f7` (`feat(policy): approve the whole Mode 01 capability probe
+  range`) widened the read-only command policy specifically because the BLE
+  path proved it could walk the full Mode 01 PID range on the real ECU.
+- A complete, confirmed session exists as a replay fixture
+  (`test/fixtures/kiaRio2026-08-24Session.json`, added in commit `b1a9754`):
+  - Vehicle: Kia Rio YB 2019 1.2 MPI, parked, engine idling
+  - Session ID: `1f817ef7-0ece-4747-af3c-c3de2f3faaa6`
+  - Transport: `{ kind: "android-ble", name: "VEEPEAK" }`
+  - 91 events captured, `droppedEvents: 0`, marked `complete: true`
+  - Live telemetry decoded correctly (`410C0C4C` → 787 rpm, `410571` → 73°C),
+    both checked by hand against the OBD formulas
+- `WebSerialRfcommTransport.ts` has no equivalent evidence: no replay
+  fixture, no session log, no commit recording a vehicle run. Its test
+  suite (`test/unit/webSerialRfcommTransport.test.ts`) exercises a fake
+  serial port only.
+
+### What this evidence does NOT cover
+
+One confirmed session is enough to decide transport primacy; it is not enough
+to declare Fase 1 validated. Sprint 0 task 8 (spec Annex B.1) asks for **ten
+consecutive connections and one 30-minute session**, and remains **open** —
+only the single 91-event session above exists. Reconnection behaviour in
+particular has no vehicle evidence at all and is proven only against replay
+and mock transports.
+
+## Consequences
+
+- New transport-facing work (lab UI, reconnection, persistence) targets
+  `AndroidBleObdTransport` as the vehicle-proven path.
+- `WebSerialRfcommTransport` stays in the codebase as a dormant, unproven
+  alternative. It is not deleted — a future adapter change or a different
+  Android BLE limitation could revive the RFCOMM path — but no feature work
+  should assume it is vehicle-ready without first running the same hardware
+  validation the BLE path went through.
+- `docs/SPEC_DEVIATIONS.md` records the specific spec sections this decision
+  supersedes so a future reader does not have to reconcile the two documents
+  by hand.
+- This ADR does not claim RFCOMM does not work — only that it was never
+  tested. Do not restate the untested status as a proven failure in later
+  documents.
