@@ -183,6 +183,24 @@ describe('lab destinations', () => {
     expect(text).toContain('Herramientas OBD avanzadas')
   })
 
+  /**
+   * `WebSerialRfcommTransport` was deleted on 2026-08-25 and
+   * `PHYSICAL_TRANSPORT_KINDS` has one entry. Offering a transport that
+   * does not exist sends somebody looking for a control they will never
+   * find — worst of all at the car, mid-procedure.
+   */
+  it('offers only the transports that still exist', () => {
+    const wrapper = mount(ConnectionView, {
+      props: CONNECTION_PROPS,
+      global: { stubs }
+    })
+
+    expect(wrapper.text()).not.toContain('Web Serial')
+    expect(
+      wrapper.findAll('option').map(option => option.attributes('value'))
+    ).toEqual(['mock', 'replay', 'android-ble'])
+  })
+
   it('separates vehicle data from manual queries', () => {
     const text = mount(DataView, {
       props: DATA_PROPS,
