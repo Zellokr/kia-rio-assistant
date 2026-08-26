@@ -320,7 +320,11 @@ describe('ElmCommandExecutor', () => {
         responseKind: 'no-data',
         normalizedText: 'NO DATA',
         error: {
-          name: 'Error',
+          // A classified ELM327 error rejects with the typed
+          // `ElmResponseError`, so a caller can branch on `responseKind`
+          // instead of matching the message text. The message itself is
+          // unchanged.
+          name: 'ElmResponseError',
           message: 'ELM327 no-data: NO DATA',
           phase: 'response'
         }
@@ -366,7 +370,10 @@ describe('ElmCommandExecutor', () => {
         command: '0198',
         latencyMs: expect.any(Number),
         error: {
-          name: 'Error',
+          // A timeout is not an ELM327 response and has no response kind,
+          // so it rejects with its own typed error. The message is
+          // unchanged.
+          name: 'ElmTimeoutError',
           message: 'Timeout waiting for ELM327 response to 0198',
           phase: 'timeout'
         }
