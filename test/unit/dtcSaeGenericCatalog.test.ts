@@ -17,8 +17,11 @@ const catalog: DtcCatalog = saeGenericDtcCatalog
  * SAE J2012 generic powertrain codes only. `P0` is the sole SAE-defined
  * powertrain block this catalogue may describe; `P1`/`P3xxx` below P3400
  * are manufacturer territory and belong to nobody's generic catalogue.
+ *
+ * The three digits after `P0` are unconstrained: the generic block spans
+ * P0000-P0FFF, so P0420 and P0562 are as generic as P0300.
  */
-const GENERIC_POWERTRAIN_CODE = /^P0[0-3][0-9A-F]{2}$/
+const GENERIC_POWERTRAIN_CODE = /^P0[0-9A-F]{3}$/
 
 describe('SAE generic DTC catalogue', () => {
   it('describes a curated set of codes', () => {
@@ -91,12 +94,28 @@ describe('SAE generic DTC catalogue', () => {
    * in it — not in a code, not in a cause, not in a piece of prose.
    */
   it('contains no vehicle-specific data', () => {
-    const haystack = JSON.stringify(
-      SAE_GENERIC_DTC_ENTRIES
-    ).toLowerCase()
+    const haystack = JSON.stringify(SAE_GENERIC_DTC_ENTRIES)
 
+    // Whole words only. A bare substring search would flag ordinary
+    // Spanish — `varios`, `accesorios` and `criterio` all contain "rio" —
+    // and a check that fires on correct prose trains its author to write
+    // worse prose instead of catching the thing it exists to catch.
     for (const brand of ['kia', 'rio', 'hyundai', 'g4la', 'yb']) {
-      expect(haystack).not.toContain(brand)
+      expect(haystack).not.toMatch(
+        new RegExp(`\\b${brand}\\b`, 'i')
+      )
+    }
+  })
+
+  it('detects a brand name if one is ever added', () => {
+    const contaminated = JSON.stringify([
+      { title: 'Fallo específico del Kia Rio' }
+    ])
+
+    for (const brand of ['kia', 'rio']) {
+      expect(contaminated).toMatch(
+        new RegExp(`\\b${brand}\\b`, 'i')
+      )
     }
   })
 
