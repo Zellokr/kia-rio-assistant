@@ -6,7 +6,10 @@ import {
   vi
 } from 'vitest'
 
-import { decodeMode03Response } from '../../core/obd/decoder/decodeMode03Response'
+import {
+  DTC_MODES,
+  decodeDtcResponse
+} from '../../core/obd/decoder/decodeDtcResponse'
 import { ElmCommandExecutor } from '../../core/obd/protocol/ElmCommandExecutor'
 import {
   buildReplayTranscript,
@@ -239,7 +242,7 @@ describe('obdReplaySessions fixtures', () => {
     const result = await executor.execute('03')
 
     expect(result.normalizedText).toBe('43 03 00 00 00')
-    expect(decodeMode03Response(result.normalizedText).dtcs).toEqual([
+    expect(decodeDtcResponse(result.normalizedText, DTC_MODES.stored).codes.map(c => c.code)).toEqual([
       'P0300'
     ])
 
@@ -260,7 +263,7 @@ describe('obdReplaySessions fixtures', () => {
     const result = await executor.execute('03')
 
     expect(result.normalizedText).toBe('43 04 20 00 00')
-    expect(decodeMode03Response(result.normalizedText).dtcs).toEqual([
+    expect(decodeDtcResponse(result.normalizedText, DTC_MODES.stored).codes.map(c => c.code)).toEqual([
       'P0420'
     ])
 

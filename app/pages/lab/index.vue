@@ -22,8 +22,9 @@ import {
   ObdPollScheduler
 } from '~~/core/obd/polling/ObdPollScheduler'
 import {
-  decodeMode03Response
-} from '~~/core/obd/decoder/decodeMode03Response'
+  DTC_MODES,
+  decodeDtcResponse
+} from '~~/core/obd/decoder/decodeDtcResponse'
 import {
   ObdTelemetryStore
 } from '~~/core/obd/telemetry/ObdTelemetryStore'
@@ -817,9 +818,16 @@ async function sendCommand() {
       || result.command === '03TEST'
     ) {
       try {
-        const dtcResult = decodeMode03Response(
-          result.normalizedText
+        // NOTE: only `.codes` is consumed here; the mode-parameterised
+        // decoder's `kind`/`reason` distinction (complete vs. incomplete
+        // multi-frame/odd-byte responses) is not yet surfaced to this page.
+        // Wiring that, and the DtcObservation persistence shape, is PR 2's
+        // scope (see docs/DTC_PHYSICAL_VALIDATION.md check 1).
+        const dtcResult = decodeDtcResponse(
+          result.normalizedText,
+          DTC_MODES.stored
         )
+        const dtcs = dtcResult.codes.map(code => code.code)
 
         sessionLog.record({
           type: 'decoded-value',
@@ -828,12 +836,12 @@ async function sendCommand() {
           latencyMs: result.latencyMs,
           decoded: {
             kind: 'dtc',
-            dtcs: dtcResult.dtcs
+            dtcs
           }
         })
         if (persistence) {
           const sessionId = sessionLog.getExport().sessionId
-          persist(persistence.recordObservations(dtcResult.dtcs.map((code, index) => ({
+          persist(persistence.recordObservations(dtcs.map((code, index) => ({
             schemaVersion: 1 as const,
             id: `${sessionId}:${code}:${Date.now()}:${index}`,
             sessionId,
