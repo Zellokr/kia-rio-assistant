@@ -83,11 +83,11 @@ describe('core → catalog import boundary', () => {
     const someCoreFile = join(CORE_ROOT, 'obd', 'diagnostics', 'ports.ts')
 
     it.each([
-      "import { x } from '../../../catalog/dtc-sae-generic'",
-      "import { x } from '~~/catalog/kia-rio/warning-lights'",
-      "import { x } from 'catalog/dtc-sae-generic'",
-      "const x = await import('~/catalog/dtc-sae-generic')",
-      "const x = require('../../../catalog')"
+      'import { x } from \'../../../catalog/dtc-sae-generic\'',
+      'import { x } from \'~~/catalog/kia-rio/warning-lights\'',
+      'import { x } from \'catalog/dtc-sae-generic\'',
+      'const x = await import(\'~/catalog/dtc-sae-generic\')',
+      'const x = require(\'../../../catalog\')'
     ])('detects the violating import %s', (source) => {
       expect(
         findCatalogImports(source, someCoreFile)
@@ -95,11 +95,11 @@ describe('core → catalog import boundary', () => {
     })
 
     it.each([
-      "import { x } from './ports'",
-      "import { x } from '../dtc/DtcCode'",
-      "import { x } from '~~/core/obd/diagnostics/ports'",
-      "import { x } from 'node:fs'",
-      "const catalog = buildCatalog('catalog')"
+      'import { x } from \'./ports\'',
+      'import { x } from \'../dtc/DtcCode\'',
+      'import { x } from \'~~/core/obd/diagnostics/ports\'',
+      'import { x } from \'node:fs\'',
+      'const catalog = buildCatalog(\'catalog\')'
     ])('does not fire on the legitimate line %s', (source) => {
       expect(
         findCatalogImports(source, someCoreFile)
