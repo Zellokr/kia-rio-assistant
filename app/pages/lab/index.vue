@@ -52,6 +52,13 @@ import type {
   ObdTransportMetadata,
   ObdTransportState
 } from '~~/core/obd/transport/ObdTransport'
+import {
+  useVehicleDiagnostics
+} from '~/composables/useVehicleDiagnostics'
+import type { DtcModeKey } from '~/composables/useVehicleDiagnostics'
+import {
+  kiaRioWarningLightsCatalog
+} from '~~/catalog/kia-rio/warning-lights'
 import { labViews } from '~/utils/labNav'
 import type { LabViewId } from '~/utils/labNav'
 
@@ -198,6 +205,85 @@ function recordError(
 
 function recordPersistenceError(error: unknown): void {
   console.warn('OBD persistence failed without affecting the active session', error)
+}
+
+/**
+ * Driver-facing diagnostic reads.
+ *
+ * Separate from the manual command box on purpose. That box is a raw
+ * protocol tool and stays one: it sends what is typed and shows what came
+ * back. This path goes through `readDiagnosticCodes`, so a vehicle that
+ * answers nothing is reported as unconfirmed instead of as a failure.
+ *
+ * The executor is passed as a getter because `connect` replaces it when
+ * the transport changes; capturing it here would read through a disposed
+ * object after the first reconnection.
+ */
+const diagnostics = useVehicleDiagnostics({
+  executor: () => executor,
+  adapterConnected: () => sessionState.value === 'ready'
+})
+
+async function readDiagnosticTroubleCodes(
+  mode: DtcModeKey
+): Promise<void> {
+  const previous = diagnostics.reads.value.find(
+    read => read.state === mode
+  )
+  const startedAt = Date.now()
+
+  await diagnostics.read(mode)
+
+  const outcome = diagnostics.reads.value.find(
+    read => read.state === mode
+  )
+
+  // `read` is a no-op while another read is in flight, which would leave
+  // the previous outcome in place. Logging and persisting it again would
+  // duplicate an observation the vehicle only reported once.
+  if (outcome === undefined || outcome === previous) {
+    return
+  }
+
+  if (outcome.kind !== 'codes') {
+    return
+  }
+
+  const observedAt = new Date().toISOString()
+  const observations = outcome.codes.map(code => ({
+    ...code,
+    state: outcome.state,
+    observedAt
+  }))
+
+  sessionLog.record({
+    type: 'decoded-value',
+    source: 'manual',
+    command: DTC_MODES[mode].command,
+    latencyMs: Date.now() - startedAt,
+    decoded: {
+      kind: 'dtc',
+      observations
+    }
+  })
+
+  if (!persistence) {
+    return
+  }
+
+  const sessionId = sessionLog.getExport().sessionId
+
+  persist(persistence.recordObservations(
+    observations.map((observation, index) => ({
+      schemaVersion: 2 as const,
+      id: `${sessionId}:${observation.code}:${Date.now()}:${index}`,
+      sessionId,
+      code: observation.code,
+      type: observation.type,
+      state: observation.state,
+      observedAt: observation.observedAt
+    }))
+  ))
 }
 
 function persist(operation: Promise<void>): void {
@@ -980,6 +1066,79 @@ onBeforeUnmount(() => {
           @send-command="sendCommand"
           @run-queue-test="runQueueTest"
         />
+
+        <template v-if="activeView === 'data'">
+          <UCard>
+            <div class="flex flex-col gap-4">
+              <div class="flex flex-col gap-1">
+                <h2 class="text-lg font-semibold text-highlighted">
+                  Leer códigos de avería
+                </h2>
+                <p class="text-sm leading-6 text-muted">
+                  Lectura únicamente. Este laboratorio no borra códigos
+                  ni escribe nada en la centralita.
+                </p>
+              </div>
+
+              <div class="grid gap-2 sm:grid-cols-2">
+                <UButton
+                  color="primary"
+                  variant="solid"
+                  size="lg"
+                  :disabled="diagnostics.busy.value"
+                  @click="readDiagnosticTroubleCodes('stored')"
+                >
+                  Códigos almacenados
+                </UButton>
+                <UButton
+                  color="neutral"
+                  variant="soft"
+                  size="lg"
+                  :disabled="diagnostics.busy.value"
+                  @click="readDiagnosticTroubleCodes('pending')"
+                >
+                  Códigos pendientes
+                </UButton>
+                <UButton
+                  color="neutral"
+                  variant="soft"
+                  size="lg"
+                  :disabled="diagnostics.busy.value"
+                  @click="readDiagnosticTroubleCodes('permanent')"
+                >
+                  Códigos permanentes
+                </UButton>
+                <UButton
+                  color="neutral"
+                  variant="ghost"
+                  size="lg"
+                  :disabled="diagnostics.busy.value"
+                  @click="diagnostics.reset()"
+                >
+                  Limpiar resultados
+                </UButton>
+              </div>
+
+              <UAlert
+                v-if="diagnostics.errorMessage.value"
+                color="error"
+                variant="soft"
+                icon="i-lucide-triangle-alert"
+                :description="diagnostics.errorMessage.value"
+              />
+            </div>
+          </UCard>
+
+          <DiagnosticAssessmentCard
+            :assessment="diagnostics.assessment.value"
+            :reads="diagnostics.reads.value"
+          />
+
+          <WarningLightIdentifier
+            :catalog="kiaRioWarningLightsCatalog"
+            :adapter-connected="sessionState === 'ready'"
+          />
+        </template>
 
         <LogView
           v-else
