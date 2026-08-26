@@ -8,6 +8,9 @@
 > al vehículo, no como una lista de tareas pendiente.
 > Motivo de la eliminación y evidencia completa: la enmienda de
 > [ADR-002](decisions/ADR-002-obd-transport.md).
+> **Lo único vivo que contenía este archivo** — la validación de Mode 03
+> multi-trama, que no dependía del transporte — se movió a
+> [DTC_PHYSICAL_VALIDATION.md](DTC_PHYSICAL_VALIDATION.md).
 
 **Estado: NOT RUN, y ya no ejecutable.** Esta lista nunca confirmó
 compatibilidad con ningún vehículo o adaptador, y ya no puede hacerlo.
@@ -45,12 +48,10 @@ y [serial Bluetooth RFCOMM en Chrome](https://developer.chrome.com/blog/serial-o
    inicialización ELM327 y el descubrimiento de PIDs.
 5. Con la sesión en `ready`, prueba solo lecturas permitidas: `010C`, `0105` y
    `03`. No uses Mode 04, borrado de DTC, codificación ni adaptación.
-   - **Validación pendiente de Mode 03 multi-trama:** el decoder de DTC solo
-     está validado para una respuesta de una sola trama con hasta tres códigos
-     y sin byte de conteo. Si el vehículo tiene más de tres DTC almacenados,
-     guarda la respuesta `03` sin editar (todas las líneas) y compárala con los
-     códigos que muestre una herramienta de referencia. Confirma si tras `43`
-     aparece un byte de conteo o framing ISO-TP antes de fiarte de la salida.
+   - La validación pendiente de Mode 03 multi-trama **ya no vive aquí**. Nunca
+     fue específica de Web Serial, así que se movió a
+     [DTC_PHYSICAL_VALIDATION.md](DTC_PHYSICAL_VALIDATION.md), que sí está
+     vigente. Es el documento al que apunta `decodeMode03Response.ts`.
 6. Inicia telemetría durante un intervalo corto. Comprueba que los valores y
    latencias se actualizan sin bloquear la interfaz.
 7. Detén la telemetría, pulsa **Desconectar** y confirma `disconnected`.

@@ -47,8 +47,8 @@ function decodeDtc(
  * NOT YET VALIDATED: multi-frame responses (more than three DTCs), where CAN
  * ISO-TP framing and a possible DTC-count byte change the byte layout. Some
  * stacks (e.g. python-OBD) strip a count byte after 0x43; whether the target
- * adapter/vehicle emits one is unconfirmed until the physical Mode 03 check in
- * docs/STEP_18_PHYSICAL_TEST.md is run with more than three stored codes. Do
+ * adapter/vehicle emits one is unconfirmed until check 1 of
+ * docs/DTC_PHYSICAL_VALIDATION.md is run with more than three stored codes. Do
  * not widen this decoder to strip a count byte without that real evidence — it
  * would corrupt the common single-frame case.
  */
