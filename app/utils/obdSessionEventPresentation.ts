@@ -125,8 +125,10 @@ export function presentSessionEvent(
       }
     case 'decoded-value': {
       const summary = event.decoded.kind === 'dtc'
-        ? event.decoded.dtcs.length
-          ? event.decoded.dtcs.join(', ')
+        ? event.decoded.observations.length
+          ? event.decoded.observations.map((observation) => {
+              return `${observation.code} (${observation.state}, ${observation.type})`
+            }).join(', ')
           : 'Sin códigos almacenados'
         : `${event.decoded.label}: ${event.decoded.value} ${event.decoded.unit}`
 

@@ -2,11 +2,13 @@ import type {
   DtcRepository,
   ObdSessionRepository,
   PersistedDtcObservation,
+  PersistedDtcObservationRecord,
   PersistedObdSessionEventRecord,
   PersistedObdSessionRecord,
   PersistedSupportedPidCache,
   SupportedPidCacheRepository
 } from '~~/core/obd/persistence/ports'
+import { upgradeDtcObservation } from '../../core/obd/persistence/upgradeDtcObservation'
 import { openObdDatabase } from './migrations'
 import { OBD_STORES } from './stores'
 
@@ -92,12 +94,17 @@ export class IndexedDbAdapter implements
     await transactionDone(transaction)
   }
 
-  async recordObservations(observations: PersistedDtcObservation[]): Promise<void> {
+  async recordObservations(observations: PersistedDtcObservationRecord[]): Promise<void> {
     await this.writeStore(OBD_STORES.observations, store => observations.forEach(item => store.put(item)))
   }
 
   async listObservations(): Promise<PersistedDtcObservation[]> {
-    return this.readStore(OBD_STORES.observations, store => requestResult(store.getAll()))
+    const observations = await this.readStore(
+      OBD_STORES.observations,
+      store => requestResult(store.getAll())
+    ) as PersistedDtcObservationRecord[]
+
+    return observations.map(upgradeDtcObservation)
   }
 
   async deleteObservation(id: string): Promise<void> {

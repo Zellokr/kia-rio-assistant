@@ -22,9 +22,11 @@ function formatEvent(event: ObdSessionEvent): string {
       return `RX FRAME ← ${event.normalizedText} (${event.responseKind}${event.latencyMs === undefined ? '' : `, ${event.latencyMs} ms`})`
     case 'decoded-value':
       if (event.decoded.kind === 'dtc') {
-        return event.decoded.dtcs.length === 0
+        return event.decoded.observations.length === 0
           ? 'DTC ← Sin códigos almacenados'
-          : `DTC ← ${event.decoded.dtcs.join(', ')}`
+          : `DTC ← ${event.decoded.observations.map((observation) => {
+            return `${observation.code} (${observation.state}, ${observation.type})`
+          }).join(', ')}`
       }
 
       return `${event.source === 'telemetry' ? 'TELEMETRY' : 'VALUE'} ← ${event.decoded.label}: ${event.decoded.value} ${event.decoded.unit}`

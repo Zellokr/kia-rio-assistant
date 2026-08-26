@@ -818,16 +818,16 @@ async function sendCommand() {
       || result.command === '03TEST'
     ) {
       try {
-        // NOTE: only `.codes` is consumed here; the mode-parameterised
-        // decoder's `kind`/`reason` distinction (complete vs. incomplete
-        // multi-frame/odd-byte responses) is not yet surfaced to this page.
-        // Wiring that, and the DtcObservation persistence shape, is PR 2's
-        // scope (see docs/DTC_PHYSICAL_VALIDATION.md check 1).
         const dtcResult = decodeDtcResponse(
           result.normalizedText,
           DTC_MODES.stored
         )
-        const dtcs = dtcResult.codes.map(code => code.code)
+        const observedAt = new Date().toISOString()
+        const observations = dtcResult.codes.map(code => ({
+          ...code,
+          state: dtcResult.state,
+          observedAt
+        }))
 
         sessionLog.record({
           type: 'decoded-value',
@@ -836,17 +836,19 @@ async function sendCommand() {
           latencyMs: result.latencyMs,
           decoded: {
             kind: 'dtc',
-            dtcs
+            observations
           }
         })
         if (persistence) {
           const sessionId = sessionLog.getExport().sessionId
-          persist(persistence.recordObservations(dtcs.map((code, index) => ({
-            schemaVersion: 1 as const,
-            id: `${sessionId}:${code}:${Date.now()}:${index}`,
+          persist(persistence.recordObservations(observations.map((code, index) => ({
+            schemaVersion: 2 as const,
+            id: `${sessionId}:${code.code}:${Date.now()}:${index}`,
             sessionId,
-            code,
-            observedAt: new Date().toISOString()
+            code: code.code,
+            type: code.type,
+            state: dtcResult.state,
+            observedAt: code.observedAt
           }))))
         }
       } catch (error) {

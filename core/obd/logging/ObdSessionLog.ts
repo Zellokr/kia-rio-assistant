@@ -2,6 +2,9 @@ import type {
   DecodedPidValue
 } from '../decoder/decodeMode01Response'
 import type {
+  DtcObservation
+} from '../dtc/DtcCode'
+import type {
   ElmResponseKind
 } from '../protocol/classifyElmResponse'
 import type {
@@ -61,7 +64,7 @@ export type ObdDecodedPayload
   = | ({ kind: 'pid' } & DecodedPidValue)
     | {
       kind: 'dtc'
-      dtcs: string[]
+      observations: DtcObservation[]
     }
 
 export interface ObdDecodedValueEvent

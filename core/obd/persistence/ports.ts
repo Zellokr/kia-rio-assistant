@@ -1,3 +1,4 @@
+import type { DtcState, DtcType } from '../dtc/DtcCode'
 import type { PersistableObdSessionEvent } from './persistedEventAllowlist'
 import type { ObdTransportMetadata } from '../transport/ObdTransport'
 
@@ -28,13 +29,25 @@ export interface PersistedObdSessionEventRecord {
   event: PersistableObdSessionEvent
 }
 
-export interface PersistedDtcObservation {
+export interface PersistedDtcObservationV1 {
   schemaVersion: 1
   id: string
   sessionId: string
   code: string
   observedAt: string
 }
+
+export interface PersistedDtcObservation {
+  schemaVersion: 2
+  id: string
+  sessionId: string
+  code: string
+  type: DtcType
+  state: DtcState
+  observedAt: string
+}
+
+export type PersistedDtcObservationRecord = PersistedDtcObservationV1 | PersistedDtcObservation
 
 export interface PersistedSupportedPidCache {
   schemaVersion: 1
@@ -55,7 +68,7 @@ export interface ObdSessionRepository {
 }
 
 export interface DtcRepository {
-  recordObservations(observations: PersistedDtcObservation[]): Promise<void>
+  recordObservations(observations: PersistedDtcObservationRecord[]): Promise<void>
   listObservations(): Promise<PersistedDtcObservation[]>
   deleteObservation(id: string): Promise<void>
 }
