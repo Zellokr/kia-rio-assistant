@@ -1,11 +1,12 @@
 # Spec deviations from the v2.0 document
 
 The implementation has diverged from
-`docs/Especificacion_Final_Asistente_Kia_Rio_v2.0.pdf` (v2.0) in three ways
-that vehicle evidence and an implementation decision have overtaken, plus one
-structural difference in how session states are modeled. This document is
-the map between what the spec says and what the repository actually does, so
-a future reader does not have to reconcile the two by hand.
+`docs/Especificacion_Final_Asistente_Kia_Rio_v2.0.pdf` (v2.0) in four ways —
+three that vehicle evidence and an implementation decision overtook, and one
+taken deliberately — plus one structural difference in how session states are
+modeled. This document is the map between what the spec says and what the
+repository actually does, so a future reader does not have to reconcile the
+two by hand.
 
 None of these deviations change the read-only, local-first scope of the
 project. They record where reality diverged from the plan, not a change in
@@ -13,20 +14,23 @@ intent.
 
 ## Quick path
 
-1. Read the table below for the three stale spec claims and their evidence.
+1. Read the table below for the four diverging spec claims and their
+   evidence. Deviations 1-3 record reality overtaking the text; deviation 4
+   is a deliberate architectural choice made against the text.
 2. Read the state mapping table if you are comparing `SessionController`
    (spec) against `ObdSessionStateMachine` (repo).
 3. Treat this document, `docs/ANDROID_BLE_CONTRACT.md`, and
    `docs/decisions/ADR-002-obd-transport.md` as the current source of truth
    over the PDF for the topics listed here.
 
-## Stale spec claims
+## Diverging spec claims
 
-| # | Spec location | Stale claim | Current reality |
+| # | Spec location | Spec claim | Current reality |
 |---|---|---|---|
 | 1 | Annex A (ADR-002), section 5.2, section 17 | Web Serial/RFCOMM is the primary Android transport; BLE/GATT is an optional, experimental fallback | Inverted by vehicle evidence, then removed outright on 2026-08-25. `AndroidBleObdTransport` is the only transport implementation in the repository, and the only one validated against the real car (2026-08-24, Kia Rio YB 2019 1.2 MPI). `WebSerialRfcommTransport` had unit tests against a fake port but was never run against the vehicle, and was deleted because official Chrome documentation limits native Web Serial to desktop platforms — it could never execute inside the Capacitor Android app — and because the owned VEEPEAK adapter is BLE, a different protocol from RFCOMM. See the amendment in `docs/decisions/ADR-002-obd-transport.md` for the full evidence trail. |
 | 2 | Sections 5.2, 13.1, 16, RNF-005 | The app is a Chrome-Android PWA (RNF-005: "Chrome Android actualizado"; section 16: "Chrome 138 o posterior" for RFCOMM) | The app ships as a Capacitor Android app (`@capacitor/android` 8.5.0), not a browser PWA. This shift was authorized by the spec's own section 3.1 "Fase 0 decision gate": if the adapter cannot communicate reliably via Web Bluetooth or Web Serial in Chrome Android, the project switches adapter or evaluates a native Android container. The BLE path only worked once wired to a native Capacitor bridge, so the container branch of that gate was taken — but sections 5.2, 13.1, 16, and RNF-005 were never rewritten to reflect it. Chrome version is no longer the compatibility axis; the Capacitor Android WebView and native plugin layer are. |
 | 3 | Section 13.1 | The BLE transport double is named `WebBluetoothTransport` | The real class is `AndroidBleObdTransport` (`core/obd/transport/AndroidBleObdTransport.ts`), backed by the native Capacitor bridge `AndroidBleBridge` (`core/bluetooth/AndroidBleBridge.ts`). It is not a Web Bluetooth API implementation — the browser API is unavailable inside the Capacitor Android WebView for this use case. |
+| 4 | Section 16.1 | Diagnostic catalogues live at `core/diagnostics/catalogs/` | Catalogue data lives at top-level `catalog/` instead — `catalog/dtc-sae-generic/` for the SAE generic DTC subset, `catalog/kia-rio/warning-lights/` for the vehicle-specific light catalogue. **This is a deliberate divergence, not a stale claim.** `AGENTS.MD` states that generic OBD code must not contain Kia-specific logic, and the spec's own location would put vehicle data inside `core/`, breaking that rule the moment the second catalogue lands. Catalogues are injected into `core/obd/diagnostics/` through the `DtcCatalog` and `WarningLightCatalog` ports, so `core/` depends on the shape of catalogue data and never on the data itself. The rule is mechanised rather than trusted: `test/unit/coreCatalogImportBoundary.test.ts` walks every `.ts` file under `core/` and fails if any of them imports from `catalog/`. Confirmed by the owner on 2026-08-26. |
 
 ## State model: spec `SessionController` vs. repo `ObdSessionStateMachine`
 
