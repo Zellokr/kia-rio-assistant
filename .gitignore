@@ -25,3 +25,4 @@ logs
 !.env.example
 # Local Pi runtime state
 .atl/
+kia-rio-assistant-debug.apk
