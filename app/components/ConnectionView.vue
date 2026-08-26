@@ -100,7 +100,7 @@ watch(
             Herramientas OBD avanzadas
           </span>
           <span class="block text-sm text-muted">
-            Mock, Replay y Web Serial para desarrollo
+            Mock, Replay y adaptador real para desarrollo
           </span>
         </span>
         <UIcon
