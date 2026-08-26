@@ -30,7 +30,15 @@ export const PHYSICAL_ALLOWED_COMMANDS = [
   '01C0',
   '010C',
   '0105',
-  '03'
+  // The three SAE J1979 DTC reads. All three are pure reads: they return
+  // stored ($03), pending ($07) and permanent ($0A) codes and write nothing.
+  // Mode 04 (clear) is NOT here and never will be. Whether a vehicle answers
+  // $07/$0A with a padded frame or with `NO DATA` is unconfirmed — see check 2
+  // of docs/DTC_PHYSICAL_VALIDATION.md — which is a decoding question, not a
+  // safety one: sending them cannot modify the ECU.
+  '03',
+  '07',
+  '0A'
 ] as const
 
 export type PhysicalAllowedCommand

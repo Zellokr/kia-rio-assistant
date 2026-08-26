@@ -10,6 +10,8 @@ import {
   classifyElmResponse,
   isElmErrorResponse
 } from './classifyElmResponse'
+import { ElmResponseError } from './ElmResponseError'
+import { ElmTimeoutError } from './ElmTimeoutError'
 
 import type {
   ElmResponseKind
@@ -208,7 +210,7 @@ export class ElmCommandExecutor {
       const timedOutItem = this.current.item
       const latencyMs = Date.now()
         - this.current.startedAt
-      const error = new Error(
+      const error = new ElmTimeoutError(
         `Timeout waiting for ELM327 response to ${timedOutItem.command}`
       )
 
@@ -335,8 +337,9 @@ export class ElmCommandExecutor {
       if (isElmErrorResponse(responseKind)) {
         clearTimeout(current.timer)
 
-        const error = new Error(
-          `ELM327 ${responseKind}: ${response.normalizedText || '<empty>'}`
+        const error = new ElmResponseError(
+          `ELM327 ${responseKind}: ${response.normalizedText || '<empty>'}`,
+          responseKind
         )
 
         this.observeError(

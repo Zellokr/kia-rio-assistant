@@ -7,8 +7,9 @@ import type {
  * `classifyElmResponse`, carrying the classification alongside the message
  * so a caller can branch on `responseKind` instead of parsing error text.
  *
- * Not yet thrown anywhere: `ElmCommandExecutor` still rejects with a plain
- * `Error` for these cases. Wiring it in is a later unit's scope.
+ * Thrown by `ElmCommandExecutor` for every response `isElmErrorResponse`
+ * classifies as an error. The message is unchanged from the plain `Error` it
+ * replaced, so callers that only read `error.message` keep working.
  */
 export class ElmResponseError extends Error {
   readonly responseKind: ElmResponseKind
