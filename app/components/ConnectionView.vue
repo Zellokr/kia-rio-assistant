@@ -142,12 +142,9 @@ watch(
             <template v-else-if="transportChoice === 'replay'">
               Reproduce localmente una sesión estructurada.
             </template>
-            <template v-else-if="transportChoice === 'android-ble'">
+            <template v-else>
               Habla con el VEEPEAK por Bluetooth LE. Solo en la aplicación
               Android, y únicamente con comandos de lectura.
-            </template>
-            <template v-else>
-              Requiere una plataforma con Web Serial y RFCOMM.
             </template>
           </p>
         </div>

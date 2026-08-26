@@ -195,11 +195,29 @@ describe('lab destinations', () => {
       global: { stubs }
     })
 
-    expect(wrapper.text()).not.toContain('Web Serial')
     expect(
       wrapper.findAll('option').map(option => option.attributes('value'))
     ).toEqual(['mock', 'replay', 'android-ble'])
   })
+
+  /**
+   * Checked for every choice, not just the default. The first version of
+   * this test used `mock` alone and passed while a dead `v-else` branch
+   * still named Web Serial — it shipped into the APK, where a text search
+   * found it. A per-branch claim needs a per-branch assertion.
+   */
+  it.each(['mock', 'replay', 'android-ble'] as const)(
+    'never names a deleted transport with %s selected',
+    (transportChoice) => {
+      const wrapper = mount(ConnectionView, {
+        props: { ...CONNECTION_PROPS, transportChoice },
+        global: { stubs }
+      })
+
+      expect(wrapper.text()).not.toContain('Web Serial')
+      expect(wrapper.text()).not.toContain('RFCOMM')
+    }
+  )
 
   it('separates vehicle data from manual queries', () => {
     const text = mount(DataView, {
