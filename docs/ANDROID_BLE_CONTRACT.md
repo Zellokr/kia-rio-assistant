@@ -1,9 +1,12 @@
 # Android BLE OBD transport contract
 
-This document freezes the TypeScript contract for a future Capacitor Android
-BLE byte pipe that will feed `ObdTransport` / `ElmCommandExecutor`.
+This document holds the TypeScript contract for the Capacitor Android BLE byte
+pipe feeding `ObdTransport` / `ElmCommandExecutor`.
 
-It is **not** a claim that VEEPEAK BLE OBD works in the app today.
+It was originally written before any of it existed. The pipe now ships and has
+answered a real vehicle, so the sections below describe what is built, not what
+is planned. Read the Status block for exactly how far the hardware evidence
+reaches — it is narrower than "it works".
 
 ## Status
 
@@ -16,21 +19,25 @@ It is **not** a claim that VEEPEAK BLE OBD works in the app today.
   `0100` answered `4100BE3EB813` after one `SEARCHING...`, yielding 18 supported
   PIDs in range 01-20. Live telemetry decoded `410C0C4C` -> 787 rpm and
   `410571` -> 73 degrees C, both verified by hand against the OBD formulas.
-- Discovery stops at PID `0x20`. The `0100` bitmask sets PID 20, meaning the ECU
-  has further ranges, but `0120` is not in `PHYSICAL_ALLOWED_COMMANDS`, so
-  `discoverSupportedPids` catches `PhysicalCommandRejectedError` and ends the
-  loop cleanly. This is the read-only policy working as designed, not a defect.
-  Widening the range is a deliberate policy decision, never an incidental fix.
+- **Range walk: widened on 2026-08-25, never run on the car.** During the
+  2026-08-24 session discovery stopped at PID `0x20`: the `0100` bitmask set PID
+  20, so the ECU had further ranges, but `0120` was not yet allowlisted and
+  `discoverSupportedPids` ended the loop cleanly on `PhysicalCommandRejectedError`
+  — the read-only policy working as designed, not a defect. Commit `87f11f7` then
+  approved the whole Mode 01 probe range (`0120` through `01C0`) as a deliberate
+  policy decision. That commit lands **one day after** the only vehicle session
+  this project has, so the widened walk has only ever run against fakes. The 18
+  PIDs above are still the complete vehicle evidence.
 
 ## Layers
 
 | Layer | Role |
 |-------|------|
 | `GattInspector*` | Scan VEEPEAK + discover GATT structure only (no value I/O) |
-| `AndroidBleBridge` | Future native byte stream (select / connect / write / RX) |
+| `AndroidBleBridge` | Native byte stream contract (select / connect / write / RX) |
 | `AndroidBleProfile` | Opaque service + TX/RX characteristic UUIDs |
 | `AndroidBleObdTransport` | `ObdTransport` adapter (`kind: 'android-ble'`) |
-| `capacitorAndroidBle` | Capacitor stub: detectable on Android, I/O throws until inventory |
+| `capacitorAndroidBle` | Live Capacitor binding (`app/services/capacitorAndroidBle.ts`) onto the Kotlin `BleObdBridge` plugin |
 
 Gatt inventory and the OBD byte pipe stay separate on purpose. Do not merge
 inspect-only APIs into the OBD bridge.
@@ -77,13 +84,19 @@ The transport maps:
 - bridge RX chunks → transport `subscribe` listeners
 - `disconnect()` / `error` → `subscribeState` (executor fails in-flight work)
 
-## What must not ship yet
+## Standing rules
 
-- Kotlin/Capacitor plugin that enables notifications or writes characteristics
-- Assumed Nordic UART / “standard ELM BLE” UUID sets without inventory proof
-- Lab UI option that implies Android BLE OBD is physically ready
+The first and third bullets of this section were "must not ship yet" gates.
+Both were cleared deliberately, on inventory evidence, and the plugin and the
+lab option now ship. What remains is a permanent rule, not a gate:
 
-## How to test today
+- Never assume Nordic UART or "standard ELM BLE" UUID sets without inventory
+  proof. Profiles come from a real Step 19 inventory or they do not come at all.
+- Never let the lab UI imply more physical readiness than the Status block
+  supports. Initial connection is proven; reconnection is not (see
+  [ADR-003](decisions/ADR-003-fase-1-closure-waiver.md)).
+
+## How to test without a car
 
 Use a fake `AndroidBleBridge` in Vitest (see
 `test/unit/androidBleObdTransport.test.ts`):
@@ -96,9 +109,17 @@ Use a fake `AndroidBleBridge` in Vitest (see
 pnpm exec vitest run test/unit/androidBleObdTransport.test.ts
 ```
 
-## Next step after inventory
+## Build-out status
 
-1. Complete [Step 19](STEP_19_GATT_INSPECTION.md) and save the JSON inventory.
-2. Choose write + notify characteristics from that evidence.
-3. Implement the real Capacitor plugin behind `AndroidBleBridge`.
-4. Only then expose the transport in `/lab` and run a physical checklist.
+The inventory sequence this document was written to gate is complete:
+
+1. ~~Complete [Step 19](STEP_19_GATT_INSPECTION.md) and save the JSON inventory.~~ Done.
+2. ~~Choose write + notify characteristics from that evidence.~~ Done.
+3. ~~Implement the real Capacitor plugin behind `AndroidBleBridge`.~~ Done —
+   `android/app/src/main/java/dev/krist/kiarioassistant/plugins/BleObdBridgePlugin.kt`.
+4. ~~Expose the transport in `/lab` and run a physical checklist.~~ Exposed, and
+   run once on 2026-08-24.
+
+Still outstanding: Sprint 0 task 8 — ten consecutive connections plus one
+30-minute session including a drop and a recovery. It is **open**, waived rather
+than executed by [ADR-003](decisions/ADR-003-fase-1-closure-waiver.md).

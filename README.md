@@ -34,16 +34,24 @@ Supported transports today:
 |-----------|---------|
 | Mock | Synthetic ELM responses for UI and protocol work |
 | Replay | Replays a recorded schema-v1 session export |
-| Web Serial / RFCOMM | Browser serial path when the platform exposes `navigator.serial` |
-| VEEPEAK Bluetooth LE | Native Android transport (`android-ble`); confirmed against the vehicle |
+| VEEPEAK Bluetooth LE | Native Android transport (`android-ble`); the only physical transport |
 
-The Bluetooth LE path is proven end to end: on 2026-08-24 the Kia Rio answered
-over it while parked and idling, returning live RPM and coolant temperature.
-See [docs/ANDROID_BLE_CONTRACT.md](docs/ANDROID_BLE_CONTRACT.md).
+`android-ble` is the sole entry in `PHYSICAL_TRANSPORT_KINDS`
+(`core/obd/transport/ObdTransport.ts`). A Web Serial / RFCOMM transport used to
+exist and was **deleted** on 2026-08-25: native Web Serial is desktop-only, so it
+could never execute inside the Capacitor Android app, and the owned VEEPEAK
+adapter is BLE rather than classic-Bluetooth RFCOMM. The evidence trail is in the
+amendment to [docs/decisions/ADR-002-obd-transport.md](docs/decisions/ADR-002-obd-transport.md);
+[docs/STEP_18_PHYSICAL_TEST.md](docs/STEP_18_PHYSICAL_TEST.md) is the obsolete
+checklist for that removed path, kept only as history.
 
-Physical **Web Serial** checks are a different path and are documented in
-[docs/STEP_18_PHYSICAL_TEST.md](docs/STEP_18_PHYSICAL_TEST.md). They remain
-**NOT RUN**: no Web Serial session has ever reached the vehicle.
+What the Bluetooth LE path actually proved: on 2026-08-24 the Kia Rio answered
+over it while parked and idling, returning live RPM and coolant temperature, in a
+single 91-event session during which nothing disconnected. That is evidence for
+the **initial connection path only**. Reconnection and IndexedDB persistence
+shipped in Fase 1 and have **never run against the vehicle** — see
+[docs/decisions/ADR-003-fase-1-closure-waiver.md](docs/decisions/ADR-003-fase-1-closure-waiver.md).
+See also [docs/ANDROID_BLE_CONTRACT.md](docs/ANDROID_BLE_CONTRACT.md).
 
 The lab is read-only. Only a closed allowlist of commands may reach a physical
 transport; Mode 04 and every other ECU-writing operation is blocked in

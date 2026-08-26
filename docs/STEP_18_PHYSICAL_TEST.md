@@ -1,7 +1,16 @@
 # Prueba física del transporte Web Serial/RFCOMM
 
-**Estado: NOT RUN.** Esta lista no confirma compatibilidad con un vehículo o
-adaptador concreto. Registra la evidencia real antes de cambiar ese estado.
+> **OBSOLETO desde el 2026-08-25. No ejecutes este procedimiento.**
+> El transporte que describe ya no existe: `WebSerialRfcommTransport` fue
+> eliminado del repositorio, y `PHYSICAL_TRANSPORT_KINDS` contiene una sola
+> entrada, `android-ble`. No hay nada en la aplicación que pueda realizar estos
+> pasos. Este documento se conserva como historial de una ruta que nunca llegó
+> al vehículo, no como una lista de tareas pendiente.
+> Motivo de la eliminación y evidencia completa: la enmienda de
+> [ADR-002](decisions/ADR-002-obd-transport.md).
+
+**Estado: NOT RUN, y ya no ejecutable.** Esta lista nunca confirmó
+compatibilidad con ningún vehículo o adaptador, y ya no puede hacerlo.
 
 > **Compatibilidad Android no confirmada:** la documentación oficial actual de
 > Chrome limita Web Serial nativo a plataformas de escritorio. En Android solo
