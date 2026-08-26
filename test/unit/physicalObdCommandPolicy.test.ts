@@ -105,4 +105,74 @@ describe('PhysicalObdCommandPolicy', () => {
     expect(isPhysicalCommandAllowed('0 1 0 0')).toBe(true)
     expect(isPhysicalCommandAllowed('AT Z')).toBe(true)
   })
+
+  /**
+   * Full-array snapshot of the physical safety boundary.
+   *
+   * This is deliberately an exact, literal list rather than a property check:
+   * the allowlist is the only thing standing between this lab and a write to
+   * the ECU, so any future widening MUST show up as a visible diff in this
+   * test and be argued for in review.
+   */
+  it('pins the exact set of commands allowed to reach a real vehicle', () => {
+    expect([...PHYSICAL_ALLOWED_COMMANDS]).toEqual([
+      'ATZ',
+      'ATE0',
+      'ATL0',
+      'ATS0',
+      'ATH0',
+      'ATSP0',
+      '0100',
+      '0120',
+      '0140',
+      '0160',
+      '0180',
+      '01A0',
+      '01C0',
+      '010C',
+      '0105',
+      '03',
+      '07',
+      '0A'
+    ])
+  })
+
+  it('allows the pending and permanent DTC reads', () => {
+    expect(isPhysicalCommandAllowed('07')).toBe(true)
+    expect(isPhysicalCommandAllowed('0A')).toBe(true)
+    expect(isPhysicalCommandAllowed('0a')).toBe(true)
+    expect(isPhysicalCommandAllowed(' 0 a ')).toBe(true)
+  })
+
+  it('rejects neighbouring modes that were not deliberately approved', () => {
+    expect(isPhysicalCommandAllowed('0B')).toBe(false)
+    expect(isPhysicalCommandAllowed('08')).toBe(false)
+    expect(isPhysicalCommandAllowed('09')).toBe(false)
+    expect(isPhysicalCommandAllowed('06')).toBe(false)
+  })
+
+  /**
+   * Widening the allowlist for 07/0A must not weaken Mode 04. Mode 04 is
+   * guarded twice on purpose — by omission from the array AND by an explicit
+   * prefix check — so that neither guard alone is load-bearing.
+   */
+  it('keeps both independent Mode 04 guards intact after the widening', () => {
+    expect(
+      PHYSICAL_ALLOWED_COMMANDS.filter(command =>
+        command.startsWith('04')
+      )
+    ).toEqual([])
+
+    for (const command of ['04', '0400', '04FF', '04 ', ' 04', '\t04\r']) {
+      expect(isPhysicalCommandAllowed(command)).toBe(false)
+      expect(() => {
+        assertPhysicalCommandAllowed(command)
+      }).toThrow(PhysicalCommandRejectedError)
+    }
+
+    expect(isPhysicalCommandAllowed('04')).toBe(false)
+    expect(isPhysicalCommandAllowed('04'.toLowerCase())).toBe(false)
+    expect(isPhysicalCommandAllowed('07\r04')).toBe(false)
+    expect(isPhysicalCommandAllowed('0A\r04')).toBe(false)
+  })
 })

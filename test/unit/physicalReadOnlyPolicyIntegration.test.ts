@@ -81,6 +81,65 @@ describe('physical read-only command policy — integration', () => {
     executor.dispose()
   })
 
+  /**
+   * Mode 07 (pending) and Mode 0A (permanent) reach the vehicle only because
+   * the allowlist was deliberately widened. These mirror the existing Mode 03
+   * cases at the transport boundary, so a regression in the policy shows up
+   * here and not only in the unit test of the array itself.
+   */
+  it.each([
+    ['07', '47 00 00 00 00 00 00'],
+    ['0A', '4A 00 00 00 00 00 00']
+  ])(
+    'allows the widened DTC read %s through to the real bridge',
+    async (command, emptyFrame) => {
+      const { bridge, transport } = await connectedPhysicalTransport()
+      const executor = new ElmCommandExecutor(transport)
+
+      const result = executor.execute(command)
+
+      await waitForWrite(bridge, 1)
+      respond(bridge, `${emptyFrame}\r>`)
+
+      await expect(result).resolves.toMatchObject({ command })
+      expect(bridge.writes).toHaveLength(1)
+      expect(
+        new TextDecoder().decode(bridge.writes[0]!).trim()
+      ).toBe(command)
+
+      executor.dispose()
+    }
+  )
+
+  it.each(['0B', '08', '09'])(
+    'still rejects the unapproved mode %s at the transport boundary',
+    async (command) => {
+      const { bridge, transport } = await connectedPhysicalTransport()
+      const executor = new ElmCommandExecutor(transport)
+
+      await expect(executor.execute(command)).rejects.toThrow()
+      expect(bridge.writes).toHaveLength(0)
+
+      executor.dispose()
+    }
+  )
+
+  it('rejects Mode 04 even when a widened DTC read precedes it', async () => {
+    const { bridge, transport } = await connectedPhysicalTransport()
+    const executor = new ElmCommandExecutor(transport)
+
+    const allowed = executor.execute('07')
+
+    await waitForWrite(bridge, 1)
+    respond(bridge, '47 00 00 00 00 00 00\r>')
+    await expect(allowed).resolves.toMatchObject({ command: '07' })
+
+    await expect(executor.execute('04')).rejects.toThrow()
+    expect(bridge.writes).toHaveLength(1)
+
+    executor.dispose()
+  })
+
   it('runs the full ELM327 initialization sequence over the physical transport', async () => {
     const { bridge, transport } = await connectedPhysicalTransport()
     const executor = new ElmCommandExecutor(transport)
