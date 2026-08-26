@@ -140,7 +140,12 @@ describe('IndexedDbAdapter (against fake-indexeddb, NOT the Android WebView — 
       await adapter.startSession(session(String(index), startedAt(index)))
     }
 
-    expect(await adapter.listObservations()).toEqual([observation])
+    expect(await adapter.listObservations()).toEqual([{
+      ...observation,
+      schemaVersion: 2,
+      type: 'generic',
+      state: 'stored'
+    }])
   })
 
   it('normalizes a v1 IndexedDB observation to the v2 read model without opening a new database version', async () => {
