@@ -27,6 +27,7 @@
   "devDependencies": {
     "@capacitor/cli": "8.5.0",
     "@nuxt/eslint": "^1.16.0",
+    "@vitejs/plugin-vue": "^6.0.8",
     "@vue/test-utils": "^2.4.11",
     "eslint": "^10.8.0",
     "fake-indexeddb": "^6.2.5",
