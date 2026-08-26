@@ -4,7 +4,10 @@
 executed against the Kia Rio.
 
 It holds the vehicle checks the DTC decoders need before their unvalidated
-branches can be trusted. These checks are **transport-independent**: they are
+branches can be trusted. The step-by-step procedure that runs them, together
+with the still-open Sprint 0 task 8, is
+[`FIELD_TEST_VEHICLE_VALIDATION.md`](FIELD_TEST_VEHICLE_VALIDATION.md) —
+check 2 is Part B there, check 1 is Part D. These checks are **transport-independent**: they are
 about ELM327 and ECU framing, not about how bytes reach the adapter. They apply
 to whatever transport is current — today that is `android-ble`, the only entry
 in `PHYSICAL_TRANSPORT_KINDS`.
