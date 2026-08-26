@@ -13,9 +13,11 @@ export type DtcState = 'stored' | 'pending' | 'permanent'
 
 /**
  * Whether a DTC belongs to the SAE-defined generic set or to a
- * manufacturer-specific extension, per the second character of the code
- * (e.g. the "0" in "P0300" is generic, the "1" in "P1300" is
- * manufacturer-specific).
+ * manufacturer-specific extension.
+ *
+ * This is NOT a plain read of the second character: SAE J2012 gives that
+ * digit different meanings per system, so it must be classified together
+ * with the system letter. See `classifyDtcType`.
  */
 export type DtcType = 'generic' | 'manufacturer'
 
@@ -32,8 +34,40 @@ export interface DtcObservation extends DtcCode {
 
 const DTC_CODE_PATTERN = /^([PCBU])([0-3])([0-9A-F]{3})$/
 
-function classifyDtcType(typeDigit: string): DtcType {
-  return typeDigit === '0' || typeDigit === '2'
+/**
+ * Classifies a DTC as SAE-generic or manufacturer-specific.
+ *
+ * The second digit does NOT carry one meaning across all four systems, so
+ * classifying it without the system letter mislabels Chassis, Body and
+ * Network codes. Per SAE J2012:
+ *
+ * - Powertrain: `0` and `2` are SAE-defined, `1` is manufacturer-specific,
+ *   and `3` is split — P3000-P3399 are manufacturer-defined while
+ *   P3400-P3999 revert to SAE.
+ * - Chassis, Body, Network: only `0` is SAE-defined. Both `1` AND `2` are
+ *   manufacturer-specific, and `3` is reserved by SAE rather than delegated
+ *   to the manufacturer, so it classifies as generic.
+ */
+function classifyDtcType(
+  system: DtcSystem,
+  typeDigit: string,
+  remainder: string
+): DtcType {
+  if (system === 'P') {
+    if (typeDigit === '0' || typeDigit === '2') {
+      return 'generic'
+    }
+
+    if (typeDigit === '1') {
+      return 'manufacturer'
+    }
+
+    return remainder[0]! < '4'
+      ? 'manufacturer'
+      : 'generic'
+  }
+
+  return typeDigit === '0' || typeDigit === '3'
     ? 'generic'
     : 'manufacturer'
 }
@@ -57,12 +91,15 @@ export function parseDtcCode(raw: string): DtcCode {
   const [
     code,
     system,
-    typeDigit
+    typeDigit,
+    remainder
   ] = match
+
+  const dtcSystem = system as DtcSystem
 
   return {
     code,
-    system: system as DtcSystem,
-    type: classifyDtcType(typeDigit!)
+    system: dtcSystem,
+    type: classifyDtcType(dtcSystem, typeDigit!, remainder!)
   }
 }

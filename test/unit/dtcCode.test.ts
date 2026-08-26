@@ -69,9 +69,36 @@ describe('parseDtcCode', () => {
     })
   })
 
-  it('classifies type digit 2 as generic and digit 3 as manufacturer', () => {
+  it('classifies Powertrain digits 0 and 2 as generic, 1 as manufacturer', () => {
+    expect(parseDtcCode('P0300').type).toBe('generic')
     expect(parseDtcCode('P2300').type).toBe('generic')
-    expect(parseDtcCode('P3300').type).toBe('manufacturer')
+    expect(parseDtcCode('P1300').type).toBe('manufacturer')
+  })
+
+  it('splits Powertrain digit 3 at P3400, per SAE J2012', () => {
+    expect(parseDtcCode('P3000').type).toBe('manufacturer')
+    expect(parseDtcCode('P3399').type).toBe('manufacturer')
+    expect(parseDtcCode('P3400').type).toBe('generic')
+    expect(parseDtcCode('P3999').type).toBe('generic')
+  })
+
+  it('treats Chassis, Body and Network digit 2 as manufacturer, not generic', () => {
+    // The Powertrain rule does NOT carry over: for B/C/U, both 1 and 2 are
+    // manufacturer-specific. Classifying digit 2 as generic here would
+    // mislabel every manufacturer chassis, body and network code.
+    for (const system of ['B', 'C', 'U']) {
+      expect(parseDtcCode(`${system}1300`).type).toBe('manufacturer')
+      expect(parseDtcCode(`${system}2300`).type).toBe('manufacturer')
+    }
+  })
+
+  it('treats Chassis, Body and Network digit 0 and 3 as generic', () => {
+    // 0 is SAE-defined and 3 is SAE-reserved — neither is delegated to the
+    // manufacturer.
+    for (const system of ['B', 'C', 'U']) {
+      expect(parseDtcCode(`${system}0300`).type).toBe('generic')
+      expect(parseDtcCode(`${system}3300`).type).toBe('generic')
+    }
   })
 
   it('rejects an unknown system letter', () => {
