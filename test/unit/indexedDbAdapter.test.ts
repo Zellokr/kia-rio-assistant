@@ -143,6 +143,33 @@ describe('IndexedDbAdapter (against fake-indexeddb, NOT the Android WebView — 
     expect(await adapter.listObservations()).toEqual([observation])
   })
 
+  it('normalizes a v1 IndexedDB observation to the v2 read model without opening a new database version', async () => {
+    const legacy = {
+      schemaVersion: 1,
+      id: 'legacy-p0300',
+      sessionId: 'legacy-session',
+      code: 'P0300',
+      observedAt: '2026-08-26T19:00:00.000Z'
+    }
+    const database = await openObdDatabase(factory)
+    const transaction = database.transaction(OBD_STORES.observations, 'readwrite')
+    transaction.objectStore(OBD_STORES.observations).put(legacy)
+    await new Promise<void>((resolve, reject) => {
+      transaction.oncomplete = () => resolve()
+      transaction.onerror = transaction.onabort = () => reject(transaction.error)
+    })
+    database.close()
+
+    const adapter = new IndexedDbAdapter(factory)
+
+    expect(await adapter.listObservations()).toEqual([{
+      ...legacy,
+      schemaVersion: 2,
+      type: 'generic',
+      state: 'stored'
+    }])
+  })
+
   it('round-trips the supported-PID cache by fingerprint', async () => {
     const adapter = new IndexedDbAdapter(factory)
     const cache = { schemaVersion: 1 as const, fingerprint: '0100:BE3FA813', pids: ['0C', '0D'] }

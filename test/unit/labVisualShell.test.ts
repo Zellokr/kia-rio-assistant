@@ -67,6 +67,15 @@ describe('OBD laboratory visual shell', () => {
     expect(cssSource).toContain('--color-terminal-foreground:')
   })
 
+  it('persists Mode 03 observations using the v2 state and type boundary', () => {
+    const shellSource = readProjectFile('app/pages/lab/index.vue')
+
+    expect(shellSource).toMatch(/decoded: \{\s+kind: 'dtc',\s+observations/)
+    expect(shellSource).toContain('schemaVersion: 2 as const')
+    expect(shellSource).toContain('type: code.type')
+    expect(shellSource).toContain('state: dtcResult.state')
+  })
+
   it('reacts to an unexpected transport drop instead of showing a stale ready badge', () => {
     const shellSource = readProjectFile('app/pages/lab/index.vue')
 

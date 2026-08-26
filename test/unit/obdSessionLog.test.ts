@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+
 import {
   describe,
   expect,
@@ -252,6 +255,51 @@ describe('ObdSessionLog', () => {
       type: 'error',
       error: {
         message: 'Original error'
+      }
+    })
+  })
+
+  it('defines DTC payloads as observations so each log event retains state and type', () => {
+    const source = readFileSync(
+      fileURLToPath(new URL('../../core/obd/logging/ObdSessionLog.ts', import.meta.url)),
+      'utf8'
+    )
+
+    expect(source).toMatch(/kind:\s*'dtc'[\s\S]*observations:\s*DtcObservation\[\]/)
+  })
+
+  it('defensively detaches DTC observations after recording them', () => {
+    const log = new ObdSessionLog({
+      transport: { kind: 'mock' },
+      now: createClock(0, 1),
+      idFactory: () => 'session-1'
+    })
+    const observations = [{
+      code: 'P0300',
+      system: 'P' as const,
+      type: 'generic' as const,
+      state: 'stored' as const,
+      observedAt: '2026-08-26T19:00:00.000Z'
+    }]
+
+    log.record({
+      type: 'decoded-value',
+      source: 'manual',
+      command: '03',
+      latencyMs: 1,
+      decoded: { kind: 'dtc', observations }
+    } as unknown as Parameters<typeof log.record>[0])
+    observations[0]!.state = 'permanent'
+
+    expect(log.getExport().events[0]).toMatchObject({
+      type: 'decoded-value',
+      decoded: {
+        kind: 'dtc',
+        observations: [{
+          code: 'P0300',
+          type: 'generic',
+          state: 'stored'
+        }]
       }
     })
   })

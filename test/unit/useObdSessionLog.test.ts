@@ -28,6 +28,37 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
+describe('useObdSessionLog DTC formatting', () => {
+  it('keeps each DTC state and type visible in the terminal line', () => {
+    const log = new ObdSessionLog({
+      transport: { kind: 'mock' }
+    })
+    log.record({
+      type: 'decoded-value',
+      source: 'manual',
+      command: '03',
+      latencyMs: 1,
+      decoded: {
+        kind: 'dtc',
+        observations: [{
+          code: 'C1234',
+          system: 'C',
+          type: 'manufacturer',
+          state: 'stored',
+          observedAt: '2026-08-26T19:00:00.000Z'
+        }]
+      }
+    } as unknown as Parameters<typeof log.record>[0])
+    const { scope, api } = runComposable(log)
+
+    expect(api.lines.value[0]).toContain('C1234')
+    expect(api.lines.value[0]).toContain('stored')
+    expect(api.lines.value[0]).toContain('manufacturer')
+
+    scope.stop()
+  })
+})
+
 describe('useObdSessionLog downloadJson', () => {
   it('defers revoking the object URL until after the click so the download is not cut off', () => {
     vi.useFakeTimers()
