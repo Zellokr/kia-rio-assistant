@@ -11,9 +11,14 @@ import type {
  * generation shares with essentially every modern car. That standardisation
  * is what makes them safe to describe without the vehicle in front of you.
  *
- * They have **NOT** been checked against this car's actual instrument
- * cluster or its owner's manual. Two consequences follow, and neither is
- * hypothetical:
+ * Eleven of the thirteen were checked against the owner's manual
+ * (`YB_2019_es_ES.pdf`, section "Testigos indicadores y de advertencia",
+ * 4-70 to 4-77) and confirmed. Two were not, and are kept on the strength of
+ * OBD convention rather than the manual — see `coolant-temperature` and
+ * `check-engine-blinking` below, and
+ * `docs/WARNING_LIGHT_CATALOG_VERIFICATION.md` for the full comparison.
+ *
+ * Three consequences follow, and none is hypothetical:
  *
  * 1. A trim-specific or market-specific tell-tale that is not in the
  *    standardised set is simply absent here. `identifyWarningLight` answers
@@ -23,9 +28,14 @@ import type {
  *    not names taken from any Kia document. They exist so the guided flow
  *    can narrow on symbol shape; they are not a claim about Kia's own
  *    naming.
+ * 3. The manual names tell-tales this catalogue does not carry, three of
+ *    them inside this project's engine and emissions scope: the exhaust
+ *    (GPF) lamp, the engine oil **level** lamp — a different lamp from
+ *    `oil-pressure` — and the master warning. Adding them is open work.
  *
- * Verifying this catalogue against the real cluster and the owner's manual
- * is open work. Until it is done, treat coverage as "the standard set",
+ * Checking the catalogue against the real instrument cluster is still open:
+ * the manual covers the YB generation across trims and markets, and "si
+ * está equipado" runs through it. Treat coverage as "the standard set",
  * never as "every light this car can show".
  *
  * SEVERITY. `critical` is reserved for lights that mean stop now — loss of
@@ -67,6 +77,16 @@ export const KIA_RIO_WARNING_LIGHTS: readonly WarningLightEntry[] = [
     associatedDtcPrefixes: ['P0', 'P2'],
     subsystems: ['engine', 'emissions']
   },
+  /**
+   * NOT in the owner's manual. Its MIL section describes steady
+   * illumination only and never mentions a blinking state — and "parpadea"
+   * appears 74 times elsewhere in the manual, so the silence is about this
+   * section, not about the vocabulary.
+   *
+   * Kept on OBD convention, which is sound and safety-relevant: a blinking
+   * MIL means an active misfire dumping unburnt fuel into the catalyst.
+   * Recorded here so nobody later cites it as manual-verified.
+   */
   {
     id: 'check-engine-blinking',
     name: 'Testigo de avería del motor parpadeando',
@@ -154,6 +174,17 @@ export const KIA_RIO_WARNING_LIGHTS: readonly WarningLightEntry[] = [
     associatedDtcPrefixes: [],
     subsystems: ['electrical']
   },
+  /**
+   * NOT a tell-tale on this car. The manual documents a needle gauge
+   * ("Indicador de temperatura del refrigerante del motor") and a separate
+   * LCD message ("Motor sobrecalentado", above 120 °C) — there is no
+   * coolant warning lamp in its tell-tale section.
+   *
+   * Kept because a driver may still meet a thermometer symbol on a variant
+   * the manual does not cover, and because answering `unidentified` for an
+   * overheating engine is the worse failure. The symptoms below lead with
+   * the gauge for that reason.
+   */
   {
     id: 'coolant-temperature',
     name: 'Temperatura del refrigerante',
