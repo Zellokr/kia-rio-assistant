@@ -39,3 +39,30 @@ export function createLabTransport(
     profile: VEEPEAK_BLE_PROFILE
   })
 }
+
+/**
+ * Whether the URL is asking a development build to talk to a mock adapter
+ * instead of the Android bridge, which is the only way to work on the page
+ * away from the car: without it every selection fails at the bridge and
+ * nothing past the connection view can be reached by hand.
+ *
+ * Two gates, both required. Off unless the build is a development one, and
+ * off unless the URL asks — a mock answering inside a shipped build would
+ * render numbers that look like a vehicle and are not, which is the one
+ * failure this project cannot afford.
+ *
+ * This decides; it does not build. The adapter itself is imported
+ * dynamically by the plugin, behind a check that folds to a constant at
+ * build time, so `MockObdTransport` is absent from a production bundle
+ * rather than merely unreachable inside it.
+ */
+export function shouldUseDevMockTransport(
+  search: string,
+  isDevelopment: boolean
+): boolean {
+  if (!isDevelopment) {
+    return false
+  }
+
+  return new URLSearchParams(search).get('transport') === 'mock'
+}
