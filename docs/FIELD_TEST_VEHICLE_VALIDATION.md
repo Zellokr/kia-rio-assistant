@@ -44,6 +44,11 @@ Unchanged from every physical procedure in this project.
 
 ---
 
+> **UI note.** Android BLE is now the only transport the app ships and the
+> only option in the selector, so nothing has to be set before connecting.
+> The technical panel that holds it is **Controles técnicos** — it was
+> called "Herramientas OBD avanzadas" when this document was first written.
+
 ## Part A — Sprint 0 task 8 (blocking)
 
 **What is unknown.** Reconnection has never run against this car. No drop,
@@ -61,12 +66,10 @@ session containing at least one drop and its recovery.
 With the ignition on and the engine off:
 
 1. Open the app, go to **Conexión**.
-2. Expand **Herramientas OBD avanzadas** and set *Fuente de datos OBD* to
-   **Real · VEEPEAK Bluetooth LE**.
-3. **Preparar conexión** → pick the adapter.
-4. **Conectar e inicializar**. Wait for the badge to read ready.
-5. **Desconectar**.
-6. Repeat 3–5 **ten times without closing the app**.
+2. **Buscar adaptador** → pick the VEEPEAK.
+3. **Conectar**. Wait for the badge to read ready.
+4. **Desconectar**.
+5. Repeat 2–4 **ten times without closing the app**.
 
 Record for each of the ten: did it reach ready, how long it took roughly,
 and anything that needed a retry. **A retry is a result, not a mistake to
@@ -83,7 +86,7 @@ Then go to **Registro** → **Exportar** and save the JSON as `A1.json`.
 Start the engine. Ventilated space.
 
 1. Connect as in A1 and reach ready.
-2. Go to **Datos** and press **Iniciar telemetría**. Leave it running.
+2. Go to **Datos** and press **Ver lecturas**. Leave it running.
 3. Let it run undisturbed for about ten minutes. Note whether values keep
    updating or quietly freeze.
 4. **Induce a drop.** Use one of these, in order of preference:
@@ -100,7 +103,7 @@ Start the engine. Ventilated space.
    - After recovery, did telemetry resume, or did it stay dead while the
      badge claimed ready?
 6. Continue the session to **30 minutes total**.
-7. Press **Detener telemetría**, disconnect, and export the log as `A2.json`.
+7. Press **Pausar lecturas**, disconnect, and export the log as `A2.json`.
 
 **A2 passes only if the drop was detected and the recovery observed.** A
 30-minute session where nothing dropped is not a pass — it is an
@@ -154,18 +157,25 @@ photograph.
 
 1. Turn the ignition on **without starting the engine** and photograph the
    full cluster during the lamp test. Take several; they go out fast.
-2. Open the owner's manual at the warning-lights section and photograph
-   those pages.
-3. Compare against the 13 entries in the catalogue and list:
+2. Compare against the 16 entries in the catalogue and list:
    - Tell-tales on the cluster that are **not** in the catalogue.
    - Catalogue entries this car does **not** have.
    - Any whose colour differs from what the catalogue claims.
-4. Then open **Datos** → the warning-light section, answer the guided
+3. Then open **Datos** → the warning-light section, answer the guided
    questions for two or three real lights, and check whether it reaches
    the right one.
 
 Missing entries are the expected finding, not a bug: an unknown light
 correctly surfaces as "sin identificar" with the safe alternative.
+
+Step 2 of this part used to say "photograph the manual's warning-light
+pages". That comparison is done — see
+`docs/WARNING_LIGHT_CATALOG_VERIFICATION.md`, which confirmed eleven
+entries against the manual, found two the manual does not support, and
+added the three it named that the catalogue lacked. What is left here is
+the part no document can answer: which lamps **this** car physically has.
+The manual covers the YB generation across trims and markets, and "si está
+equipado" runs through it — including all three of the new entries.
 
 ---
 
