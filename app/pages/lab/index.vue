@@ -57,6 +57,16 @@ import {
 } from '~~/catalog/kia-rio/warning-lights'
 import { labViews } from '~/utils/labNav'
 import type { LabViewId } from '~/utils/labNav'
+import { useObdSessionLog } from '~/composables/useObdSessionLog'
+import { useObdTelemetry } from '~/composables/useObdTelemetry'
+import { useObdReconnection } from '~/composables/useObdReconnection'
+import BottomTabBar from '~/components/BottomTabBar.vue'
+import ConnectionView from '~/components/ConnectionView.vue'
+import DataView from '~/components/DataView.vue'
+import DiagnosticAssessmentCard from '~/components/DiagnosticAssessmentCard.vue'
+import LogView from '~/components/LogView.vue'
+import NavRail from '~/components/NavRail.vue'
+import WarningLightIdentifier from '~/components/WarningLightIdentifier.vue'
 
 definePageMeta({
   alias: ['/']
