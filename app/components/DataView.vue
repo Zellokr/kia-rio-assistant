@@ -43,7 +43,7 @@ const emit = defineEmits<{
         id="data-view-title"
         class="text-2xl font-bold tracking-tight text-highlighted"
       >
-        Datos del vehículo
+        Lecturas en directo
       </h1>
       <p class="text-sm text-muted">
         Prioriza las métricas esenciales y consulta el resto cuando lo necesites.
@@ -92,10 +92,10 @@ const emit = defineEmits<{
             </span>
             <div>
               <h2 class="font-semibold text-highlighted">
-                Telemetría
+                Lecturas en directo
               </h2>
               <p class="text-sm text-muted">
-                {{ telemetryRunning ? 'Actualización activa' : 'Detenida hasta que tú la inicies' }}
+                {{ telemetryRunning ? 'Actualización activa' : 'Detenidas hasta que tú las inicies' }}
               </p>
             </div>
           </div>
@@ -107,7 +107,7 @@ const emit = defineEmits<{
             class="min-h-12 justify-center"
             @click="emit('start-telemetry')"
           >
-            Iniciar telemetría
+            Ver lecturas
           </UButton>
           <UButton
             v-else
@@ -118,7 +118,7 @@ const emit = defineEmits<{
             class="min-h-12 justify-center"
             @click="emit('stop-telemetry')"
           >
-            Detener telemetría
+            Pausar lecturas
           </UButton>
         </div>
       </UCard>
@@ -182,7 +182,7 @@ const emit = defineEmits<{
             class="size-5 text-primary"
             aria-hidden="true"
           />
-          <span class="flex-1 font-semibold text-highlighted">Más datos del motor</span>
+          <span class="flex-1 font-semibold text-highlighted">Más lecturas</span>
           <UIcon
             name="i-lucide-chevron-down"
             class="size-5 text-muted transition-transform group-open:rotate-180 motion-reduce:transition-none"
@@ -225,7 +225,7 @@ const emit = defineEmits<{
             aria-hidden="true"
           />
           <span class="flex-1">
-            <span class="block font-semibold text-highlighted">Consultas manuales</span>
+            <span class="block font-semibold text-highlighted">Lecturas disponibles</span>
             <span class="block text-sm text-muted">Un único comando permitido cada vez</span>
           </span>
           <UIcon

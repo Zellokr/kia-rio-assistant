@@ -2,10 +2,6 @@
 import { onBeforeUnmount, ref, computed } from 'vue'
 import { MockObdTransport } from '~~/core/obd/transport/MockObdTransport'
 import {
-  buildReplayTranscript,
-  ReplayObdTransport
-} from '~~/core/obd/transport/ReplayObdTransport'
-import {
   AndroidBleObdTransport
 } from '~~/core/obd/transport/AndroidBleObdTransport'
 import { capacitorAndroidBle } from '~/services/capacitorAndroidBle'
@@ -90,11 +86,8 @@ const transportState = ref(transport.state)
 const activeView = ref<'connection' | 'data' | 'log'>('connection')
 const transportChoice = ref<
   'mock' | 'replay' | 'android-ble'
->('mock')
-const replayFilename = ref('')
-const replayImportError = ref('')
+>('android-ble')
 const transportError = ref('')
-let replaySessionExport: unknown
 const telemetryDomainStore
   = new ObdTelemetryStore()
 let selectedTransport: ObdTransportMetadata = {
@@ -453,14 +446,6 @@ function replaceTransport(next: ObdTransport): void {
 }
 
 function prepareSelectedTransport(): void {
-  if (transportChoice.value === 'mock') {
-    if (transport.kind !== 'mock') {
-      replaceTransport(new MockObdTransport())
-    }
-
-    return
-  }
-
   if (transportChoice.value === 'android-ble') {
     if (transport.kind !== 'android-ble') {
       replaceTransport(new AndroidBleObdTransport({
@@ -472,32 +457,11 @@ function prepareSelectedTransport(): void {
     return
   }
 
-  if (replaySessionExport === undefined) {
-    throw new Error(
-      'Importa una sesión OBD antes de seleccionar Replay'
-    )
-  }
-
-  replaceTransport(
-    new ReplayObdTransport(replaySessionExport)
+  throw new Error(
+    'Transporte no disponible en la aplicación'
   )
 }
 
-async function importReplayFile(file: File): Promise<void> {
-  replayImportError.value = ''
-  replayFilename.value = ''
-  replaySessionExport = undefined
-
-  try {
-    const parsed: unknown = JSON.parse(await file.text())
-
-    buildReplayTranscript(parsed)
-    replaySessionExport = parsed
-    replayFilename.value = file.name
-  } catch (error) {
-    replayImportError.value = toError(error).message
-  }
-}
 function transitionSession(
   next: Parameters<typeof session.transition>[0]
 ) {
@@ -1037,14 +1001,11 @@ onBeforeUnmount(() => {
           :session-state-label="sessionStateLabel"
           :transport-state="transportState"
           :transport-error="transportError"
-          :replay-filename="replayFilename"
-          :replay-import-error="replayImportError"
           :session-busy="sessionBusy"
           :session-badge-color="sessionBadgeColor"
           @select-device="selectDevice"
           @connect="connect"
           @disconnect="disconnect"
-          @import-replay="importReplayFile"
         />
 
         <DataView

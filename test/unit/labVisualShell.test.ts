@@ -79,13 +79,11 @@ function sessionEvent(
 }
 
 const CONNECTION_PROPS = {
-  transportChoice: 'mock',
+  transportChoice: 'android-ble',
   sessionState: 'idle',
   sessionStateLabel: 'Inactivo',
   transportState: 'disconnected',
   transportError: '',
-  replayFilename: '',
-  replayImportError: '',
   sessionBusy: false,
   sessionBadgeColor: 'neutral'
 } as const
@@ -101,7 +99,8 @@ const DATA_PROPS = {
   supportedPids: [],
   commands: ['0100', '03'],
   selectedCommand: '0100',
-  transportChoice: 'mock'
+  transportChoice: 'android-ble'
+
 } as const
 
 describe('lab navigation', () => {
@@ -179,8 +178,10 @@ describe('lab destinations', () => {
       global: { stubs }
     }).text()
 
-    expect(text).toContain('Preparar conexión')
-    expect(text).toContain('Herramientas OBD avanzadas')
+    expect(text).toContain('Conectar con el coche')
+    expect(text).toContain('Buscar adaptador')
+    expect(text).toContain('Comprobaciones técnicas')
+    expect(text).toContain('Controles técnicos')
   })
 
   /**
@@ -197,7 +198,9 @@ describe('lab destinations', () => {
 
     expect(
       wrapper.findAll('option').map(option => option.attributes('value'))
-    ).toEqual(['mock', 'replay', 'android-ble'])
+    ).toEqual(['android-ble'])
+    expect(wrapper.text()).not.toContain('Mock')
+    expect(wrapper.text()).not.toContain('Replay')
   })
 
   /**
@@ -225,8 +228,10 @@ describe('lab destinations', () => {
       global: { stubs }
     }).text()
 
-    expect(text).toContain('Datos del vehículo')
-    expect(text).toContain('Consultas manuales')
+    expect(text).toContain('Lecturas en directo')
+    expect(text).toContain('Lecturas disponibles')
+    expect(text).toContain('Ver lecturas')
+    expect(text).toContain('Más lecturas')
   })
 
   it('shows the log through the session log panel', () => {

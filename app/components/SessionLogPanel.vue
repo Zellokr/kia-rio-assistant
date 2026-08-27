@@ -66,13 +66,13 @@ const hiddenByLimit = computed(() => {
             id="session-log-title"
             class="text-2xl font-bold tracking-tight text-highlighted"
           >
-            Registro de sesión
+            Actividad de la sesión
           </h1>
           <UBadge
             color="neutral"
             variant="outline"
           >
-            {{ events.length }} eventos
+            {{ events.length }} actividades
           </UBadge>
           <UBadge
             v-if="truncated"
@@ -83,8 +83,8 @@ const hiddenByLimit = computed(() => {
           </UBadge>
         </div>
         <p class="text-sm text-muted">
-          Los eventos más recientes aparecen primero. Abre uno para consultar
-          la evidencia raw.
+          Las actividades más recientes aparecen primero. Abre una para consultar
+          los detalles técnicos, si los necesitas.
         </p>
       </div>
 
@@ -167,10 +167,10 @@ const hiddenByLimit = computed(() => {
         </span>
         <div class="flex max-w-sm flex-col gap-1">
           <h2 class="font-semibold text-highlighted">
-            No hay eventos para mostrar
+            No hay actividad para mostrar
           </h2>
           <p class="text-sm text-muted">
-            Los comandos, respuestas y errores aparecerán aquí durante la sesión.
+            Las acciones, respuestas y errores aparecerán aquí durante la sesión.
           </p>
         </div>
       </div>
