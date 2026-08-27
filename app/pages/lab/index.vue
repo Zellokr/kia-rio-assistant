@@ -1,11 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, ref, computed } from 'vue'
-import { MockObdTransport } from '~~/core/obd/transport/MockObdTransport'
-import {
-  AndroidBleObdTransport
-} from '~~/core/obd/transport/AndroidBleObdTransport'
-import { capacitorAndroidBle } from '~/services/capacitorAndroidBle'
-import { VEEPEAK_BLE_PROFILE } from '~/services/veepeakBleProfile'
+import { inject, onBeforeUnmount, ref, computed } from 'vue'
 import { ElmCommandExecutor } from '~~/core/obd/protocol/ElmCommandExecutor'
 import { decodeMode01Response } from '~~/core/obd/decoder/decodeMode01Response'
 import { decodeSupportedPids } from '~~/core/obd/decoder/decodeSupportedPids'
@@ -57,6 +51,10 @@ import {
 } from '~~/catalog/kia-rio/warning-lights'
 import { labViews } from '~/utils/labNav'
 import type { LabViewId } from '~/utils/labNav'
+import {
+  createLabTransport,
+  labTransportFactoryKey
+} from '~/utils/labTransportFactory'
 import { useObdSessionLog } from '~/composables/useObdSessionLog'
 import { useObdTelemetry } from '~/composables/useObdTelemetry'
 import { useObdReconnection } from '~/composables/useObdReconnection'
@@ -76,7 +74,8 @@ definePageMeta({
 // consecutive failures instead of flooding the log until the user reacts.
 const MAX_CONSECUTIVE_POLL_ERRORS = 5
 
-let transport: ObdTransport = new MockObdTransport()
+const createTransport = inject(labTransportFactoryKey, createLabTransport)
+let transport: ObdTransport = createTransport('android-ble')
 const sessionLog = new ObdSessionLog({
   transport: { kind: transport.kind }
 })
@@ -456,20 +455,16 @@ function replaceTransport(next: ObdTransport): void {
 }
 
 function prepareSelectedTransport(): void {
-  if (transportChoice.value === 'android-ble') {
-    if (transport.kind !== 'android-ble') {
-      replaceTransport(new AndroidBleObdTransport({
-        bridge: capacitorAndroidBle,
-        profile: VEEPEAK_BLE_PROFILE
-      }))
-    }
+  const next = createTransport(transportChoice.value)
 
-    return
+  /**
+   * Comparing kinds, not instances: the factory builds a fresh transport on
+   * every call, and re-selecting the adapter already in use must not throw
+   * away its state.
+   */
+  if (transport.kind !== next.kind) {
+    replaceTransport(next)
   }
-
-  throw new Error(
-    'Transporte no disponible en la aplicación'
-  )
 }
 
 function transitionSession(

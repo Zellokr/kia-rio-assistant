@@ -315,15 +315,10 @@ describe('lab destinations', () => {
  *
  * `app/pages/lab/index.vue` used to be on that list, on the grounds that
  * mounting it meant standing up the whole stack. That turned out to be
- * wrong — it mounts, and the assertions that only needed rendered output
- * have moved into `describe('the lab page renders')` below.
- *
- * Two of its assertions stay text-based, and the reason is a design
- * limit rather than a test one: both describe what the page does with a
- * session in `ready`, and the page constructs its own transport in setup
- * with no seam to inject one that connects. Off the vehicle, selection
- * fails at the Capacitor bridge and `ready` is unreachable. Giving the
- * page an injectable transport would fix that, and is not this change.
+ * wrong. Everything it had here has moved: what needed only rendered
+ * output into `describe('the lab page renders')` below, and what needed a
+ * session in `ready` into `labPageSession`, which injects a transport
+ * through `labTransportFactoryKey` and drives the real handshake.
  */
 describe('what cannot be mounted', () => {
   it('brands the shell as this project, not the starter template', () => {
@@ -348,26 +343,6 @@ describe('what cannot be mounted', () => {
 
     expect(source).toContain('--color-terminal:')
     expect(source).toContain('--color-terminal-foreground:')
-  })
-
-  it('reacts to an unexpected transport drop instead of a stale ready badge', () => {
-    const source = readProjectFile('app/pages/lab/index.vue')
-
-    // The page must observe raw transport state, not only its own operations.
-    expect(source).toContain('transport.subscribeState(')
-    expect(source).toContain('isObdTransportUnavailable')
-    // An unexpected loss while connected must fail the session and stop polling.
-    expect(source).toContain('sessionState.value !== \'ready\'')
-    expect(source).toContain('failSession()')
-    // The subscription must be released when the transport is swapped.
-    expect(source).toContain('unsubscribeTransportState()')
-  })
-
-  it('persists Mode 03 observations on the v2 state and type boundary', () => {
-    const source = readProjectFile('app/pages/lab/index.vue')
-
-    expect(source).toMatch(/decoded: \{\s+kind: 'dtc',\s+observations/)
-    expect(source).toContain('schemaVersion: 2 as const')
   })
 
   /**
