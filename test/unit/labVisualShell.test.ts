@@ -16,6 +16,7 @@ import DataView from '../../app/components/DataView.vue'
 import LogView from '../../app/components/LogView.vue'
 import NavRail from '../../app/components/NavRail.vue'
 import SessionLogPanel from '../../app/components/SessionLogPanel.vue'
+import LabPage from '../../app/pages/lab/index.vue'
 import { labViews } from '../../app/utils/labNav'
 import type {
   ObdSessionEvent
@@ -311,10 +312,18 @@ describe('lab destinations', () => {
  * - `nuxt.config.ts` is build configuration; there is no runtime to ask.
  * - `main.css` declares theme tokens, and no Tailwind pipeline runs in
  *   the test environment, so a computed style would be empty either way.
- * - `app/pages/lab/index.vue` builds a transport, an executor, a poll
- *   scheduler and a session log at setup. Mounting it means standing up
- *   the whole stack; it is covered by `pnpm build` and by the unit tests
- *   of the pieces it composes.
+ *
+ * `app/pages/lab/index.vue` used to be on that list, on the grounds that
+ * mounting it meant standing up the whole stack. That turned out to be
+ * wrong — it mounts, and the assertions that only needed rendered output
+ * have moved into `describe('the lab page renders')` below.
+ *
+ * Two of its assertions stay text-based, and the reason is a design
+ * limit rather than a test one: both describe what the page does with a
+ * session in `ready`, and the page constructs its own transport in setup
+ * with no seam to inject one that connects. Off the vehicle, selection
+ * fails at the Capacitor bridge and `ready` is unreachable. Giving the
+ * page an injectable transport would fix that, and is not this change.
  */
 describe('what cannot be mounted', () => {
   it('brands the shell as this project, not the starter template', () => {
@@ -339,24 +348,6 @@ describe('what cannot be mounted', () => {
 
     expect(source).toContain('--color-terminal:')
     expect(source).toContain('--color-terminal-foreground:')
-  })
-
-  it('keeps the read-only framing and the mobile safe area on the page', () => {
-    const source = readProjectFile('app/pages/lab/index.vue')
-
-    expect(source).toContain('Solo lectura')
-    expect(source).toContain('pb-[calc(7rem+env(safe-area-inset-bottom))]')
-  })
-
-  it('composes three destinations without a stray log panel', () => {
-    const source = readProjectFile('app/pages/lab/index.vue')
-
-    expect(source).toContain('<NavRail')
-    expect(source).toContain('<BottomTabBar')
-    expect(source).toContain('<ConnectionView')
-    expect(source).toContain('<DataView')
-    expect(source).toContain('<LogView')
-    expect(source).not.toContain('<SessionLogPanel')
   })
 
   it('reacts to an unexpected transport drop instead of a stale ready badge', () => {
@@ -393,5 +384,40 @@ describe('what cannot be mounted', () => {
     expect(source).toContain('2. Elegir dispositivo')
     expect(source).toContain('3. Descubrir servicios')
     expect(source).toContain('No lee ni escribe datos del vehículo')
+  })
+})
+
+describe('the lab page renders', () => {
+  function mountPage() {
+    return mount(LabPage, { global: { stubs } })
+  }
+
+  it('keeps the read-only framing and the mobile safe area', () => {
+    const wrapper = mountPage()
+
+    expect(wrapper.text()).toContain('Solo lectura')
+    expect(wrapper.html())
+      .toContain('pb-[calc(7rem+env(safe-area-inset-bottom))]')
+  })
+
+  it('offers both navigations without a stray log panel', () => {
+    const wrapper = mountPage()
+
+    expect(wrapper.findComponent(NavRail).exists()).toBe(true)
+    expect(wrapper.findComponent(BottomTabBar).exists()).toBe(true)
+    expect(wrapper.findComponent(SessionLogPanel).exists()).toBe(false)
+  })
+
+  it('reaches all three destinations', async () => {
+    const wrapper = mountPage()
+
+    expect(wrapper.findComponent(ConnectionView).exists()).toBe(true)
+
+    await wrapper.findComponent(BottomTabBar).vm.$emit('select', 'data')
+    expect(wrapper.findComponent(DataView).exists()).toBe(true)
+
+    await wrapper.findComponent(BottomTabBar).vm.$emit('select', 'log')
+    expect(wrapper.findComponent(LogView).exists()).toBe(true)
+    expect(wrapper.findComponent(SessionLogPanel).exists()).toBe(false)
   })
 })

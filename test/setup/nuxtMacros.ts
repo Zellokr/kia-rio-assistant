@@ -2,26 +2,41 @@ import { beforeEach } from 'vitest'
 import { ref, type Ref } from 'vue'
 
 /**
- * Nuxt compiles `definePageMeta` away at build time, so the macro never
- * exists at runtime. Vitest transforms pages with bare `@vitejs/plugin-vue`,
- * which leaves the call in place — mounting a page would throw
- * `ReferenceError: definePageMeta is not defined` before any assertion runs.
+ * Nuxt supplies a handful of things at build time that a page's `<script
+ * setup>` calls as if they were globals. Vitest transforms pages with bare
+ * `@vitejs/plugin-vue`, which leaves those calls in place, so mounting a
+ * page throws a ReferenceError before any assertion runs. Each stub below
+ * keeps the part of the contract that the page actually depends on and
+ * drops the rest.
  *
- * The stub is deliberately inert: page metadata is routing configuration,
- * and nothing a mounted page does in a test depends on it.
+ * Every store is cleared before each test. Sharing within a test is the
+ * contract; sharing across tests is a leak, and a snapshot surviving into
+ * the next test is exactly the kind of false green these stubs exist to
+ * avoid.
  */
-(globalThis as Record<string, unknown>).definePageMeta = () => {}
+
+/**
+ * `definePageMeta` is routing configuration that Nuxt compiles away. The
+ * stub records the argument so a test can assert what the page declared —
+ * which is the declaration, not proof that Nuxt routes it.
+ */
+const pageMeta: Record<string, unknown>[] = []
+
+export function recordedPageMeta(): Record<string, unknown>[] {
+  return pageMeta
+}
+
+(globalThis as Record<string, unknown>).definePageMeta = (
+  meta: Record<string, unknown>
+) => {
+  pageMeta.push(meta)
+}
 
 /**
  * `useState` is Nuxt's keyed, SSR-safe shared state. The stub keeps the part
- * that callers actually depend on — the same key hands back the same ref —
- * and drops the payload serialisation, which only matters across an SSR
- * boundary that no test crosses.
- *
- * The store is cleared before every test. Sharing by key is the contract;
- * sharing across tests would be a leak, and a telemetry snapshot surviving
- * into the next test is exactly the kind of false green this suite exists
- * to prevent.
+ * callers depend on — the same key hands back the same ref — and drops the
+ * payload serialisation, which only matters across an SSR boundary that no
+ * test crosses.
  */
 const sharedState = new Map<string, Ref<unknown>>()
 
@@ -41,8 +56,22 @@ function useStateStub<T>(key: string, init?: () => T): Ref<T> {
 
 (globalThis as Record<string, unknown>).useState = useStateStub
 
-beforeEach(() => {
-  sharedState.clear()
-})
+/**
+ * `useNuxtApp` carries the plugin-provided injections. Only `$obdPersistence`
+ * matters here, and it is absent by default so a page mounts with
+ * persistence switched off, exactly as it behaves before the client plugin
+ * has run. A test that wants the persistence path injects its own.
+ */
+let nuxtApp: Record<string, unknown> = {}
 
-export {}
+export function provideNuxtInjections(injections: Record<string, unknown>): void {
+  nuxtApp = injections
+}
+
+(globalThis as Record<string, unknown>).useNuxtApp = () => nuxtApp
+
+beforeEach(() => {
+  pageMeta.length = 0
+  sharedState.clear()
+  nuxtApp = {}
+})

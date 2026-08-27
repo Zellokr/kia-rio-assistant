@@ -1,19 +1,15 @@
-import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { InMemoryObdPersistenceAdapter } from '../../core/obd/persistence/InMemoryObdPersistenceAdapter'
 import { ObdSessionStateMachine } from '../../core/obd/session/ObdSessionStateMachine'
 import { createSupportedTelemetryPollTasks } from '../../core/obd/telemetry/createSupportedTelemetryPollTasks'
 
-const source = readFileSync(fileURLToPath(new URL('../../app/pages/lab/index.vue', import.meta.url)), 'utf8')
-
+/**
+ * The page-level half of this contract — that a failing write is routed away
+ * from the session instead of blocking it — lives in
+ * `labPageBehaviour`'s sibling `labPagePersistence`, which mounts the page.
+ * What stays here is the core behaviour the page composes.
+ */
 describe('OBD persistence wiring', () => {
-  it('keeps persistence non-blocking and records DTCs from Mode 03', () => {
-    expect(source).toContain('void operation.catch(recordPersistenceError)')
-    expect(source).toContain('new BufferedObdSessionRecorder')
-    expect(source).toContain('persistence.recordObservations')
-  })
-
   it('does not create unsupported telemetry poll tasks', () => {
     expect(createSupportedTelemetryPollTasks(['0C']).map(task => task.command))
       .toEqual(['010C'])
