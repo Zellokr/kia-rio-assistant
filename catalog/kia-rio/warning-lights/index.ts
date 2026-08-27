@@ -406,6 +406,143 @@ export const KIA_RIO_WARNING_LIGHTS: readonly WarningLightEntry[] = [
     associatedDtcCodes: [],
     associatedDtcPrefixes: ['B1'],
     subsystems: ['electrical']
+  },
+
+  /*
+   * The three lamps below are named by the owner's manual and are absent
+   * from the ISO 2575 standard set the rest of this catalogue was built
+   * from. Their wording follows the manual's own description of each — see
+   * docs/WARNING_LIGHT_CATALOG_VERIFICATION.md.
+   *
+   * All three are "si está equipado" in the manual: it covers the YB
+   * generation across trims and markets, so a car without the equipment
+   * simply never lights them.
+   */
+
+  /**
+   * Steady. The manual gives a regeneration drive that clears it, and the
+   * numbers here are its numbers rather than a rule of thumb: over 30
+   * minutes, at least 80 km/h, third gear or higher, 1500-4000 rpm.
+   */
+  {
+    id: 'exhaust-gpf',
+    name: 'Filtro de partículas de gasolina (GPF)',
+    color: 'amber',
+    shape: 'exhaust-with-dots',
+    behavior: ['steady'],
+    displayTextKeywords: ['GPF'],
+    symptoms: [
+      'Trayectos cortos y repetidos sin que el motor alcance temperatura',
+      'Menor respuesta al acelerar'
+    ],
+    severity: 'warning',
+    immediateAction:
+      'Puedes seguir conduciendo. El filtro se limpia solo si le das la '
+      + 'ocasión: más de 30 minutos a 80 km/h como mínimo, en tercera o '
+      + 'superior y entre 1500 y 4000 rpm, siempre que la carretera lo '
+      + 'permita con seguridad.',
+    recommendedChecks: [
+      'Hacer el trayecto de regeneración que indica el manual',
+      READ_DTCS
+    ],
+    associatedDtcCodes: [],
+    associatedDtcPrefixes: ['P04', 'P24'],
+    subsystems: ['emissions', 'engine']
+  },
+
+  /**
+   * Blinking. The manual's own escalation: if it still blinks after the
+   * regeneration drive — and it shows an LCD message when it does — the
+   * filter needs a workshop, not another trip.
+   */
+  {
+    id: 'exhaust-gpf-blinking',
+    name: 'Filtro de partículas de gasolina (GPF) parpadeando',
+    color: 'amber',
+    shape: 'exhaust-with-dots',
+    behavior: ['blinking'],
+    displayTextKeywords: ['GPF'],
+    symptoms: [
+      'El aviso sigue tras el trayecto de regeneración',
+      'Mensaje de advertencia en la pantalla del cuadro',
+      'Pérdida de potencia'
+    ],
+    severity: 'warning',
+    immediateAction:
+      'El trayecto de regeneración ya no basta: lleva el coche a un taller '
+      + 'para que revisen el GPF. Conducir mucho tiempo así puede dañar el '
+      + 'sistema de escape.',
+    recommendedChecks: [
+      READ_DTCS,
+      'Revisar el filtro de partículas en un taller'
+    ],
+    associatedDtcCodes: [],
+    associatedDtcPrefixes: ['P04', 'P24'],
+    subsystems: ['emissions', 'engine']
+  },
+
+  /**
+   * NOT the oil-pressure lamp. Low pressure means stop the engine before it
+   * seizes; low level means top it up soon. Keeping the two apart is the
+   * whole point of carrying this one.
+   */
+  {
+    id: 'engine-oil-level',
+    name: 'Nivel de aceite del motor',
+    color: 'amber',
+    shape: 'oil-can-with-level',
+    behavior: ['steady'],
+    displayTextKeywords: ['OIL'],
+    symptoms: [
+      'Consumo de aceite entre mantenimientos',
+      'Sin señales de alarma en el motor'
+    ],
+    severity: 'warning',
+    immediateAction:
+      'Comprueba el nivel de aceite cuanto antes y añade si hace falta, '
+      + 'sin pasar de la marca F de la varilla. No es una emergencia, pero '
+      + 'no lo dejes: quedarse sin aceite sí lo es.',
+    recommendedChecks: [
+      'Medir el nivel con la varilla, en llano y con el motor frío',
+      'Añadir el aceite especificado en el manual, despacio y con embudo',
+      'Vigilar si el nivel vuelve a bajar: eso apunta a consumo o fuga'
+    ],
+    associatedDtcCodes: [],
+    associatedDtcPrefixes: [],
+    subsystems: ['engine']
+  },
+
+  /**
+   * Names no fault of its own. The manual lists what it stands in for —
+   * TPMS fault or low pressure, low engine oil, and the FCA, BCW and HBA
+   * driver-assistance systems — and says it goes out when the underlying
+   * condition clears. Its advice has to send the driver to the display
+   * rather than guess which of those is at fault.
+   */
+  {
+    id: 'master-warning',
+    name: 'Testigo de advertencia maestro',
+    color: 'amber',
+    shape: 'triangle-exclamation',
+    behavior: ['steady'],
+    displayTextKeywords: [],
+    symptoms: [
+      'Un mensaje de advertencia apareció antes en la pantalla',
+      'Otro testigo se encendió a la vez'
+    ],
+    severity: 'warning',
+    immediateAction:
+      'Este testigo no dice qué falla por sí solo: mira el mensaje de la '
+      + 'pantalla del cuadro, que es donde se nombra el sistema afectado. '
+      + 'Se apaga cuando esa situación se resuelve.',
+    recommendedChecks: [
+      'Leer el mensaje de la pantalla del cuadro de instrumentos',
+      'Comprobar la presión de los neumáticos y el nivel de aceite',
+      READ_DTCS
+    ],
+    associatedDtcCodes: [],
+    associatedDtcPrefixes: [],
+    subsystems: ['electrical']
   }
 ]
 

@@ -38,6 +38,36 @@ describe('Kia Rio warning-light catalogue', () => {
     expect(new Set(ids).size).toBe(ids.length)
   })
 
+  /**
+   * The guided flow narrows on colour, then shape, then behaviour. Two
+   * entries sharing all three cannot be told apart by any answer a driver
+   * can give, so the flow would have to pick one and would sometimes pick
+   * wrong. Adding entries is what breaks this: `check-engine` and
+   * `check-engine-blinking` share a colour and a shape, and so do the two
+   * GPF entries — behaviour is the only thing keeping each pair apart.
+   *
+   * This compares one behaviour at a time rather than fingerprinting the
+   * whole array, which is what it replaces. Joining the array left a hole:
+   * an entry listing both behaviours produced `blinking+steady` and so
+   * never collided with a `steady` entry it would in fact be
+   * indistinguishable from for a driver who answered "fija".
+   */
+  it('leaves no two lights answering the same description', () => {
+    const byDescription = new Map<string, string[]>()
+
+    for (const entry of KIA_RIO_WARNING_LIGHTS) {
+      for (const behavior of entry.behavior) {
+        const key = `${entry.color}|${entry.shape}|${behavior}`
+
+        byDescription.set(key, [...(byDescription.get(key) ?? []), entry.id])
+      }
+    }
+
+    expect(
+      [...byDescription.values()].filter(ids => ids.length > 1)
+    ).toEqual([])
+  })
+
   it('fills every spec §11.1 attribute', () => {
     for (const entry of KIA_RIO_WARNING_LIGHTS) {
       expect(entry.id.trim().length).toBeGreaterThan(0)
@@ -50,6 +80,67 @@ describe('Kia Rio warning-light catalogue', () => {
       expect(entry.recommendedChecks.length).toBeGreaterThan(0)
       expect(entry.subsystems.length).toBeGreaterThan(0)
     }
+  })
+
+  /**
+   * The three tell-tales the owner's manual names inside this project's
+   * engine and emissions scope. They were absent while the catalogue held
+   * only the ISO 2575 standard set; see
+   * `docs/WARNING_LIGHT_CATALOG_VERIFICATION.md`.
+   */
+  describe('the manual-specific tell-tales', () => {
+    it('covers the gasoline particulate filter, steady and blinking', () => {
+      const steady = kiaRioWarningLightsCatalog.byId('exhaust-gpf')
+      const blinking = kiaRioWarningLightsCatalog.byId(
+        'exhaust-gpf-blinking'
+      )
+
+      expect(steady?.behavior).toEqual(['steady'])
+      expect(blinking?.behavior).toEqual(['blinking'])
+      expect(steady?.subsystems).toContain('emissions')
+      expect(blinking?.subsystems).toContain('emissions')
+    })
+
+    /**
+     * The manual's own distinction, and the reason these are two entries:
+     * a steady lamp is cleared by a regeneration drive, a blinking one is
+     * a workshop visit. Collapsing them would give one of the two the
+     * wrong advice.
+     */
+    it('sends a steady filter lamp driving and a blinking one to a workshop', () => {
+      expect(kiaRioWarningLightsCatalog.byId('exhaust-gpf')?.immediateAction)
+        .toContain('80 km/h')
+      expect(
+        kiaRioWarningLightsCatalog.byId('exhaust-gpf-blinking')
+          ?.immediateAction
+      ).toContain('taller')
+    })
+
+    /**
+     * Oil level is not oil pressure. Two lamps, two failures: low pressure
+     * means stop the engine now, low level means top it up soon. Sharing a
+     * severity would push one of them to the wrong urgency.
+     */
+    it('separates engine oil level from oil pressure', () => {
+      const level = kiaRioWarningLightsCatalog.byId('engine-oil-level')
+      const pressure = kiaRioWarningLightsCatalog.byId('oil-pressure')
+
+      expect(level?.severity).toBe('warning')
+      expect(pressure?.severity).toBe('critical')
+      expect(level?.shape).not.toBe(pressure?.shape)
+    })
+
+    /**
+     * The master warning names no fault of its own — it defers to the LCD
+     * message, so its advice has to send the driver there rather than
+     * guess which of the systems behind it is at fault.
+     */
+    it('sends the master warning to the instrument display', () => {
+      const master = kiaRioWarningLightsCatalog.byId('master-warning')
+
+      expect(master?.immediateAction.toLowerCase()).toContain('pantalla')
+      expect(master?.severity).toBe('warning')
+    })
   })
 
   /**
@@ -94,15 +185,4 @@ describe('Kia Rio warning-light catalogue', () => {
    * are identical across all three they can never be told apart, and the
    * flow would dead-end on `candidates` with no question left to ask.
    */
-  it('keeps every light distinguishable by the guided questions', () => {
-    const fingerprints = KIA_RIO_WARNING_LIGHTS.map(entry =>
-      [
-        entry.color,
-        entry.shape,
-        [...entry.behavior].sort().join('+')
-      ].join('|')
-    )
-
-    expect(new Set(fingerprints).size).toBe(fingerprints.length)
-  })
 })

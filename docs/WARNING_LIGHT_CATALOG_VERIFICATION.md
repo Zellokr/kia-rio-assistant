@@ -62,24 +62,35 @@ convention rather than as manual-verified.
 
 ### Tell-tales the manual lists and the catalogue does not
 
-The catalogue covers the standardised set. The manual names roughly thirty
+The catalogue covered the standardised set. The manual names roughly thirty
 tell-tales in total, so the gap is expected — most of the remainder are
 lighting and convenience indicators (turn signals, main beam, fog lamps,
 cruise control, doors ajar, washer fluid, seat belt) that carry no diagnostic
 meaning for a read-only OBD tool.
 
-Three of the absences do fall inside this project's declared engine and
-emissions scope:
+Three of the absences fell inside this project's declared engine and
+emissions scope. **They have since been added**, taking the catalogue from
+13 entries to 16:
 
-| Manual tell-tale | Why it matters here |
-|---|---|
-| Testigo de advertencia del sistema de escape (GPF) (motor de gasolina) (si está equipado) | The gasoline particulate filter is an emissions device; a fault here is exactly what this tool reads |
-| Testigo de advertencia del nivel de aceite del motor (si está equipado) | Distinct from `oil-pressure` — level, not pressure. Two different lamps and two different failures |
-| Testigo de advertencia maestro | The master warning aggregates several conditions; a driver seeing it has no way to look it up here |
+| Manual tell-tale | Catalogue entry | Why it matters here |
+|---|---|---|
+| Testigo de advertencia del sistema de escape (GPF) (motor de gasolina) (si está equipado) | `exhaust-gpf`, `exhaust-gpf-blinking` | The gasoline particulate filter is an emissions device; a fault here is exactly what this tool reads |
+| Testigo de advertencia del nivel de aceite del motor (si está equipado) | `engine-oil-level` | Distinct from `oil-pressure` — level, not pressure. Two different lamps and two different failures |
+| Testigo de advertencia maestro | `master-warning` | The master warning aggregates several conditions; a driver seeing it had no way to look it up here |
 
-Adding them is open work. It changes what a driver is told about a lit lamp,
-which is a content decision rather than a mechanical one, so it is recorded
-here rather than taken silently.
+The GPF lamp became two entries because the manual gives it two procedures:
+steady is cleared by a regeneration drive — over 30 minutes, at least
+80 km/h, third gear or higher, 1500-4000 rpm — while blinking after that
+drive means the filter needs a workshop. One entry would have given one of
+those states the wrong advice.
+
+`engine-oil-level` is `warning` where `oil-pressure` is `critical`, and the
+difference is deliberate: low pressure means stop the engine before it
+seizes, low level means top it up soon.
+
+`master-warning` names no fault of its own. The manual lists what it stands
+in for — TPMS, low engine oil, and the FCA, BCW and HBA assistance systems —
+so its advice sends the driver to the LCD message rather than guessing.
 
 ## What this does and does not establish
 
