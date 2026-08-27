@@ -145,11 +145,14 @@ convenient summary of it.
 
 ## Part C — Warning-light catalogue
 
-**What is unknown.** `catalog/kia-rio/warning-lights/` holds the 13
-standardised ISO 2575 / ECE R121 tell-tales. They have never been compared
-against this car's instrument cluster or its owner's manual, and the
-`shape` values are descriptive identifiers chosen for the catalogue, not
-names from any Kia document.
+**What is unknown.** `catalog/kia-rio/warning-lights/` holds 16 entries,
+already compared against the owner's manual — eleven confirmed, two the
+manual does not support, three added because it named them (see
+`docs/WARNING_LIGHT_CATALOG_VERIFICATION.md`). What no document can settle
+is which lamps **this** car physically has: the manual covers the YB
+generation across trims and markets, and "si está equipado" runs through
+it. The `shape` values also remain descriptive identifiers chosen for the
+catalogue, not names from any Kia document.
 
 With the ignition on and the engine off, the cluster performs its lamp
 test — most tell-tales illuminate for a few seconds. That is the moment to
