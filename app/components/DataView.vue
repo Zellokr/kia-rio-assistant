@@ -1,12 +1,18 @@
 <script setup lang="ts">
 import type { ObdSessionState } from '~~/core/obd/session/ObdSessionStateMachine'
+import { computed, onScopeDispose, ref } from 'vue'
+
 import { isPhysicalTransportKind } from '~~/core/obd/transport/ObdTransport'
+import type {
+  ObdTelemetryMetric
+} from '~~/core/obd/telemetry/ObdTelemetryStore'
 import type {
   ObdTelemetryMetrics
 } from '~/composables/useObdTelemetry'
+import { describeMetricFreshness } from '~/utils/telemetryAge'
 import type { ObdTransportChoice } from '~/utils/obdTransportChoice'
 
-defineProps<{
+const props = defineProps<{
   sessionState: ObdSessionState
   telemetryRunning: boolean
   telemetry: ObdTelemetryMetrics
@@ -15,6 +21,40 @@ defineProps<{
   selectedCommand: string
   transportChoice: ObdTransportChoice
 }>()
+
+/**
+ * A reading's age has to advance on its own. Nothing changes in the store
+ * while polling is stopped, so without a clock of its own the display would
+ * freeze at whatever age it had when the last value arrived — which is the
+ * exact failure this is here to remove.
+ */
+const nowMs = ref(Date.now())
+const clock = setInterval(() => {
+  nowMs.value = Date.now()
+}, 1000)
+
+onScopeDispose(() => clearInterval(clock))
+
+function freshness(metric: ObdTelemetryMetric | undefined) {
+  return describeMetricFreshness(metric, nowMs.value)
+}
+
+/**
+ * Whether any reading on screen has gone stale. One quiet line above the
+ * cards is easier to catch than five separate ones, and it is what says the
+ * link is gone rather than the engine being still.
+ */
+const anyStale = computed(() => {
+  const metrics = [
+    props.telemetry.engineRpm,
+    props.telemetry.vehicleSpeed,
+    props.telemetry.coolantTemperature,
+    props.telemetry.engineLoad,
+    props.telemetry.throttlePosition
+  ]
+
+  return metrics.some(metric => freshness(metric).stale)
+})
 
 const emit = defineEmits<{
   'update:selectedCommand': [string]
@@ -119,6 +159,20 @@ const emit = defineEmits<{
         </div>
       </UCard>
 
+      <!--
+        The link going quiet has to be said, not inferred from numbers that
+        stopped changing. Frozen readings used to look exactly like live
+        ones — the same bold value over a plausible latency.
+      -->
+      <UAlert
+        v-if="anyStale"
+        color="warning"
+        variant="soft"
+        icon="i-lucide-wifi-off"
+        title="Lecturas sin actualizar"
+        description="El coche ha dejado de responder. Los números de abajo son los últimos recibidos, no los de ahora."
+      />
+
       <div class="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
         <UCard>
           <div class="flex min-h-36 flex-col justify-between gap-3">
@@ -131,7 +185,10 @@ const emit = defineEmits<{
               />
             </div>
             <div>
-              <span class="font-mono text-4xl font-bold tabular-nums text-highlighted">
+              <span
+                class="font-mono text-4xl font-bold tabular-nums transition-colors"
+                :class="freshness(telemetry.engineRpm).stale ? 'text-muted/60' : 'text-highlighted'"
+              >
                 {{ telemetry.engineRpm ? Math.round(telemetry.engineRpm.value) : '—' }}
               </span>
               <span
@@ -139,8 +196,11 @@ const emit = defineEmits<{
                 class="ml-1 text-xs text-muted"
               >rpm</span>
             </div>
-            <span class="text-xs text-muted">
-              {{ telemetry.engineRpm ? `${telemetry.engineRpm.latencyMs} ms` : 'Sin muestra' }}
+            <span
+              class="text-xs"
+              :class="freshness(telemetry.engineRpm).stale ? 'font-medium text-warning' : 'text-muted'"
+            >
+              {{ telemetry.engineRpm ? freshness(telemetry.engineRpm).label : 'Sin muestra' }}
             </span>
           </div>
         </UCard>
@@ -156,7 +216,10 @@ const emit = defineEmits<{
               />
             </div>
             <div>
-              <span class="font-mono text-4xl font-bold tabular-nums text-highlighted">
+              <span
+                class="font-mono text-4xl font-bold tabular-nums transition-colors"
+                :class="freshness(telemetry.vehicleSpeed).stale ? 'text-muted/60' : 'text-highlighted'"
+              >
                 {{ telemetry.vehicleSpeed ? Math.round(telemetry.vehicleSpeed.value) : '—' }}
               </span>
               <span
@@ -164,8 +227,11 @@ const emit = defineEmits<{
                 class="ml-1 text-xs text-muted"
               >km/h</span>
             </div>
-            <span class="text-xs text-muted">
-              {{ telemetry.vehicleSpeed ? `${telemetry.vehicleSpeed.latencyMs} ms` : 'Sin muestra' }}
+            <span
+              class="text-xs"
+              :class="freshness(telemetry.vehicleSpeed).stale ? 'font-medium text-warning' : 'text-muted'"
+            >
+              {{ telemetry.vehicleSpeed ? freshness(telemetry.vehicleSpeed).label : 'Sin muestra' }}
             </span>
           </div>
         </UCard>
@@ -190,24 +256,51 @@ const emit = defineEmits<{
             <p class="text-sm text-muted">
               Refrigerante
             </p>
-            <p class="mt-2 font-mono text-2xl font-bold tabular-nums text-highlighted">
+            <p
+              class="mt-2 font-mono text-2xl font-bold tabular-nums transition-colors"
+              :class="freshness(telemetry.coolantTemperature).stale ? 'text-muted/60' : 'text-highlighted'"
+            >
               {{ telemetry.coolantTemperature ? `${telemetry.coolantTemperature.value} °C` : '—' }}
+            </p>
+            <p
+              class="mt-1 text-xs"
+              :class="freshness(telemetry.coolantTemperature).stale ? 'font-medium text-warning' : 'text-muted'"
+            >
+              {{ telemetry.coolantTemperature ? freshness(telemetry.coolantTemperature).label : 'Sin muestra' }}
             </p>
           </div>
           <div class="rounded-xl bg-elevated p-4">
             <p class="text-sm text-muted">
               Carga del motor
             </p>
-            <p class="mt-2 font-mono text-2xl font-bold tabular-nums text-highlighted">
+            <p
+              class="mt-2 font-mono text-2xl font-bold tabular-nums transition-colors"
+              :class="freshness(telemetry.engineLoad).stale ? 'text-muted/60' : 'text-highlighted'"
+            >
               {{ telemetry.engineLoad ? `${telemetry.engineLoad.value.toFixed(1)} %` : '—' }}
+            </p>
+            <p
+              class="mt-1 text-xs"
+              :class="freshness(telemetry.engineLoad).stale ? 'font-medium text-warning' : 'text-muted'"
+            >
+              {{ telemetry.engineLoad ? freshness(telemetry.engineLoad).label : 'Sin muestra' }}
             </p>
           </div>
           <div class="rounded-xl bg-elevated p-4">
             <p class="text-sm text-muted">
               Acelerador
             </p>
-            <p class="mt-2 font-mono text-2xl font-bold tabular-nums text-highlighted">
+            <p
+              class="mt-2 font-mono text-2xl font-bold tabular-nums transition-colors"
+              :class="freshness(telemetry.throttlePosition).stale ? 'text-muted/60' : 'text-highlighted'"
+            >
               {{ telemetry.throttlePosition ? `${telemetry.throttlePosition.value.toFixed(1)} %` : '—' }}
+            </p>
+            <p
+              class="mt-1 text-xs"
+              :class="freshness(telemetry.throttlePosition).stale ? 'font-medium text-warning' : 'text-muted'"
+            >
+              {{ telemetry.throttlePosition ? freshness(telemetry.throttlePosition).label : 'Sin muestra' }}
             </p>
           </div>
         </div>
