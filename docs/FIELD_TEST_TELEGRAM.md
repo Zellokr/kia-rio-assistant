@@ -79,27 +79,55 @@ pnpm build:android:web && pnpm field:assert-clean
 
 ## Using it at the car
 
-The **Enviar a Telegram** button appears in **Registro**, next to *Copiar
+The **Enviar informe** button appears in **Registro**, next to *Copiar
 registro*, and only in a build made with the flag.
 
-The upload is never the only copy. The session stays in the log and in
-IndexedDB whether it succeeds or not, so a garage with no signal costs you
-nothing — press it again when you have coverage. The status line under the
-buttons says what happened, including when the network failed.
+Press it once, at the end. It posts a report and then every recorded
+session as a JSON file. **There is nothing to write down**: everything the
+procedure asks a human to observe — whether each connection reached ready
+and how long it took, what errored, whether a drop was detected, whether
+recovery happened and how long it took, and whether telemetry resumed
+afterwards — is computed from the event log by
+`core/obd/fieldTest/summariseFieldTest.ts`.
+
+The report is descriptive, never a verdict. It says what the log contains
+and leaves the pass/fail to a person. It does call out the one thing that
+sends people home early: a session with no drop recorded is an unfinished
+A2, not a passing one.
+
+### It reads storage, not the live log
+
+`sessionLog.start()` resets the log, and `selectDevice()` calls it on every
+connection attempt — so after ten connect/disconnect cycles the live log
+holds the tenth and nothing else. Exporting it would have sent one
+connection while claiming to be evidence for ten. The sessions are read
+back from IndexedDB, where each was written as it happened.
+
+### Failure is survivable
+
+The upload is never the only copy. Sessions stay in IndexedDB whether it
+succeeds or not, so a garage with no signal costs you nothing — press it
+again when you have coverage. The report goes first, so if the connection
+dies mid-upload the numbers that decide whether to keep testing have
+already arrived. The status line under the buttons says what happened.
 
 ## Removing it
 
-1. Delete `app/services/telegramFieldLog.ts`.
-2. Delete `test/unit/telegramFieldLog.test.ts`.
+1. Delete `app/services/telegramFieldLog.ts`,
+   `app/services/sendFieldTestReport.ts` and
+   `core/obd/fieldTest/`.
+2. Delete `test/unit/telegramFieldLog.test.ts` and
+   `test/unit/summariseFieldTest.test.ts`.
 3. Delete `scripts/assert-no-field-test-secrets.mjs` and the
    `field:assert-clean` / `field:build` scripts in `package.json`.
 4. Delete the "Assert no field-test secrets" step in
    `.github/workflows/ci.yml`.
 5. Remove the `runtimeConfig` and `vite.define` blocks in `nuxt.config.ts`,
    and the `define` block in `vitest.config.ts`.
-6. Remove `telegramEnabled` / `sendToTelegram` from `useObdSessionLog` and
-   `useObdSessionRecording`, the `telegram` prop and emit from `LogView` and
-   `SessionLogPanel`, and `sendLogToTelegram` from `app/pages/index.vue`.
+6. Remove `telegramEnabled` from `useObdSessionLog`, `sendFieldReport` from
+   `useObdSessionRecording`, both from `useObdLabSession`, the `telegram`
+   prop and emit from `LogView` and `SessionLogPanel`, and
+   `sendLogToTelegram` from `app/pages/index.vue`.
 7. Delete this file.
 
 Every one of those carries a `TEMPORARY` comment pointing back here, so

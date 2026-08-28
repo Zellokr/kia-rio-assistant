@@ -45,7 +45,7 @@ const {
   downloadSessionLog,
   copySessionLog,
   telegramEnabled,
-  sendToTelegram,
+  sendFieldReport,
   diagnostics,
   selectDevice,
   connect,
@@ -122,8 +122,8 @@ async function copyLog(): Promise<void> {
  * `app/services/telegramFieldLog.ts`.
  */
 async function sendLogToTelegram(): Promise<void> {
-  logCopyStatus.value = 'Enviando a Telegram…'
-  logCopyStatus.value = await sendToTelegram()
+  logCopyStatus.value = 'Componiendo y enviando el informe…'
+  logCopyStatus.value = await sendFieldReport()
 }
 </script>
 

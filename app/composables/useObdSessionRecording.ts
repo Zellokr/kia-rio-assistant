@@ -13,6 +13,13 @@ import type { ObdPersistence } from '~~/data/repositories/createObdPersistence'
 import { useObdSessionLog } from '~/composables/useObdSessionLog'
 
 /**
+ * TEMPORARY — field-test evidence delivery. Defined by `vite.define` in
+ * `nuxt.config.ts` and by `vitest.config.ts`; see
+ * `docs/FIELD_TEST_TELEGRAM.md`.
+ */
+declare const __FIELD_TEST_TELEGRAM__: boolean
+
+/**
  * Everything that writes the session down: the log the driver exports, and
  * the store it is mirrored into.
  *
@@ -40,9 +47,45 @@ export function useObdSessionRecording(sessionLog: ObdSessionLog) {
     clearDisplay,
     downloadJson,
     copyJson,
-    telegramEnabled,
-    sendToTelegram
+    telegramEnabled
   } = useObdSessionLog(sessionLog)
+
+  /**
+   * TEMPORARY — field-test evidence delivery. Delete with
+   * `app/services/telegramFieldLog.ts`; see `docs/FIELD_TEST_TELEGRAM.md`.
+   *
+   * Reads every stored session, not the live one. `sessionLog.start()`
+   * resets the log and `selectDevice()` calls it on each attempt, so after
+   * ten cycles the live log holds only the tenth — sending it would claim
+   * to be evidence for ten while carrying one.
+   */
+  async function sendFieldReport(): Promise<string> {
+    if (!__FIELD_TEST_TELEGRAM__) {
+      return 'Esta compilación no lleva envío a Telegram.'
+    }
+
+    if (!persistence) {
+      return 'No hay almacenamiento en este dispositivo; no se puede componer el informe.'
+    }
+
+    const config = useRuntimeConfig().public.telegram as {
+      botToken: string
+      chatId: string
+    }
+
+    const { sendFieldTestReport } = await import(
+      '~/services/sendFieldTestReport'
+    )
+
+    const result = await sendFieldTestReport(persistence, config)
+
+    if (result.problems.length > 0) {
+      return `Enviadas ${result.sessionsSent} de ${result.sessionsFound}.`
+        + ` ${result.problems[0]}`
+    }
+
+    return `Informe enviado con ${result.sessionsSent} sesiones.`
+  }
 
   function toError(error: unknown): Error {
     return error instanceof Error
@@ -184,7 +227,7 @@ export function useObdSessionRecording(sessionLog: ObdSessionLog) {
 
     /** TEMPORARY — field-test evidence delivery. See `telegramFieldLog.ts`. */
     telegramEnabled,
-    sendToTelegram,
+    sendFieldReport,
 
     toError,
     recordError,

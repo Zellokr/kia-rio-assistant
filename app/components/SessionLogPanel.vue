@@ -114,7 +114,7 @@ const hiddenByLimit = computed(() => {
           class="min-h-12 justify-center"
           @click="emit('telegram')"
         >
-          Enviar a Telegram
+          Enviar informe
         </UButton>
         <p
           v-if="props.copyStatus"
