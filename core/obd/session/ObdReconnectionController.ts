@@ -23,6 +23,17 @@ export const DEFAULT_RECONNECTION_DELAYS_MS = [
 
 export const DEFAULT_RECONNECTION_DEADLINE_MS = 30_000
 
+/**
+ * How long one attempt may run before it is abandoned.
+ *
+ * Connecting took 6.6–8.4 s on the vehicle across twenty measured sessions,
+ * so 12 s leaves room for a slow one without letting a hung one eat the
+ * whole run: bounded only by the overall deadline, the first attempt would
+ * consume all 30 s and the remaining four would never start — which is the
+ * shape of the 2026-08-28 failure, not a fix for it.
+ */
+export const DEFAULT_RECONNECTION_ATTEMPT_TIMEOUT_MS = 12_000
+
 export interface ObdReconnectionAttempt {
   attempt: number
   attempts: number
@@ -41,6 +52,7 @@ export interface ObdReconnectionFailure {
 export interface ObdReconnectionControllerOptions {
   delaysMs?: readonly number[]
   deadlineMs?: number
+  attemptTimeoutMs?: number
   now?: () => number
   onEnter?: (reason: ObdLinkSuspectReason) => void
   attempt: (context: ObdReconnectionAttempt) => Promise<void>
@@ -58,10 +70,21 @@ export interface ObdReconnectionControllerOptions {
  * generation-counter idiom instead of `AbortController`: `abort()` increments a
  * private generation, and the run loop re-checks it after every `await` so a
  * late-resolving attempt is dropped rather than reported as recovered.
+ *
+ * The deadline is enforced against a running attempt, not only between
+ * attempts. It was checked only between them until 2026-08-28, when the
+ * vehicle showed what that costs: the driver walked out of range, the BLE
+ * connect never returned — neither `AndroidBleObdTransport.connect` nor the
+ * native `connectGatt` carries a timeout of its own — and the loop sat
+ * awaiting an attempt that would never settle. One `reconnect-attempt` was
+ * logged where five were due, no failure was ever reported, and the app
+ * simply stopped saying anything. A deadline that a hung attempt can put
+ * out of reach is not a deadline.
  */
 export class ObdReconnectionController {
   private readonly delaysMs: readonly number[]
   private readonly deadlineMs: number
+  private readonly attemptTimeoutMs: number
   private readonly now: () => number
 
   private activeState = false
@@ -74,6 +97,8 @@ export class ObdReconnectionController {
   ) {
     this.delaysMs = options.delaysMs ?? DEFAULT_RECONNECTION_DELAYS_MS
     this.deadlineMs = options.deadlineMs ?? DEFAULT_RECONNECTION_DEADLINE_MS
+    this.attemptTimeoutMs = options.attemptTimeoutMs
+      ?? DEFAULT_RECONNECTION_ATTEMPT_TIMEOUT_MS
     this.now = options.now ?? Date.now
   }
 
@@ -151,7 +176,22 @@ export class ObdReconnectionController {
         = { attempt: index + 1, attempts, delayMs, elapsedMs, reason }
 
       try {
-        await this.options.attempt(context)
+        /**
+         * Bounded twice: by its own timeout, and by whatever is left of the
+         * overall deadline. An attempt that never settles is abandoned
+         * rather than allowed to hold the loop open forever, and it cannot
+         * spend the whole run either — the later attempts are the ones that
+         * catch an adapter coming back into range.
+         *
+         * Abandoned, not cancelled: nothing here can force a hung BLE
+         * connect to return. The generation check after the race is what
+         * keeps its eventual result — if it ever arrives — from being read
+         * as a recovery that already timed out.
+         */
+        await this.withDeadline(
+          this.options.attempt(context),
+          Math.min(this.attemptTimeoutMs, this.deadlineMs - elapsedMs)
+        )
       } catch (error) {
         if (generation !== this.generation) {
           return
@@ -187,6 +227,40 @@ export class ObdReconnectionController {
   private delay(ms: number): Promise<void> {
     return new Promise((resolve) => {
       setTimeout(resolve, ms)
+    })
+  }
+
+  /**
+   * Rejects if `work` has not settled within `ms`.
+   *
+   * The timer is always cleared, including on the winning path: a pending
+   * one keeps the event loop alive, which in tests looks like a hang and on
+   * a phone is a wakeup nobody asked for.
+   */
+  private withDeadline<T>(work: Promise<T>, ms: number): Promise<T> {
+    if (ms <= 0) {
+      return Promise.reject(
+        new Error('Reconnection deadline reached before the attempt began')
+      )
+    }
+
+    return new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        reject(new Error(
+          `Reconnection attempt exceeded the ${ms} ms left of its deadline`
+        ))
+      }, ms)
+
+      work.then(
+        (value) => {
+          clearTimeout(timer)
+          resolve(value)
+        },
+        (error) => {
+          clearTimeout(timer)
+          reject(error)
+        }
+      )
     })
   }
 }

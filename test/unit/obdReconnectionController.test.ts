@@ -210,3 +210,82 @@ describe('ObdReconnectionController', () => {
     expect(onEnter).toHaveBeenCalledTimes(2)
   })
 })
+
+describe('a hung attempt', () => {
+  /**
+   * Found on the vehicle on 2026-08-28. The driver walked out of range, the
+   * BLE connect never returned — neither the transport nor the native
+   * connectGatt carries a timeout — and the controller sat awaiting it. The
+   * log shows one `reconnect-attempt` where five were due, then nothing at
+   * all: no further attempts, no failure, no word to the driver.
+   *
+   * The deadline was checked only between attempts, so an attempt that
+   * never settled put it permanently out of reach.
+   */
+  it('gives up on an attempt that never settles and keeps going', async () => {
+    vi.useFakeTimers()
+
+    const started: number[] = []
+    let releaseFirst: (() => void) | undefined
+
+    const controller = new ObdReconnectionController({
+      now: () => Date.now(),
+      attempt: async (context) => {
+        started.push(context.attempt)
+
+        if (context.attempt === 1) {
+          // Never settles on its own, exactly like a BLE connect to an
+          // adapter that is no longer in range.
+          await new Promise<void>((resolve) => {
+            releaseFirst = resolve
+          })
+        }
+      }
+    })
+
+    controller.notifyLinkSuspect('transport-state')
+
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(started).toEqual([1])
+
+    // Past the 12s an attempt may hold, several times over. Bounded only by
+    // the overall deadline, the first would have spent all 30 s and the
+    // remaining four would never have started.
+    await vi.advanceTimersByTimeAsync(40_000)
+
+    expect(started.length).toBeGreaterThan(1)
+    expect(controller.active).toBe(false)
+
+    releaseFirst?.()
+    vi.useRealTimers()
+  })
+
+  /**
+   * The run has to end for the driver, not merely stop attempting. A
+   * controller that goes quiet leaves the screen claiming it is still
+   * reconnecting forever.
+   */
+  it('reports failure rather than going silent', async () => {
+    vi.useFakeTimers()
+
+    const onFailed = vi.fn()
+    let release: (() => void) | undefined
+
+    const controller = new ObdReconnectionController({
+      now: () => Date.now(),
+      onFailed,
+      attempt: () => new Promise<void>((resolve) => {
+        release = resolve
+      })
+    })
+
+    controller.notifyLinkSuspect('poll-halt')
+    await vi.advanceTimersByTimeAsync(40_000)
+
+    expect(onFailed).toHaveBeenCalledOnce()
+    expect(controller.active).toBe(false)
+
+    release?.()
+    vi.useRealTimers()
+  })
+})
