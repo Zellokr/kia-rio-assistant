@@ -9,7 +9,7 @@ evidence it asks for, never by deciding it probably works.
 | A1 | **Closed** | Criteria met — eleven consecutive connections |
 | A2 | **Closed** | Owner waiver, `ADR-004`: one of two recoveries observed |
 | B | **Closed** | Criteria met — all three modes answered |
-| C | **Partly** | Cluster photographed and compared; guided identifier not run |
+| C | **Closed** | Cluster photographed and compared; guided identifier owner-reported correct for ABS, seatbelt and immobilizer |
 | D | **Not executable** | The car has no stored codes to multi-frame |
 
 Evidence lives in the Telegram field-test channel: two reports and
@@ -21,7 +21,7 @@ This is one trip to the car. It closes, in order:
 |---|---|---|
 | A | Sprint 0 task 8 — the Fase 1 exit criterion, waived by ADR-003 rather than met. **Closed 2026-08-28; see `ADR-004`** | **Yes** |
 | B | `DTC_PHYSICAL_VALIDATION.md` check 2 — Mode 07/0A empty-result behaviour | No |
-| C | The Rio warning-light catalogue, never compared to the real cluster | No |
+| C | The Rio warning-light catalogue and guided identifier, now checked against real cluster evidence | No |
 | D | `DTC_PHYSICAL_VALIDATION.md` check 1 — Mode 03 multi-frame | Opportunistic only |
 
 Part A is the one that matters. B, C and D improve things that already
@@ -221,11 +221,12 @@ convenient summary of it.
 
 ## Part C — Warning-light catalogue
 
-> **PARTLY DONE 2026-08-28.** A high-resolution cluster photograph was
-> captured with the ignition on, engine off, at 76066 km. Nine existing
-> entries are confirmed present: `abs`, `tpms`, `esc-traction`,
-> `power-steering`, `charging-system`, `oil-pressure`, `brake-system`,
-> `airbag-srs`, and `check-engine`.
+> **CLOSED 2026-08-28; updated from the clearer photograph supplied later
+> and from the owner's report of the guided-identifier run.** A high-resolution
+> cluster photograph was captured with the ignition on, engine off, at
+> 76066 km. Ten existing entries are confirmed present: `abs`, `tpms`,
+> `esc-traction`, `power-steering`, `charging-system`, `oil-pressure`,
+> `brake-system`, `airbag-srs`, `check-engine`, and `immobilizer`.
 >
 > Two physical findings are now catalogue entries: amber `esc-off`
 > (`car-with-skid-marks-off`) and red `seatbelt`
@@ -233,25 +234,28 @@ convenient summary of it.
 > identifiers, not Kia document names.
 >
 > The amber lamp below ABS is the already-catalogued TPMS lamp, not a second
-> amber `(!)`, and there is no door-ajar lamp. The ambiguous amber
-> lozenge or hook remains unidentified rather than guessed as GPF or
-> immobilizer. `(A)` Auto Stop/Start is a status indicator, not a warning.
-> No other lamps are marked absent because a lamp test does not illuminate
-> every fault-dependent tell-tale.
+> amber `(!)`, and there is no door-ajar lamp. The amber key-shaped lamp at
+> the lower right confirms the already-catalogued `immobilizer` entry rather
+> than a GPF or other emissions warning. `(A)` Auto Stop/Start is a status
+> indicator, not a warning. No other lamps are marked absent because a lamp
+> test does not illuminate every fault-dependent tell-tale.
 >
-> The guided identifier has still not been physically run.
+> The guided identifier was run during the last vehicle trip, according to the
+> owner. The owner tested `abs`, `seatbelt`, and `immobilizer`; all three
+> reached the correct result. No screenshots or exported identifier evidence
+> were captured, so the identifier evidence is recorded as owner-reported.
 
 **What is unknown.** The manual covers the YB generation across trims and
 markets, and "si está equipado" runs through it, so this lamp test cannot
-establish which unlit tell-tales are fitted. The ambiguous amber lamp also
-remains deliberately unidentified. The `shape` values are descriptive
-identifiers chosen for the catalogue, not names from any Kia document.
+establish which unlit tell-tales are fitted. The `shape` values are
+descriptive identifiers chosen for the catalogue, not names from any Kia
+document.
 
-The photograph has completed the physical catalogue comparison. The remaining
-Part C work is to open **Datos** → the warning-light section, answer the
-guided questions for two or three real lights, and confirm that the flow
-reaches the right result. An unknown light must remain "sin identificar" with
-the safe alternative, not be matched to a plausible-looking catalogue entry.
+The photograph completed the physical catalogue comparison. The later
+owner-reported guided-identifier run completed the UI-flow check for three
+real lights: `abs`, `seatbelt`, and `immobilizer`. An unknown light must still
+remain "sin identificar" with the safe alternative, not be matched to a
+plausible-looking catalogue entry.
 
 The owner's-manual comparison remains recorded in
 `docs/WARNING_LIGHT_CATALOG_VERIFICATION.md`; this physical result adds only
@@ -295,7 +299,9 @@ Bring back:
   app sent them. Retries, timings, drops and recoveries are in the report;
   nothing was transcribed by hand, so nothing depends on memory.
 - `B.json` if Part B ran, and `D.json` if Part D ran.
-- The cluster photographs for Part C.
+- The cluster photographs for Part C, plus screenshots if a future run repeats
+  the guided identifier. The 2026-08-28 identifier closure is owner-reported
+  and has no screenshots.
 
 Then, and only then:
 

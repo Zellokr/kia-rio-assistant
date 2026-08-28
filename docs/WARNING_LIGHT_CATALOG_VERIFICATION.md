@@ -20,21 +20,28 @@ scratch directory. The extractor is not part of the repository; it produced
 evidence, not a build artefact.
 
 **Physical-cluster provenance**: high-resolution cluster photograph captured
-2026-08-28, ignition on and engine off, at 76066 km. The lamp test confirmed
-nine existing catalogue entries — `abs`, `tpms`, `esc-traction`,
-`power-steering`, `charging-system`, `oil-pressure`, `brake-system`,
-`airbag-srs`, and `check-engine` — plus exactly two additions: `esc-off` and
+2026-08-28, ignition on and engine off, at 76066 km, with a later clearer copy
+supplied from `5805678457499883578.jpg`. The lamp test confirmed ten existing
+catalogue entries — `abs`, `tpms`, `esc-traction`, `power-steering`,
+`charging-system`, `oil-pressure`, `brake-system`, `airbag-srs`,
+`check-engine`, and `immobilizer` — plus exactly two additions: `esc-off` and
 `seatbelt`. Their shapes, `car-with-skid-marks-off` and
 `seated-person-with-belt`, are descriptive catalogue identifiers, not Kia
 names. `esc-off` is the amber driver-selected system-disabled state; `seatbelt`
 is the red belt reminder.
 
-The ambiguous amber lozenge or hook is not identified and has no new catalogue
-entry: it must not be guessed as GPF or immobilizer. `(A)` Auto Stop/Start is a
-status indicator, not a warning. The amber lamp below ABS is the already
-catalogued TPMS lamp, not a second amber `(!)`, and there is no door-ajar lamp.
-No other lamp is marked absent: a lamp test does not illuminate every
-fault-dependent tell-tale.
+The amber key-shaped lamp at the lower right confirms the already-catalogued
+`immobilizer` entry and has no new catalogue entry: it must not be guessed as
+GPF or another emissions warning. `(A)` Auto Stop/Start is a status indicator,
+not a warning. The amber lamp below ABS is the already catalogued TPMS lamp,
+not a second amber `(!)`, and there is no door-ajar lamp. No other lamp is
+marked absent: a lamp test does not illuminate every fault-dependent
+tell-tale.
+
+The guided identifier was also physically exercised during the last vehicle
+trip, according to the owner. `abs`, `seatbelt`, and `immobilizer` each reached
+the correct result. No screenshots were captured for that identifier run, so
+that part of the physical record is owner-reported rather than image-backed.
 
 ## Result
 

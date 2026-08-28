@@ -28,15 +28,19 @@ import type {
  *    not names taken from any Kia document. They exist so the guided flow
  *    can narrow on symbol shape; they are not a claim about Kia's own
  *    naming.
- * 3. The manual names tell-tales this catalogue does not carry, three of
+ * 3. The manual names tell-tales this catalogue did not carry, three of
  *    them inside this project's engine and emissions scope: the exhaust
  *    (GPF) lamp, the engine oil **level** lamp — a different lamp from
- *    `oil-pressure` — and the master warning. Adding them is open work.
+ *    `oil-pressure` — and the master warning. They were added after the
+ *    manual comparison.
  *
- * Checking the catalogue against the real instrument cluster is still open:
- * the manual covers the YB generation across trims and markets, and "si
- * está equipado" runs through it. Treat coverage as "the standard set",
- * never as "every light this car can show".
+ * The catalogue has also been compared with a real instrument-cluster lamp
+ * test from this Kia Rio. That confirms the lit tell-tales recorded in
+ * `docs/WARNING_LIGHT_CATALOG_VERIFICATION.md`, including the amber
+ * key-shaped immobilizer lamp. It does not prove that every unlit tell-tale
+ * is absent: the manual covers the YB generation across trims and markets,
+ * and "si está equipado" runs through it. Treat coverage as "the standard
+ * set plus observed lights", never as "every light this car can show".
  *
  * SEVERITY. `critical` is reserved for lights that mean stop now — loss of
  * lubrication, cooling, braking or charging. Note that not every red light
