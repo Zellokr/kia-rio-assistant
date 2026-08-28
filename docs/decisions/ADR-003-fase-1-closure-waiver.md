@@ -1,15 +1,19 @@
 # ADR-003: Fase 1 closed without hardware validation
 
-**Status**: Accepted
+**Status**: Superseded by [ADR-004](ADR-004-part-a-closure.md)
 **Date**: 2026-08-25
 **Decided by**: Kristian (project owner)
 **Related**: `docs/decisions/ADR-002-obd-transport.md`, `docs/SPEC_DEVIATIONS.md`, spec Annex B.1 (Sprint 0), spec section 3.1 ("Regla de avance")
 
 ## Decision
 
-Fase 1 is declared closed as of 2026-08-25 **without executing Sprint 0 task 8**.
-This is a deliberate, owner-accepted waiver. It is **not** a record that the
+Fase 1 was declared closed as of 2026-08-25 **without executing Sprint 0 task 8**.
+This was a deliberate, owner-accepted waiver. It was **not** a record that the
 validation was performed.
+
+This ADR records the state on 2026-08-25. It is superseded by ADR-004, which
+records the later 2026-08-28 vehicle run: A1 met its criterion, and A2 closed
+on a narrower owner waiver after two detected drops and one observed recovery.
 
 ## What was NOT done
 
@@ -45,24 +49,24 @@ reproducible tests exist. **The verified exit criterion does not.** This ADR
 records that the owner chose to advance anyway, with the gap open and visible,
 rather than leave the phase informally half-closed.
 
-## Consequences
+## Historical consequences
+
+These consequences governed the project between 2026-08-25 and ADR-004:
 
 - **Do not cite Fase 1 closure as evidence that reconnection works on the
-  vehicle.** It is not. Any future document, report or commit message that
-  implies otherwise is wrong and should be corrected against this ADR.
-- Sprint 0 task 8 stays **open** as a tracked item. Closing Fase 1 did not
-  close it.
-- The first real drop on the car is still an unrehearsed event. Expect the
-  first vehicle reconnection attempt to be the genuine test, and treat a
-  failure there as new information rather than a regression.
-- `AndroidBleObdTransport` remains the only vehicle-validated transport, for
+  vehicle.** It was not. Any document, report or commit message from that period
+  implying otherwise was wrong and should have been corrected against this ADR.
+- Sprint 0 task 8 stayed **open** as a tracked item. Closing Fase 1 did not close
+  it.
+- The first real drop on the car was still an unrehearsed event.
+- `AndroidBleObdTransport` remained the only vehicle-validated transport, for
   the initial connection path only (ADR-002).
-- If the hardware run later contradicts the implemented behaviour, this ADR is
+- If the later hardware run contradicted the implemented behaviour, this ADR was
   the record explaining why that was possible: the behaviour shipped unproven,
   knowingly.
 
-## Reversal condition
+## Supersession
 
-This waiver is superseded the moment Sprint 0 task 8 is actually executed.
-When it is, record the result — pass or fail — as a new ADR and amend this one
-to point at it.
+ADR-004 supersedes this waiver. Sprint 0 task 8 is no longer open: A1 met its
+criterion, and A2 closed by owner waiver with one recovery observed and one
+post-fix Bluetooth-toggle gap still not rerun on the vehicle.

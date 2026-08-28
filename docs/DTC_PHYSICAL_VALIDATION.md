@@ -4,13 +4,13 @@
 executable on this car. See the per-check status below.
 
 It holds the vehicle checks the DTC decoders need before their unvalidated
-branches can be trusted. The step-by-step procedure that runs them, together
-with the still-open Sprint 0 task 8, is
+branches can be trusted. The step-by-step procedure that ran the executable
+check and recorded the non-executable one is
 [`FIELD_TEST_VEHICLE_VALIDATION.md`](FIELD_TEST_VEHICLE_VALIDATION.md) —
-check 2 is Part B there, check 1 is Part D. These checks are **transport-independent**: they are
-about ELM327 and ECU framing, not about how bytes reach the adapter. They apply
-to whatever transport is current — today that is `android-ble`, the only entry
-in `PHYSICAL_TRANSPORT_KINDS`.
+check 2 is Part B there, check 1 is Part D. These checks are
+**transport-independent**: they are about ELM327 and ECU framing, not about how
+bytes reach the adapter. They apply to whatever transport is current — today
+that is `android-ble`, the only entry in `PHYSICAL_TRANSPORT_KINDS`.
 
 > **Why this file exists.** The Mode 03 multi-frame check below used to live
 > inside step 5 of `STEP_18_PHYSICAL_TEST.md`, a Web Serial procedure. That
@@ -64,42 +64,18 @@ Eight such events sit in the 16:48 session — two for `03`, three for `07`,
 three for `0A`. All three branches remain implemented; this records which
 one this car takes, not that the others are dead code.
 
-Neither Mode 07 (pending) nor Mode 0A (permanent) has ever been sent to this
-vehicle. Both are now in `PHYSICAL_ALLOWED_COMMANDS` — the allowlist was
-deliberately widened on 2026-08-26 — so this check is now runnable. Being
-sendable is not being validated: nothing below has been executed.
+Before the 2026-08-28 run, the open question was what this ECU would return
+when there was nothing to report. It could have returned the padded empty frame
+Mode 03 already used, a literal `NO DATA`, or `?` for an unsupported mode. Those
+branches remain distinct in code because other ECUs may choose differently:
 
-The open question is what they return when there is nothing to report. Mode 03
-copes with an empty result because the ECU still answers a padded
-`43 00 00 00 00 00 00` frame. `classifyElmResponse` treats a literal `NO DATA`
-as a **hard error** for every command, globally — so if Mode 07 or Mode 0A
-answers `NO DATA` on an empty set instead of a padded frame, "no pending codes"
-would surface to the user as a failure.
+- a padded frame reports `no-codes-reported`;
+- a `NO DATA` rejection reports `unconfirmed / no-data`;
+- a `?` rejection reports `unconfirmed / unsupported-mode`.
 
-There is a third possible answer: the ECU may not implement the mode at all and
-reply `?`, which `classifyElmResponse` reports as `unknown-command`. That is a
-different fact from an empty result and must not be collapsed into it.
-
-`readDiagnosticCodes` already handles all three without asserting which one this
-vehicle produces: a padded frame reports `no-codes-reported`, a `NO DATA`
-rejection reports `unconfirmed / no-data`, and a `?` rejection reports
-`unconfirmed / unsupported-mode`. **`unconfirmed` is never rendered as "no
-codes".** Running this check does not change that code; it records which branch
-the vehicle actually takes, so the UI copy can stop hedging.
-
-Do not assert either behaviour in code or in documentation before this runs.
-
-1. With the session `ready`, send `07`, then `0A`.
-2. Record the raw response for each, including the case where the vehicle has no
-   pending or permanent codes.
-3. Note which of the three the reply is: a padded frame, `NO DATA`, or `?`.
-4. If it is `NO DATA`, confirm the empty case stays handled above the executor —
-   record that as the finding rather than loosening the global error
-   classification.
-5. If it is `?`, record that this ECU does not implement the mode, and for which
-   of the two modes. Do not remove the command from the allowlist on that basis
-   alone: an unimplemented read is harmless, and one capture is not a fleet.
-6. Attach the raw capture. A conclusion without the raw bytes is not evidence.
+For this Kia Rio, that question is closed: all three diagnostic modes reached
+the decoded `codes` path with zero reported DTCs. Do not generalise this to all
+vehicles, and do not remove the other branches.
 
 ## Safety
 
@@ -108,8 +84,9 @@ Mode 04, DTC clearing, ECU writes, coding and adaptation are forbidden, and
 `PhysicalObdCommandPolicy` enforces that below the UI. Vehicle immobilised,
 parking brake on, ventilated area. Stop the test rather than improvise.
 
-## Recording a result
+## Recording a future result
 
-When a check runs, record it as a new ADR — pass or fail — and change its status
-here from OPEN to the ADR reference. A check is closed by evidence, never by a
-decision to stop worrying about it.
+If Check 1 ever becomes executable on this or another vehicle, record it as a
+new ADR — pass or fail — and change its status here from NOT EXECUTABLE to the
+ADR reference. A check is closed by evidence, never by a decision to stop
+worrying about it.
