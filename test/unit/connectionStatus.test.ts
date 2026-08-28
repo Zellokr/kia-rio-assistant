@@ -4,8 +4,7 @@ import { mount } from '@vue/test-utils'
 
 import ConnectionStatus from '~/components/ConnectionStatus.vue'
 import {
-  describeSessionStatus,
-  sessionToneColor
+  describeSessionStatus
 } from '~/utils/sessionStatusPresentation'
 import {
   OBD_SESSION_STATES
@@ -56,10 +55,11 @@ describe('describeSessionStatus', () => {
   })
 
   it('separates a healthy session from one needing attention', () => {
-    expect(sessionToneColor(describeSessionStatus('ready').tone)).toBe('success')
-    expect(sessionToneColor(describeSessionStatus('error').tone)).toBe('error')
-    expect(sessionToneColor(describeSessionStatus('reconnecting').tone)).toBe('error')
-    expect(sessionToneColor(describeSessionStatus('idle').tone)).toBe('neutral')
+    expect(describeSessionStatus('ready').tone).toBe('ready')
+    expect(describeSessionStatus('error').tone).toBe('attention')
+    expect(describeSessionStatus('reconnecting').tone).toBe('attention')
+    expect(describeSessionStatus('idle').tone).toBe('neutral')
+    expect(describeSessionStatus('connecting').tone).toBe('progress')
   })
 })
 

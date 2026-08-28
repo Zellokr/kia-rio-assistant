@@ -16,7 +16,6 @@ defineModel<ObdTransportChoice>('transportChoice', { required: true })
 
 defineProps<{
   sessionState: ObdSessionState
-  sessionStateLabel: string
   transportError: string
   sessionBusy: boolean
 }>()
@@ -134,7 +133,12 @@ const emit = defineEmits<{
         disabled
         class="min-h-14 justify-center text-base"
       >
-        {{ sessionStateLabel }}
+        <!--
+          Deliberately generic. ConnectionStatus sits directly below and
+          names the phase with a colour, an icon and a sentence; repeating
+          it on the button put the same words on screen twice.
+        -->
+        Espera un momento
       </UButton>
       <UButton
         v-else
@@ -151,24 +155,6 @@ const emit = defineEmits<{
     </div>
 
     <ConnectionStatus :session-state="sessionState" />
-
-    <!--
-      The safety promise, in the vocabulary of the person being reassured.
-      It read "Sin Mode 04, programación ni escritura en ECU", which answers
-      a question a driver has not got the words to ask, and lands as a
-      warning rather than as comfort.
-    -->
-    <p class="flex items-start gap-2 rounded-xl border border-success/30 bg-success/5 px-4 py-3 text-sm leading-5 text-muted">
-      <UIcon
-        name="i-lucide-shield-check"
-        class="mt-0.5 size-4 shrink-0 text-success"
-        aria-hidden="true"
-      />
-      <span>
-        <span class="font-medium text-highlighted">Esta app solo lee.</span>
-        Nunca cambia nada en tu coche, ni borra los avisos del cuadro.
-      </span>
-    </p>
 
     <!--
       There is no advanced door any more.

@@ -299,17 +299,24 @@ describe('lab destinations', () => {
   })
 
   /**
-   * The read-only promise in the words of the person being reassured.
+   * The read-only claim is stated once, by the page strip — see
+   * `keeps the read-only framing` below. It used to be repeated here in a
+   * full sentence, which said the same thing twice on the one screen where
+   * both were visible at once.
+   *
+   * What this view still owes is the vocabulary: whatever it says, it says
+   * without naming the protocol at a driver.
    */
-  it('promises read-only in plain language', () => {
+  it('never explains itself in protocol jargon', () => {
     const text = mount(ConnectionView, {
       props: CONNECTION_PROPS,
       global: { stubs }
     }).text()
 
-    expect(text).toContain('Esta app solo lee.')
     expect(text).not.toContain('Mode 04')
     expect(text).not.toContain('ECU')
+    expect(text).not.toContain('ELM327')
+    expect(text).not.toContain('PID')
   })
 
   /**

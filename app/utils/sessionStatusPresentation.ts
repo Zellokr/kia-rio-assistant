@@ -162,21 +162,3 @@ export function describeSessionStatus(state: ObdSessionState): SessionStatus {
       return assertNever(state, 'ObdSessionState')
   }
 }
-
-/**
- * The badge colour for a tone, in Nuxt UI's semantic names.
- *
- * Separate from `tone` so the meaning and its rendering stay apart: the
- * state machine decides what is happening, this decides how it is painted.
- */
-export function sessionToneColor(
-  tone: SessionTone
-): 'neutral' | 'warning' | 'success' | 'error' {
-  switch (tone) {
-    case 'neutral': return 'neutral'
-    case 'progress': return 'warning'
-    case 'ready': return 'success'
-    case 'attention': return 'error'
-    default: return assertNever(tone, 'SessionTone')
-  }
-}

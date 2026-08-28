@@ -1,14 +1,10 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { ref } from 'vue'
 
 import {
   kiaRioWarningLightsCatalog
 } from '~~/catalog/kia-rio/warning-lights'
 import { useObdLabSession } from '~/composables/useObdLabSession'
-import {
-  describeSessionStatus,
-  sessionToneColor
-} from '~/utils/sessionStatusPresentation'
 import { labViews } from '~/utils/labNav'
 import type { LabViewId } from '~/utils/labNav'
 import BottomTabBar from '~/components/BottomTabBar.vue'
@@ -62,16 +58,6 @@ function setActiveView(view: LabViewId): void {
   activeView.value = view
 }
 
-const sessionStatus = computed(
-  () => describeSessionStatus(sessionState.value)
-)
-
-const sessionStateLabel = computed(() => sessionStatus.value.label)
-
-const sessionBadgeColor = computed(
-  () => sessionToneColor(sessionStatus.value.tone)
-)
-
 const logCopyStatus = ref('')
 
 async function copyLog(): Promise<void> {
@@ -102,39 +88,28 @@ async function sendLogToTelegram(): Promise<void> {
 
     <div class="min-w-0 flex-1 md:pr-[env(safe-area-inset-right)]">
       <UContainer class="flex max-w-3xl flex-col gap-4 pb-[calc(7rem+env(safe-area-inset-bottom))] md:pb-0">
-        <div class="flex items-center justify-between gap-3 rounded-xl border border-success/30 bg-success/5 px-4 py-3">
-          <div class="flex min-w-0 items-center gap-3">
-            <UIcon
-              name="i-lucide-shield-check"
-              class="size-5 shrink-0 text-success"
-              aria-hidden="true"
-            />
-            <!--
-              A short persistent marker, not an explanation. The line under
-              it read "Sin Mode 04, programación ni escritura en ECU" — a
-              promise written in the vocabulary of the thing it promises
-              about, on every screen. The full explanation now lives once,
-              in plain language, on the connection view where a driver is
-              deciding whether to trust this.
-            -->
-            <p class="min-w-0 font-semibold text-highlighted">
-              Solo lectura
-            </p>
-          </div>
-          <UBadge
-            :color="sessionBadgeColor"
-            variant="subtle"
-            class="shrink-0"
-          >
-            {{ sessionStateLabel }}
-          </UBadge>
+        <!--
+          One claim, once. This strip carried the session state as a badge
+          beside it, so "Sin conexión" appeared twice on the connection view
+          — here in miniature and again in ConnectionStatus, which says it
+          with a colour, an icon, a sentence and its progress. The marker
+          that earns its place on every screen is the read-only one.
+        -->
+        <div class="flex items-center gap-3 rounded-xl border border-success/30 bg-success/5 px-4 py-3">
+          <UIcon
+            name="i-lucide-shield-check"
+            class="size-5 shrink-0 text-success"
+            aria-hidden="true"
+          />
+          <p class="min-w-0 font-semibold text-highlighted">
+            Solo lectura
+          </p>
         </div>
 
         <ConnectionView
           v-if="activeView === 'connection'"
           v-model:transport-choice="transportChoice"
           :session-state="sessionState"
-          :session-state-label="sessionStateLabel"
           :transport-error="transportError"
           :session-busy="sessionBusy"
           @select-device="selectDevice"
