@@ -116,6 +116,8 @@ export function useObdLabSession(options: ObdLabSessionOptions = {}) {
     clearDisplay: clearLog,
     downloadJson: downloadSessionLog,
     copyJson: copySessionLog,
+    telegramEnabled,
+    sendToTelegram,
     toError,
     recordError,
     recordActivity,
@@ -544,6 +546,8 @@ export function useObdLabSession(options: ObdLabSessionOptions = {}) {
     clearLog,
     downloadSessionLog,
     copySessionLog,
+    telegramEnabled,
+    sendToTelegram,
 
     diagnostics,
 

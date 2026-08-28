@@ -40,3 +40,10 @@ jobs:
       # suite; only a real generate proves the deployable artifact builds.
       - name: Build
         run: pnpm run build:android:web
+
+      # TEMPORARY — field-test evidence delivery.
+      # Delete with app/services/telegramFieldLog.ts; see docs/FIELD_TEST_TELEGRAM.md.
+      # The field-test uploader may exist only while it stays out of an
+      # ordinary build. This asserts that against the emitted bytes.
+      - name: Assert no field-test secrets in the build
+        run: pnpm run field:assert-clean

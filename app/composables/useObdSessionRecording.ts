@@ -39,7 +39,9 @@ export function useObdSessionRecording(sessionLog: ObdSessionLog) {
     truncated,
     clearDisplay,
     downloadJson,
-    copyJson
+    copyJson,
+    telegramEnabled,
+    sendToTelegram
   } = useObdSessionLog(sessionLog)
 
   function toError(error: unknown): Error {
@@ -179,6 +181,10 @@ export function useObdSessionRecording(sessionLog: ObdSessionLog) {
     clearDisplay,
     downloadJson,
     copyJson,
+
+    /** TEMPORARY — field-test evidence delivery. See `telegramFieldLog.ts`. */
+    telegramEnabled,
+    sendToTelegram,
 
     toError,
     recordError,

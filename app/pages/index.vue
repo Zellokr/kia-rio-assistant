@@ -44,6 +44,8 @@ const {
   clearLog,
   downloadSessionLog,
   copySessionLog,
+  telegramEnabled,
+  sendToTelegram,
   diagnostics,
   selectDevice,
   connect,
@@ -113,6 +115,15 @@ async function copyLog(): Promise<void> {
   logCopyStatus.value = copied
     ? 'Registro copiado al portapapeles'
     : 'No se pudo copiar. Concede acceso al portapapeles e inténtalo de nuevo.'
+}
+
+/**
+ * TEMPORARY — field-test evidence delivery. Remove with
+ * `app/services/telegramFieldLog.ts`.
+ */
+async function sendLogToTelegram(): Promise<void> {
+  logCopyStatus.value = 'Enviando a Telegram…'
+  logCopyStatus.value = await sendToTelegram()
 }
 </script>
 
@@ -210,9 +221,11 @@ async function copyLog(): Promise<void> {
           :dropped-events="droppedEvents"
           :truncated="logTruncated"
           :copy-status="logCopyStatus"
+          :telegram-enabled="telegramEnabled"
           @export="downloadSessionLog"
           @copy="copyLog"
           @clear="clearLog"
+          @telegram="sendLogToTelegram"
         />
       </UContainer>
     </div>

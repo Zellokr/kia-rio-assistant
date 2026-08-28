@@ -8,12 +8,15 @@ defineProps<{
   droppedEvents: number
   truncated: boolean
   copyStatus?: string
+  /** TEMPORARY — field-test evidence delivery. See `telegramFieldLog.ts`. */
+  telegramEnabled?: boolean
 }>()
 
 const emit = defineEmits<{
   export: []
   copy: []
   clear: []
+  telegram: []
 }>()
 </script>
 
@@ -23,8 +26,10 @@ const emit = defineEmits<{
     :dropped-events="droppedEvents"
     :truncated="truncated"
     :copy-status="copyStatus"
+    :telegram-enabled="telegramEnabled"
     @export="emit('export')"
     @copy="emit('copy')"
     @clear="emit('clear')"
+    @telegram="emit('telegram')"
   />
 </template>

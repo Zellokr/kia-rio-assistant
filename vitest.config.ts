@@ -27,6 +27,16 @@ import { defineVitestConfig } from '@nuxt/test-utils/config'
  * `happy-dom` for components that only need a DOM.
  */
 export default defineVitestConfig({
+  /**
+   * TEMPORARY — field-test evidence delivery. Mirrors the `vite.define` in
+   * `nuxt.config.ts`; see `docs/FIELD_TEST_TELEGRAM.md`. Without it the
+   * composable throws a ReferenceError under test. See `telegramFieldLog.ts`.
+   */
+  define: {
+    __FIELD_TEST_TELEGRAM__: JSON.stringify(
+      process.env.FIELD_TEST_TELEGRAM === '1'
+    )
+  },
   test: {
     environment: 'node'
   },
