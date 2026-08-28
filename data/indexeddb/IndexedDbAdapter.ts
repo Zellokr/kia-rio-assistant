@@ -8,7 +8,7 @@ import type {
   PersistedSupportedPidCache,
   SupportedPidCacheRepository
 } from '~~/core/obd/persistence/ports'
-import { upgradeDtcObservation } from '../../core/obd/persistence/upgradeDtcObservation'
+import { isPersistedDtcObservationRecord, upgradeDtcObservation } from '../../core/obd/persistence/upgradeDtcObservation'
 import { openObdDatabase } from './migrations'
 import { OBD_STORES } from './stores'
 
@@ -99,12 +99,17 @@ export class IndexedDbAdapter implements
   }
 
   async listObservations(): Promise<PersistedDtcObservation[]> {
-    const observations = await this.readStore(
+    const rows = await this.readStore(
       OBD_STORES.observations,
       store => requestResult(store.getAll())
-    ) as PersistedDtcObservationRecord[]
+    )
 
-    return observations.map(upgradeDtcObservation)
+    // Validated rather than cast: these rows were written by whatever version
+    // of the application ran last, and a shape this build does not recognise
+    // must be skipped instead of coerced into a fault code it never was.
+    return (Array.isArray(rows) ? rows : [])
+      .filter(isPersistedDtcObservationRecord)
+      .map(upgradeDtcObservation)
   }
 
   async deleteObservation(id: string): Promise<void> {
