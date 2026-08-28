@@ -100,6 +100,71 @@ describe('SpeechToggleButton', () => {
       .toBe('false')
   })
 
+  it('wears a voice icon, not a media-player one, while speaking', async () => {
+    installWorkingEngine()
+
+    const wrapper = mount(SpeechToggleButton)
+
+    await wrapper.get('button').trigger('click')
+    await flush()
+
+    expect(wrapper.html()).toContain('i-lucide:audio-lines')
+  })
+
+  it('reads as muted while off', () => {
+    const wrapper = mount(SpeechToggleButton)
+
+    expect(wrapper.html()).toContain('i-lucide:volume-x')
+  })
+
+  describe('the active pulse', () => {
+    it('is absent while off, so a still button means silence', () => {
+      const wrapper = mount(SpeechToggleButton)
+
+      expect(wrapper.find('[data-testid="speech-pulse"]').exists())
+        .toBe(false)
+    })
+
+    it('appears once the voice is on', async () => {
+      installWorkingEngine()
+
+      const wrapper = mount(SpeechToggleButton)
+
+      await wrapper.get('button').trigger('click')
+      await flush()
+
+      expect(wrapper.find('[data-testid="speech-pulse"]').exists())
+        .toBe(true)
+    })
+
+    it('is absent while unavailable, which is not an active state', async () => {
+      const wrapper = mount(SpeechToggleButton)
+
+      await wrapper.get('button').trigger('click')
+      await flush()
+
+      expect(wrapper.find('[data-testid="speech-pulse"]').exists())
+        .toBe(false)
+    })
+
+    /**
+     * Driving. A halo that cannot be switched off is a distraction, and it
+     * must never be the only thing carrying the state -- colour and the
+     * icon already do that on their own.
+     */
+    it('stops animating under prefers-reduced-motion', async () => {
+      installWorkingEngine()
+
+      const wrapper = mount(SpeechToggleButton)
+
+      await wrapper.get('button').trigger('click')
+      await flush()
+
+      expect(wrapper.get('[data-testid="speech-pulse"]').classes())
+        .toContain('motion-reduce:animate-none')
+    })
+  })
+
   /**
    * The case ADR-012 refuses to assume away: no Web Speech engine in this
    * WebView. The button must say so and stay pressable, not silently claim

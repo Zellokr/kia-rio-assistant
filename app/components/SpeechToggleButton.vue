@@ -21,10 +21,19 @@ const { state, unavailableReason, toggle } = useSpeechAnnouncer()
 
 const toast = useToast()
 
+/**
+ * A talking assistant, not a media player.
+ *
+ * `audio-lines` is a waveform: it reads as *a voice speaking*, which is what
+ * being on actually means here. The off and unavailable states keep the
+ * crossed-out speaker, because that is the one mute symbol every driver
+ * already knows, and the moment to be inventive is not the one where someone
+ * is trying to shut the app up at 90 km/h.
+ */
 const presentation = computed(() => {
   if (state.value === 'on') {
     return {
-      icon: 'i-lucide-volume-2',
+      icon: 'i-lucide-audio-lines',
       color: 'primary' as const,
       label: 'Silenciar la voz'
     }
@@ -74,19 +83,42 @@ async function onToggle(): Promise<void> {
     it, where the bar is gone. Both offsets carry the safe-area inset so the
     button clears the home indicator.
   -->
-  <UButton
-    :icon="presentation.icon"
-    :color="presentation.color"
-    :aria-label="presentation.label"
-    :title="presentation.label"
-    :aria-pressed="state === 'on'"
-    variant="solid"
-    size="xl"
-    class="fixed z-50 size-14 items-center justify-center rounded-full shadow-lg focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2
+  <div
+    class="fixed z-50 size-14
            right-[calc(1rem+env(safe-area-inset-right))]
            bottom-[calc(5.5rem+env(safe-area-inset-bottom))]
            md:bottom-[calc(1.5rem+env(safe-area-inset-bottom))]"
-    :ui="{ leadingIcon: 'size-6' }"
-    @click="onToggle"
-  />
+  >
+    <!--
+      The halo pulses, not the button.
+
+      Animating the button itself would move the icon a driver is trying to
+      hit, and fade the very symbol that says what state it is in. A ring
+      behind it carries the "listening/speaking" signal while the target stays
+      still and legible.
+
+      It is decoration on purpose: colour and the icon already say the voice is
+      on, so `motion-reduce` can drop the animation entirely without losing
+      information. `pointer-events-none` keeps it from ever eating a tap.
+    -->
+    <span
+      v-if="state === 'on'"
+      data-testid="speech-pulse"
+      class="pointer-events-none absolute inset-0 rounded-full bg-primary/40 animate-pulse motion-reduce:animate-none"
+      aria-hidden="true"
+    />
+
+    <UButton
+      :icon="presentation.icon"
+      :color="presentation.color"
+      :aria-label="presentation.label"
+      :title="presentation.label"
+      :aria-pressed="state === 'on'"
+      variant="solid"
+      size="xl"
+      class="relative size-14 items-center justify-center rounded-full shadow-lg focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+      :ui="{ leadingIcon: 'size-6' }"
+      @click="onToggle"
+    />
+  </div>
 </template>
