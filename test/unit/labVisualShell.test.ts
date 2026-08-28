@@ -16,7 +16,7 @@ import DataView from '../../app/components/DataView.vue'
 import LogView from '../../app/components/LogView.vue'
 import NavRail from '../../app/components/NavRail.vue'
 import SessionLogPanel from '../../app/components/SessionLogPanel.vue'
-import LabPage from '../../app/pages/lab/index.vue'
+import LabPage from '../../app/pages/index.vue'
 import { labViews } from '../../app/utils/labNav'
 import type {
   ObdSessionEvent
@@ -163,8 +163,9 @@ describe('lab navigation', () => {
 
     it('emits the destination the user pressed', async () => {
       const wrapper = render('connection')
+      const logIndex = labViews.findIndex(view => view.value === 'log')
 
-      await wrapper.findAll('button')[2]!.trigger('click')
+      await wrapper.findAll('button')[logIndex]!.trigger('click')
 
       expect(wrapper.emitted('select')).toEqual([['log']])
     })
@@ -183,19 +184,124 @@ describe('lab navigation', () => {
       }
     })
   })
+
+  describe('BottomTabBar mobile layout', () => {
+    /**
+     * Every destination on screen at once.
+     *
+     * This was `grid-cols-3`, which pushed the fourth and fifth destinations
+     * onto a second row once the lab grew. The fix at the time was to let
+     * the row scroll horizontally, and a test pinned that scroll as correct.
+     * It traded a visible wrap for an invisible one: destinations behind a
+     * gesture, with nothing on screen saying they are there. Both break the
+     * same rule — a bottom bar shows every destination it has, and a driver
+     * does not go hunting for one.
+     *
+     * The column count is tied to `labViews` on purpose. A sixth destination
+     * fails here rather than silently reintroducing the overflow, and five
+     * is the documented ceiling for this pattern anyway.
+     *
+     * That the labels also *fit* was measured in a real browser at 320 CSS
+     * px, the narrowest screen this ships to: the widest ("Conexión")
+     * renders 52.2px inside a 57px column. No layout is computed here, so
+     * what this pins is the structure that measurement was taken from.
+     */
+    it('shows every destination at once, without scrolling', () => {
+      const wrapper = mount(BottomTabBar, {
+        props: { views: labViews, active: 'connection' },
+        global: { stubs }
+      })
+
+      for (const view of labViews) {
+        expect(wrapper.text()).toContain(view.label)
+      }
+
+      expect(wrapper.findAll('button')).toHaveLength(labViews.length)
+      expect(wrapper.html()).toContain(`grid-cols-${labViews.length}`)
+      expect(wrapper.html()).not.toContain('overflow-x')
+    })
+
+    /**
+     * 44x44 CSS px is the floor for a touch target. `min-h-14` is 56px, and
+     * the width comes from the grid column — 61px at 320px, the narrowest
+     * case, measured in a browser.
+     */
+    it('keeps each destination above the minimum touch target', () => {
+      const wrapper = mount(BottomTabBar, {
+        props: { views: labViews, active: 'connection' },
+        global: { stubs }
+      })
+
+      for (const button of wrapper.findAll('button')) {
+        expect(button.attributes('class') ?? '').toContain('min-h-14')
+      }
+    })
+  })
 })
 
 describe('lab destinations', () => {
-  it('opens the connection view on preparing a connection', () => {
+  /**
+   * The primary action has to be on screen, not behind a disclosure.
+   *
+   * It used to sit inside a collapsed `<details>` labelled "Controles
+   * técnicos", together with every other control here — so the view
+   * announced "Primer paso: conectar con el coche" and then hid the way to
+   * do it behind a door whose label told a driver it was not for them.
+   * `<details>` renders its contents into the DOM either way, so this
+   * asserts on the element that carries the action rather than on text.
+   */
+  it('puts the connect action on screen, outside any disclosure', () => {
+    const wrapper = mount(ConnectionView, {
+      props: CONNECTION_PROPS,
+      global: { stubs }
+    })
+
+    const action = wrapper.findAll('button')
+      .find(button => button.text().includes('Buscar mi adaptador'))
+
+    expect(action).toBeDefined()
+    expect(action!.element.closest('details')).toBeNull()
+  })
+
+  it('states the physical steps that have to happen before it can work', () => {
     const text = mount(ConnectionView, {
       props: CONNECTION_PROPS,
       global: { stubs }
     }).text()
 
     expect(text).toContain('Conectar con el coche')
-    expect(text).toContain('Buscar adaptador')
-    expect(text).toContain('Comprobaciones técnicas')
-    expect(text).toContain('Controles técnicos')
+    expect(text).toContain('Enchufa el adaptador')
+    expect(text).toContain('Da contacto sin arrancar')
+  })
+
+  /**
+   * One door for the technical surface, not two competing ones at the same
+   * level ("Comprobaciones técnicas" and "Controles técnicos"), and its
+   * label no longer claims the controls a driver needs are inside it.
+   */
+  it('collects the technical surface behind a single disclosure', () => {
+    const wrapper = mount(ConnectionView, {
+      props: CONNECTION_PROPS,
+      global: { stubs }
+    })
+
+    expect(wrapper.findAll('details')).toHaveLength(1)
+    expect(wrapper.text()).toContain('Opciones avanzadas')
+    expect(wrapper.text()).not.toContain('Controles técnicos')
+  })
+
+  /**
+   * The read-only promise in the words of the person being reassured.
+   */
+  it('promises read-only in plain language', () => {
+    const text = mount(ConnectionView, {
+      props: CONNECTION_PROPS,
+      global: { stubs }
+    }).text()
+
+    expect(text).toContain('Esta app solo lee.')
+    expect(text).not.toContain('Mode 04')
+    expect(text).not.toContain('ECU')
   })
 
   /**
@@ -203,16 +309,20 @@ describe('lab destinations', () => {
    * `PHYSICAL_TRANSPORT_KINDS` has one entry. Offering a transport that
    * does not exist sends somebody looking for a control they will never
    * find — worst of all at the car, mid-procedure.
+   *
+   * The select this used to read has gone: it listed a single option, so it
+   * asked the driver to make a decision that does not exist. The claim it
+   * stood for holds more simply now — the view offers no transport choice
+   * at all, and names none.
    */
-  it('offers only the transports that still exist', () => {
+  it('offers no transport choice, and names none that could mislead', () => {
     const wrapper = mount(ConnectionView, {
       props: CONNECTION_PROPS,
       global: { stubs }
     })
 
-    expect(
-      wrapper.findAll('option').map(option => option.attributes('value'))
-    ).toEqual(['android-ble'])
+    expect(wrapper.findAll('option')).toHaveLength(0)
+    expect(wrapper.findAll('select')).toHaveLength(0)
     expect(wrapper.text()).not.toContain('Mock')
     expect(wrapper.text()).not.toContain('Replay')
   })
@@ -328,7 +438,7 @@ describe('lab destinations', () => {
  * - `main.css` declares theme tokens, and no Tailwind pipeline runs in
  *   the test environment, so a computed style would be empty either way.
  *
- * `app/pages/lab/index.vue` used to be on that list, on the grounds that
+ * `app/pages/index.vue` used to be on that list, on the grounds that
  * mounting it meant standing up the whole stack. That turned out to be
  * wrong. Everything it had here has moved: what needed only rendered
  * output into `describe('the lab page renders')` below, and what needed a
@@ -408,13 +518,19 @@ describe('the lab page renders', () => {
     expect(wrapper.findComponent(SessionLogPanel).exists()).toBe(false)
   })
 
-  it('reaches all three destinations', async () => {
+  it('reaches every destination', async () => {
     const wrapper = mountPage()
 
     expect(wrapper.findComponent(ConnectionView).exists()).toBe(true)
 
     await wrapper.findComponent(BottomTabBar).vm.$emit('select', 'data')
     expect(wrapper.findComponent(DataView).exists()).toBe(true)
+
+    await wrapper.findComponent(BottomTabBar).vm.$emit('select', 'diagnostics')
+    expect(wrapper.text()).toContain('Códigos de avería')
+
+    await wrapper.findComponent(BottomTabBar).vm.$emit('select', 'warnings')
+    expect(wrapper.text()).toContain('Testigos del cuadro')
 
     await wrapper.findComponent(BottomTabBar).vm.$emit('select', 'log')
     expect(wrapper.findComponent(LogView).exists()).toBe(true)
