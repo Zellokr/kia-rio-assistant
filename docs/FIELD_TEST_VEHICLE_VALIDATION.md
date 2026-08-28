@@ -112,6 +112,11 @@ Start the engine. Ventilated space.
 
 1. Connect as in A1 and reach ready.
 2. Go to **Datos** and press **Ver lecturas**. Leave it running.
+
+   **Do not leave the app during this part.** The poll loop runs on WebView
+   timers, so backgrounding it stops the readings without the link dropping
+   — which looks exactly like the failure being tested. Between A1's
+   connection cycles, and during B and C, leaving the app is fine.
 3. About three minutes in, **induce the first drop**: unplug the adapter
    from the OBD port for ~5 seconds, then plug it back in. Cleanest and
    most controlled, and safe — the port is powered, and unplugging a reader
@@ -119,9 +124,16 @@ Start the engine. Ventilated space.
 4. Watch it recover, and confirm the readings come back and stay live for a
    couple of minutes.
 5. Around minute eight, **induce a second drop by a different cause**:
-   walk ~20 m away from the car with the phone until the link drops and
-   come back, or turn the phone screen off for two minutes and turn it back
-   on. Using the same cause twice tests one path twice.
+   walk ~20 m away from the car with the phone until the link drops, then
+   come back. Using the same cause twice tests one path twice.
+
+   > **Not by turning the screen off**, which this document used to offer.
+   > The BLE link is held natively in `BleObdBridgePlugin` and survives
+   > backgrounding, but the poll loop is a `setTimeout` chain inside the
+   > Android WebView, which Android throttles or suspends. Polling would
+   > stop while the link stayed up — indistinguishable on screen from a real
+   > drop, and A2 would record a recovery that never tested reconnection at
+   > all. That is fabricated evidence for the one thing Part A blocks on.
 6. Press **Pausar lecturas**, disconnect, and press **Registro → Enviar
    informe**.
 

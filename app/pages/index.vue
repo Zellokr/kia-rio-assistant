@@ -162,6 +162,7 @@ async function sendLogToTelegram(): Promise<void> {
           v-else-if="activeView === 'warnings'"
           :catalog="kiaRioWarningLightsCatalog"
           :adapter-connected="sessionState === 'ready'"
+          :reads="diagnostics.reads.value"
         />
 
         <LogView
