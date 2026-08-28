@@ -19,7 +19,7 @@ This is one trip to the car. It closes, in order:
 
 | Part | Closes | Blocking? |
 |---|---|---|
-| A | Sprint 0 task 8 — the Fase 1 exit criterion, waived by ADR-003 rather than met. **Closed 2026-08-28; see `ADR-004`** | **Yes** |
+| A | Sprint 0 task 8 — the Fase 1 exit criterion. **Closed 2026-08-28; A1 met, A2 owner-waived in `ADR-004`** | **Yes** |
 | B | `DTC_PHYSICAL_VALIDATION.md` check 2 — Mode 07/0A empty-result behaviour | No |
 | C | The Rio warning-light catalogue and guided identifier, now checked against real cluster evidence | No |
 | D | `DTC_PHYSICAL_VALIDATION.md` check 1 — Mode 03 multi-frame | Opportunistic only |
