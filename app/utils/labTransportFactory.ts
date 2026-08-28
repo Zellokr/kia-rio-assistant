@@ -4,10 +4,10 @@ import { AndroidBleObdTransport } from '~~/core/obd/transport/AndroidBleObdTrans
 import type { ObdTransport } from '~~/core/obd/transport/ObdTransport'
 import { capacitorAndroidBle } from '~/services/capacitorAndroidBle'
 import { VEEPEAK_BLE_PROFILE } from '~/services/veepeakBleProfile'
-import type { ConnectionTransportChoice } from '~/components/ConnectionView.vue'
+import type { ObdTransportChoice } from '~/utils/obdTransportChoice'
 
 export type LabTransportFactory
-  = (choice: ConnectionTransportChoice) => ObdTransport
+  = (choice: ObdTransportChoice) => ObdTransport
 
 /**
  * The seam that lets a caller decide which transport the lab page talks to.
@@ -28,7 +28,7 @@ export const labTransportFactoryKey: InjectionKey<LabTransportFactory>
  * the prop type still admits fails loudly rather than selecting nothing.
  */
 export function createLabTransport(
-  choice: ConnectionTransportChoice
+  choice: ObdTransportChoice
 ): ObdTransport {
   if (choice !== 'android-ble') {
     throw new Error('Transporte no disponible en la aplicación')

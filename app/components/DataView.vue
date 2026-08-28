@@ -2,9 +2,7 @@
 import type { ObdSessionState } from '~~/core/obd/session/ObdSessionStateMachine'
 import type { ObdTelemetryMetric } from '~~/core/obd/telemetry/ObdTelemetryStore'
 import { isPhysicalTransportKind } from '~~/core/obd/transport/ObdTransport'
-
-export type DataViewTransportChoice
-  = 'mock' | 'replay' | 'android-ble'
+import type { ObdTransportChoice } from '~/utils/obdTransportChoice'
 
 defineProps<{
   sessionState: ObdSessionState
@@ -17,7 +15,7 @@ defineProps<{
   supportedPids: string[]
   commands: string[]
   selectedCommand: string
-  transportChoice: DataViewTransportChoice
+  transportChoice: ObdTransportChoice
 }>()
 
 const emit = defineEmits<{

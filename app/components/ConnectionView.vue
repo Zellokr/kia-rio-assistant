@@ -1,9 +1,7 @@
 <script setup lang="ts">
 import type { ObdSessionState } from '~~/core/obd/session/ObdSessionStateMachine'
 import type { ObdTransportState } from '~~/core/obd/transport/ObdTransport'
-
-export type ConnectionTransportChoice
-  = 'mock' | 'replay' | 'android-ble'
+import type { ObdTransportChoice } from '~/utils/obdTransportChoice'
 
 export type ConnectionBadgeColor
   = | 'neutral'
@@ -13,7 +11,7 @@ export type ConnectionBadgeColor
     | 'error'
 
 defineProps<{
-  transportChoice: ConnectionTransportChoice
+  transportChoice: ObdTransportChoice
   sessionState: ObdSessionState
   sessionStateLabel: string
   transportState: ObdTransportState
@@ -24,7 +22,7 @@ defineProps<{
 }>()
 
 const emit = defineEmits<{
-  'update:transportChoice': [ConnectionTransportChoice]
+  'update:transportChoice': [ObdTransportChoice]
   'select-device': []
   'connect': []
   'disconnect': []
@@ -34,7 +32,7 @@ const emit = defineEmits<{
 function onTransportChoiceChange(event: Event): void {
   const select = event.target as HTMLSelectElement
 
-  emit('update:transportChoice', select.value as ConnectionTransportChoice)
+  emit('update:transportChoice', select.value as ObdTransportChoice)
 }
 </script>
 
