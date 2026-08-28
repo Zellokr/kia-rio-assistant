@@ -332,3 +332,90 @@ describe('useObdReconnection', () => {
     harness.scope.stop()
   })
 })
+
+describe('a device handle that died with the Bluetooth adapter', () => {
+  /**
+   * Found on the vehicle on 2026-08-28. Cycling the phone's Bluetooth was
+   * one of the induced drops. Android tears every GATT connection down and
+   * invalidates its scan results, so the device the transport holds belongs
+   * to a stack that no longer exists — `connect` against it used to wait
+   * forever, and now the native bridge rejects it outright.
+   *
+   * Rejecting is not recovering. Every attempt would repeat the same
+   * failure against the same dead handle unless something asks for a fresh
+   * scan, which is what this covers.
+   */
+  it('selects again when connecting against the held device fails', async () => {
+    const calls: string[] = []
+    let connectsBeforeSuccess = 1
+
+    const transport = {
+      kind: 'mock' as const,
+      state: 'connected' as const,
+      subscribeState: () => () => {},
+      select: async () => {
+        calls.push('select')
+        connectsBeforeSuccess = 0
+        return { kind: 'mock' as const }
+      },
+      connect: async () => {
+        calls.push('connect')
+
+        if (connectsBeforeSuccess > 0) {
+          connectsBeforeSuccess -= 1
+          throw new Error('Select the adapter from a fresh scan before connecting')
+        }
+
+        return { kind: 'mock' as const }
+      },
+      disconnect: async () => { calls.push('disconnect') },
+      write: async () => {}
+    }
+
+    let metadataSeen = false
+
+    const scope = effectScope()
+    const reconnection = scope.run(() => useObdReconnection({
+      sessionState: ref<ObdSessionState>('ready'),
+      transitionSession: () => {},
+      failSession: () => {},
+      recordActivity: () => {},
+      recordError: () => {},
+      getTransport: () => transport as never,
+      getExecutor: () => ({
+        execute: async () => ({
+          command: 'ATZ',
+          rawText: 'OK',
+          normalizedText: 'OK',
+          responseKind: 'at-ok',
+          latencyMs: 1,
+          startedAt: '',
+          completedAt: ''
+        }),
+        dispose: () => {}
+      }) as never,
+      getPollScheduler: () => ({
+        stop: () => {},
+        clearTasks: () => {}
+      }) as never,
+      getSupportedPids: () => ['0C'],
+      onTelemetryStopped: () => {},
+      onTransportConnected: () => { metadataSeen = true },
+      onSupportedPidsResolved: () => {}
+    }))!
+
+    reconnection.notifyLinkSuspect('transport-state')
+
+    await vi.waitFor(() => {
+      expect(metadataSeen).toBe(true)
+    })
+
+    // The direct connect is tried first because it is the fast path; the
+    // scan only pays its five seconds when that one has already failed.
+    expect(calls).toEqual([
+      'disconnect', 'connect', 'select', 'connect'
+    ])
+
+    scope.stop()
+  })
+})

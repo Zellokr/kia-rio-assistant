@@ -10,7 +10,10 @@ import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanResult
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Handler
@@ -39,6 +42,21 @@ import java.util.UUID
  * The read-only command policy is enforced above this layer, in
  * `AndroidBleObdTransport.write`, and repeated here as defense in depth before
  * any decoded command bytes reach the GATT write characteristic.
+ *
+ * ## Bluetooth being switched off
+ *
+ * Found on the vehicle on 2026-08-28. Cycling the phone's Bluetooth was one
+ * of the induced drops, and the reconnection never came back. Android tears
+ * every GATT connection down when the adapter goes off and invalidates the
+ * scan results with it, so [scanResults] then holds `BluetoothDevice`
+ * handles belonging to an adapter that no longer exists. `connectGatt` on
+ * one of those does not fail — it waits, and nothing here or in the
+ * reconnection controller was bounding that wait.
+ *
+ * So the adapter's state is now observed: turning Bluetooth off closes the
+ * link and clears the stale scan, and [connect] refuses outright while the
+ * adapter is disabled instead of hanging on it. A caller that is told to
+ * scan again does; one that is told nothing waits forever.
  */
 @CapacitorPlugin(
     name = "BleObdBridge",
@@ -66,6 +84,40 @@ class BleObdBridgePlugin : Plugin() {
     private var notifyCharacteristic: BluetoothGattCharacteristic? = null
     private var pendingProfile: Profile? = null
     private var pendingWriteCall: PluginCall? = null
+
+    /**
+     * Watches the adapter so a Bluetooth toggle cannot leave this plugin
+     * holding handles from a torn-down stack.
+     */
+    private val adapterStateReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action != BluetoothAdapter.ACTION_STATE_CHANGED) return
+
+            val state = intent.getIntExtra(
+                BluetoothAdapter.EXTRA_STATE,
+                BluetoothAdapter.ERROR
+            )
+
+            if (state == BluetoothAdapter.STATE_TURNING_OFF ||
+                state == BluetoothAdapter.STATE_OFF
+            ) {
+                // The scan results outlive the adapter that produced them and
+                // are useless once it restarts; reconnecting against one is
+                // what hung the link in the field.
+                scanResults.clear()
+                closeGatt()
+                notifyListeners("disconnected", JSObject())
+            }
+        }
+    }
+
+    override fun load() {
+        super.load()
+        context.registerReceiver(
+            adapterStateReceiver,
+            IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED)
+        )
+    }
 
     private data class Profile(
         val service: UUID,
@@ -115,6 +167,15 @@ class BleObdBridgePlugin : Plugin() {
 
         if (!hasBluetoothPermission()) {
             call.reject("Bluetooth permission is required to connect")
+            return
+        }
+
+        // Checked here as well as in scan(). Without it, connectGatt against
+        // a disabled adapter waits instead of failing, which is precisely how
+        // a Bluetooth toggle turned into a reconnection that never returned.
+        val adapter = bluetoothAdapter(call) ?: return
+        if (!adapter.isEnabled) {
+            call.reject("Enable Bluetooth before reaching the adapter")
             return
         }
 
@@ -399,6 +460,12 @@ class BleObdBridgePlugin : Plugin() {
     }
 
     override fun handleOnDestroy() {
+        try {
+            context.unregisterReceiver(adapterStateReceiver)
+        } catch (_: IllegalArgumentException) {
+            // Never registered, or already gone. Nothing to undo.
+        }
+
         stopScan()
         closeGatt()
         super.handleOnDestroy()

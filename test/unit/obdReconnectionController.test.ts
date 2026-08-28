@@ -248,10 +248,10 @@ describe('a hung attempt', () => {
     await vi.advanceTimersByTimeAsync(1000)
     expect(started).toEqual([1])
 
-    // Past the 12s an attempt may hold, several times over. Bounded only by
-    // the overall deadline, the first would have spent all 30 s and the
+    // Past the 20 s an attempt may hold, several times over. Bounded only by
+    // the overall deadline, the first would have spent the whole run and the
     // remaining four would never have started.
-    await vi.advanceTimersByTimeAsync(40_000)
+    await vi.advanceTimersByTimeAsync(90_000)
 
     expect(started.length).toBeGreaterThan(1)
     expect(controller.active).toBe(false)
@@ -280,7 +280,7 @@ describe('a hung attempt', () => {
     })
 
     controller.notifyLinkSuspect('poll-halt')
-    await vi.advanceTimersByTimeAsync(40_000)
+    await vi.advanceTimersByTimeAsync(90_000)
 
     expect(onFailed).toHaveBeenCalledOnce()
     expect(controller.active).toBe(false)

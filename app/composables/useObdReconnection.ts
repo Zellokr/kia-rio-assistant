@@ -79,7 +79,31 @@ export function useObdReconnection(
       options.recordError(error, 'disconnect')
     }
 
-    const metadata = await transport.connect()
+    /**
+     * Connect against the device already selected, and fall back to a fresh
+     * scan when that device is gone.
+     *
+     * Cycling the phone's Bluetooth invalidates Android's scan results, so
+     * the adapter the transport is holding belongs to a stack that no longer
+     * exists. The native bridge now refuses that outright rather than
+     * waiting on it, which turns a silent hang into an error — but an error
+     * every attempt repeats is still no recovery. Selecting again is what
+     * gets a usable device.
+     *
+     * The direct connect stays first because it is the common case and the
+     * fast one: 4.4 s to recover on the vehicle, against roughly 13 s once a
+     * five-second scan is in the way.
+     */
+    let metadata: ObdTransportMetadata
+
+    try {
+      metadata = await transport.connect()
+    } catch (error) {
+      options.recordError(error, 'connection')
+      await transport.select()
+      metadata = await transport.connect()
+    }
+
     options.onTransportConnected(metadata)
 
     const executor = options.getExecutor()

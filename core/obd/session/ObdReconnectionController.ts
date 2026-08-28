@@ -21,18 +21,29 @@ export const DEFAULT_RECONNECTION_DELAYS_MS = [
   10000
 ] as const
 
-export const DEFAULT_RECONNECTION_DEADLINE_MS = 30_000
+/**
+ * Raised from 30 s on 2026-08-28. The old budget predated the rescan
+ * fallback and could not fit even one slow attempt, which would have made
+ * that fallback unreachable — code that can never succeed is worse than no
+ * code at all. 60 s fits two, and still ends rather than retrying forever.
+ */
+export const DEFAULT_RECONNECTION_DEADLINE_MS = 60_000
 
 /**
  * How long one attempt may run before it is abandoned.
  *
- * Connecting took 6.6–8.4 s on the vehicle across twenty measured sessions,
- * so 12 s leaves room for a slow one without letting a hung one eat the
- * whole run: bounded only by the overall deadline, the first attempt would
- * consume all 30 s and the remaining four would never start — which is the
- * shape of the 2026-08-28 failure, not a fix for it.
+ * Sized so the slow path can finish. A straight reconnect took 6.6–8.4 s on
+ * the vehicle across twenty measured sessions, but an attempt whose device
+ * handle died with the Bluetooth adapter falls back to a fresh scan first —
+ * a fixed 5 s in `BleObdBridgePlugin.SCAN_DURATION_MS` — so scan plus
+ * connect is roughly 13.5 s. 20 s covers that with margin.
+ *
+ * A cap is still needed. Bounded only by the overall deadline, one hung
+ * attempt consumes the entire run and the later ones — the ones that catch
+ * an adapter coming back — never start. That is the shape of the
+ * 2026-08-28 failure, not a fix for it.
  */
-export const DEFAULT_RECONNECTION_ATTEMPT_TIMEOUT_MS = 12_000
+export const DEFAULT_RECONNECTION_ATTEMPT_TIMEOUT_MS = 20_000
 
 export interface ObdReconnectionAttempt {
   attempt: number
