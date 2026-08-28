@@ -108,8 +108,12 @@ async function onToggle(): Promise<void> {
 
       Animating the button itself would move the icon a driver is trying to
       hit, and fade the very symbol that says what state it is in. A ring
-      behind it carries the "listening/speaking" signal while the target stays
-      still and legible.
+      behind it carries the "speaking" signal while the target stays still and
+      legible.
+
+      `-inset-2` is load-bearing, not spacing. At `inset-0` this sat exactly
+      under an opaque button and was invisible — present in the DOM, painting
+      nothing. It has to reach past the button's edge to be seen at all.
 
       It is decoration on purpose: colour and the icon already say the voice is
       on, so `motion-reduce` can drop the animation entirely without losing
@@ -118,7 +122,7 @@ async function onToggle(): Promise<void> {
     <span
       v-if="state === 'on'"
       data-testid="speech-pulse"
-      class="pointer-events-none absolute inset-0 rounded-full bg-primary/40 animate-pulse motion-reduce:animate-none"
+      class="pointer-events-none absolute -inset-2 rounded-full bg-primary/30 ring-2 ring-primary/50 animate-pulse motion-reduce:animate-none"
       aria-hidden="true"
     />
 

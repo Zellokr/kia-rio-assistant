@@ -182,6 +182,28 @@ describe('SpeechToggleButton', () => {
         .toBe(false)
     })
 
+    /**
+     * The halo shipped invisible once: `inset-0` made it exactly the size of
+     * an opaque button that paints on top of it, so it existed in the DOM and
+     * showed nothing. Presence is not visibility — it has to reach past the
+     * button's edge to be seen at all.
+     */
+    it('extends past the button instead of hiding underneath it', async () => {
+      installWorkingEngine()
+
+      const wrapper = mount(SpeechToggleButton)
+
+      await wrapper.get('button').trigger('click')
+      await flush()
+
+      const classes = wrapper.get('[data-testid="speech-pulse"]').classes()
+
+      expect(classes.some(name => name.startsWith('-inset-')))
+        .toBe(true)
+
+      expect(classes).not.toContain('inset-0')
+    })
+
     it('appears once the voice is on', async () => {
       installWorkingEngine()
 
