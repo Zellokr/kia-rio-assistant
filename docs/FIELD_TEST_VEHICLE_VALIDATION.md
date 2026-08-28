@@ -59,7 +59,7 @@ Unchanged from every physical procedure in this project.
 ---
 
 > **UI note.** Android BLE is now the only transport the app ships and the
-> only option in the selector, so nothing has to be set before connecting.
+> only transport the app ships, and the selector that used to offer it is gone, so nothing has to be set before connecting.
 > The technical panel that holds it is **Controles técnicos** — it was
 > called "Herramientas OBD avanzadas" when this document was first written.
 
@@ -94,7 +94,8 @@ the reasoning, and what the shortening gives up, are in A2 below.
 With the ignition on and the engine off:
 
 1. Open the app, go to **Conexión**.
-2. **Buscar adaptador** → pick the VEEPEAK.
+2. **Buscar mi adaptador**. There is nothing to pick: the bridge scans for
+   five seconds and takes the first VEEPEAK it sees.
 3. **Conectar**. Wait for the badge to read ready.
 4. **Desconectar**.
 5. Repeat 2–4 **ten times without closing the app**.

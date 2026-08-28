@@ -19,6 +19,23 @@ text was extracted with a purpose-written pass — object-stream expansion,
 scratch directory. The extractor is not part of the repository; it produced
 evidence, not a build artefact.
 
+**Physical-cluster provenance**: high-resolution cluster photograph captured
+2026-08-28, ignition on and engine off, at 76066 km. The lamp test confirmed
+nine existing catalogue entries — `abs`, `tpms`, `esc-traction`,
+`power-steering`, `charging-system`, `oil-pressure`, `brake-system`,
+`airbag-srs`, and `check-engine` — plus exactly two additions: `esc-off` and
+`seatbelt`. Their shapes, `car-with-skid-marks-off` and
+`seated-person-with-belt`, are descriptive catalogue identifiers, not Kia
+names. `esc-off` is the amber driver-selected system-disabled state; `seatbelt`
+is the red belt reminder.
+
+The ambiguous amber lozenge or hook is not identified and has no new catalogue
+entry: it must not be guessed as GPF or immobilizer. `(A)` Auto Stop/Start is a
+status indicator, not a warning. The amber lamp below ABS is the already
+catalogued TPMS lamp, not a second amber `(!)`, and there is no door-ajar lamp.
+No other lamp is marked absent: a lamp test does not illuminate every
+fault-dependent tell-tale.
+
 ## Result
 
 **Eleven of the thirteen entries are confirmed.** The manual documents a
@@ -98,7 +115,8 @@ It establishes that the catalogue's names, coverage and severities agree with
 Kia's own document for eleven entries, and it names precisely where they do
 not.
 
-It does not establish anything about this particular car's instrument
-cluster. The manual covers the YB generation across trims and markets, and
-"si está equipado" appears throughout. Confirming which lamps this vehicle
-physically has still requires looking at it.
+It does not establish that every manual tell-tale is fitted to this car. The
+manual covers the YB generation across trims and markets, and "si está
+equipado" appears throughout. The physical lamp test confirms the eleven
+entries recorded above, but cannot establish absence for tell-tales that do
+not illuminate without their triggering condition.

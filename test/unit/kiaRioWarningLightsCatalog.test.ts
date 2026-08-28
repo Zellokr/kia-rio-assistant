@@ -82,6 +82,37 @@ describe('Kia Rio warning-light catalogue', () => {
     }
   })
 
+  describe('the physically confirmed tell-tales', () => {
+    it('covers ESC OFF as a driver-selected non-fault state, distinct from ESC traction', () => {
+      const escOff = kiaRioWarningLightsCatalog.byId('esc-off')
+      const escTraction = kiaRioWarningLightsCatalog.byId('esc-traction')
+
+      expect(escOff).toMatchObject({
+        color: 'amber',
+        shape: 'car-with-skid-marks-off',
+        severity: 'info',
+        associatedDtcCodes: [],
+        associatedDtcPrefixes: []
+      })
+      expect(escOff?.immediateAction).toContain('botón ESC OFF')
+      expect(escOff?.shape).not.toBe(escTraction?.shape)
+    })
+
+    it('covers the seatbelt reminder as a red safety tell-tale without OBD associations', () => {
+      const seatbelt = kiaRioWarningLightsCatalog.byId('seatbelt')
+
+      expect(seatbelt).toMatchObject({
+        color: 'red',
+        shape: 'seated-person-with-belt',
+        severity: 'warning',
+        associatedDtcCodes: [],
+        associatedDtcPrefixes: []
+      })
+      expect(seatbelt?.immediateAction).toContain('Abrocha el cinturón')
+      expect(seatbelt?.subsystems).toEqual(['restraints'])
+    })
+  })
+
   /**
    * The three tell-tales the owner's manual names inside this project's
    * engine and emissions scope. They were absent while the catalogue held

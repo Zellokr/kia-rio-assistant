@@ -73,8 +73,13 @@ export class AndroidBleObdTransport implements ObdTransport {
 
     try {
       this.assertSupported()
-      // Profile is validated at connect time so select can still exercise
-      // the native device picker before UUIDs are wired from inventory.
+      // Profile is validated at connect time, not here, so selecting still
+      // works before the reviewed UUIDs are wired in.
+      //
+      // There is no picker to exercise: the native bridge scans for five
+      // seconds and resolves the first VEEPEAK it finds. This comment used
+      // to say otherwise, and the UI copy that trusted it told drivers to
+      // choose from a list that never appears.
       this.device = await this.bridge.requestDevice()
       this.setState('selected')
 

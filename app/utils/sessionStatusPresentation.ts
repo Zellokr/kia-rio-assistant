@@ -75,12 +75,19 @@ export function describeSessionStatus(state: ObdSessionState): SessionStatus {
         icon: 'i-lucide-bluetooth-searching',
         busy: true,
         phase: undefined,
-        detail: 'Elige el VEEPEAK en la lista del móvil.'
+        /**
+         * Not "pick it from the list". There is no list and no system
+         * picker: `BleObdBridgePlugin.finishScan` scans for five seconds
+         * and resolves the first VEEPEAK it saw. Saying otherwise asked
+         * the driver for an action that cannot be performed, and left
+         * them waiting on a dialog that never appears.
+         */
+        detail: 'Escaneando unos segundos. Se usará el VEEPEAK que aparezca.'
       }
 
     case 'selected':
       return {
-        label: 'Adaptador elegido',
+        label: 'Adaptador encontrado',
         tone: 'progress',
         icon: 'i-lucide-bluetooth',
         busy: false,

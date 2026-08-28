@@ -290,6 +290,26 @@ export const KIA_RIO_WARNING_LIGHTS: readonly WarningLightEntry[] = [
     subsystems: ['restraints', 'electrical']
   },
   {
+    id: 'seatbelt',
+    name: 'Cinturón de seguridad desabrochado',
+    color: 'red',
+    shape: 'seated-person-with-belt',
+    behavior: ['steady', 'blinking'],
+    displayTextKeywords: [],
+    symptoms: [],
+    severity: 'warning',
+    immediateAction:
+      'Abrocha el cinturón de seguridad antes de iniciar la marcha y comprueba '
+      + 'que todos los ocupantes lo llevan correctamente colocado.',
+    recommendedChecks: [
+      'Comprobar que el cinturón queda abrochado y sin retorcerse',
+      'Comprobar que no hay objetos pesados sobre los asientos'
+    ],
+    associatedDtcCodes: [],
+    associatedDtcPrefixes: [],
+    subsystems: ['restraints']
+  },
+  {
     id: 'power-steering',
     name: 'Dirección asistida',
     color: 'amber',
@@ -360,6 +380,26 @@ export const KIA_RIO_WARNING_LIGHTS: readonly WarningLightEntry[] = [
     ],
     associatedDtcCodes: [],
     associatedDtcPrefixes: ['C0'],
+    subsystems: ['brakes', 'steering']
+  },
+  {
+    id: 'esc-off',
+    name: 'Control de estabilidad desactivado (ESC OFF)',
+    color: 'amber',
+    shape: 'car-with-skid-marks-off',
+    behavior: ['steady'],
+    displayTextKeywords: ['ESC', 'OFF'],
+    symptoms: [],
+    severity: 'info',
+    immediateAction:
+      'Pulsa el botón ESC OFF para volver a activar el control de estabilidad '
+      + 'antes de conducir en condiciones de poca adherencia.',
+    recommendedChecks: [
+      'Comprobar que el botón ESC OFF no se ha pulsado por accidente',
+      CONSULT_MANUAL
+    ],
+    associatedDtcCodes: [],
+    associatedDtcPrefixes: [],
     subsystems: ['brakes', 'steering']
   },
   {

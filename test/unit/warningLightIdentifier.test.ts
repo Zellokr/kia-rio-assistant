@@ -9,6 +9,7 @@ import {
 import WarningLightIdentifier from '../../app/components/WarningLightIdentifier.vue'
 import WarningLightQuestionStep from '../../app/components/WarningLightQuestionStep.vue'
 import WarningLightResultCard from '../../app/components/WarningLightResultCard.vue'
+import { kiaRioWarningLightsCatalog } from '../../catalog/kia-rio/warning-lights'
 import type {
   WarningLightCatalog,
   WarningLightEntry
@@ -327,6 +328,23 @@ describe('WarningLightIdentifier', () => {
     await optOut!.trigger('click')
 
     expect(wrapper.text().toLowerCase()).toContain('no se ha podido identificar')
+  })
+
+  it('leaves the ambiguous amber lozenge or hook unidentified rather than guessing GPF or immobilizer', async () => {
+    const wrapper = mount(WarningLightIdentifier, {
+      props: {
+        catalog: kiaRioWarningLightsCatalog,
+        adapterConnected: true
+      },
+      global: { stubs }
+    })
+
+    await press(wrapper, 'Ámbar')
+    await press(wrapper, 'No identificado')
+
+    expect(wrapper.text().toLowerCase()).toContain('no se ha podido identificar')
+    expect(wrapper.text()).not.toContain('Filtro de partículas de gasolina')
+    expect(wrapper.text()).not.toContain('Inmovilizador')
   })
 
   /** RF-024 entry path (b): from a DTC already read this session. */
