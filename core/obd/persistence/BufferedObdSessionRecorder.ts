@@ -44,11 +44,26 @@ export class BufferedObdSessionRecorder {
     }
   }
 
-  finish(): void {
-    this.flush()
+  /**
+   * Writes whatever is buffered, now.
+   *
+   * Public because the buffer is otherwise drained only by a 2s timer, by
+   * hitting the event limit, or by the next session starting. A caller that
+   * is about to read the store back — or that knows the process is about to
+   * lose its timers — has to be able to say "write it now" without claiming
+   * the session is over.
+   *
+   * Idempotent: with an empty buffer it clears the timer and returns.
+   */
+  flush(): void {
+    this.writePending()
   }
 
-  private flush(): void {
+  finish(): void {
+    this.writePending()
+  }
+
+  private writePending(): void {
     if (this.timer) {
       this.clearTimer(this.timer)
       this.timer = undefined

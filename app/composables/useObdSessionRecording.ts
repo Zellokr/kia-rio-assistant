@@ -68,6 +68,18 @@ export function useObdSessionRecording(sessionLog: ObdSessionLog) {
       return 'No hay almacenamiento en este dispositivo; no se puede componer el informe.'
     }
 
+    /**
+     * Write what is buffered before reading the store back.
+     *
+     * Events are held for up to two seconds before being written. Without
+     * this the report reads storage that does not yet contain the session
+     * just performed — which is what happened at the car on 2026-08-28: the
+     * most recent session arrived with a record and zero events, and the
+     * summary reported it as "did not reach ready", a claim about the
+     * vehicle manufactured out of data that had never been written.
+     */
+    recorder?.flush()
+
     const config = useRuntimeConfig().public.telegram as {
       botToken: string
       chatId: string
@@ -206,6 +218,30 @@ export function useObdSessionRecording(sessionLog: ObdSessionLog) {
         observedAt: observation.observedAt
       }))
     ))
+  }
+
+  /**
+   * Write what is buffered whenever the app stops being visible.
+   *
+   * The UI runs in an Android WebView, and a backgrounded WebView has its
+   * timers suspended — so the two-second flush may simply never fire once
+   * the screen goes off. That is precisely when the interesting events
+   * happen during a drop test: the moment you walk away from the car.
+   *
+   * Guarded because this composable also runs where there is no document.
+   */
+  function flushOnHide(): void {
+    if (document.visibilityState === 'hidden') {
+      recorder?.flush()
+    }
+  }
+
+  if (import.meta.client && typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', flushOnHide)
+
+    onScopeDispose(() => {
+      document.removeEventListener('visibilitychange', flushOnHide)
+    })
   }
 
   onScopeDispose(unsubscribe)

@@ -106,6 +106,21 @@ describe('summariseSession', () => {
     expect(dead.telemetryResumedAfterRecovery).toBe(false)
   })
 
+  /**
+   * The defect the car exposed on 2026-08-28. The last session had been
+   * created but its events were still buffered, so storage held a record
+   * with nothing in it — and the summary called that "did not reach ready",
+   * a claim about the vehicle built out of data that was never written.
+   */
+  it('marks a session with no events as unrecorded, not as failed', () => {
+    reset()
+
+    const summary = summariseSession('s0', '2026-08-28T10:00:00.000Z', [])
+
+    expect(summary.recorded).toBe(false)
+    expect(summary.reachedReady).toBe(false)
+  })
+
   it('leaves the resumed question unanswered when nothing ever dropped', () => {
     reset()
 
@@ -128,6 +143,7 @@ describe('summariseFieldTest', () => {
       (reachedReady, index) => ({
         sessionId: `s${index}`,
         startedAt: '2026-08-28T10:00:00.000Z',
+        recorded: true,
         msToReady: reachedReady ? 3000 : undefined,
         reachedReady,
         errorPhases: [],
@@ -147,11 +163,68 @@ describe('summariseFieldTest', () => {
   })
 })
 
+describe('summariseFieldTest with unrecorded sessions', () => {
+  function session(recorded: boolean, reachedReady: boolean, id: string) {
+    return {
+      sessionId: id,
+      startedAt: '2026-08-28T10:00:00.000Z',
+      recorded,
+      msToReady: reachedReady ? 3000 : undefined,
+      reachedReady,
+      errorPhases: [],
+      dropsDetected: 0,
+      reconnectAttempts: 0,
+      recoveries: 0,
+      recoveryMs: [],
+      telemetryResumedAfterRecovery: undefined,
+      telemetryReadings: 0
+    }
+  }
+
+  /**
+   * An unrecorded session neither extends the run nor breaks it. Both would
+   * be claims the data does not support, so it is counted separately and
+   * the streak is read over what was actually recorded.
+   */
+  it('does not let a session with no data break the streak', () => {
+    const summary = summariseFieldTest([
+      session(true, true, 'a'),
+      session(true, true, 'b'),
+      session(false, false, 'empty'),
+      session(true, true, 'c')
+    ])
+
+    expect(summary.longestReadyStreak).toBe(3)
+    expect(summary.sessionsWithoutData).toBe(1)
+  })
+
+  it('reports how many sessions carried no data at all', () => {
+    const report = formatFieldTestReport(summariseFieldTest([
+      session(true, true, 'a'),
+      session(false, false, 'empty')
+    ]))
+
+    expect(report).toContain('Sin datos: 1')
+    expect(report).toContain('2. sin eventos registrados')
+    expect(report).not.toContain('2. NO llegó a preparado')
+  })
+
+  it('counts readiness against the sessions that have data', () => {
+    const report = formatFieldTestReport(summariseFieldTest([
+      session(true, true, 'a'),
+      session(false, false, 'empty')
+    ]))
+
+    expect(report).toContain('Llegaron a preparado: 1 de 1 con datos')
+  })
+})
+
 describe('formatFieldTestReport', () => {
   function summaryWith(drops: number) {
     return summariseFieldTest([{
       sessionId: 's1',
       startedAt: '2026-08-28T10:00:00.000Z',
+      recorded: true,
       msToReady: 4200,
       reachedReady: true,
       errorPhases: [],

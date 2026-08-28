@@ -23,6 +23,15 @@ import type { ObdSessionEvent } from '../logging/ObdSessionLog'
 export interface FieldTestSessionSummary {
   readonly sessionId: string
   readonly startedAt: string
+  /**
+   * Whether anything was recorded for this session at all.
+   *
+   * A session with no events says nothing about the vehicle. Reporting it
+   * as "did not reach ready" is a claim manufactured out of an absence, and
+   * that is exactly what this summary did at the car on 2026-08-28 — the
+   * session had simply not been written to storage yet.
+   */
+  readonly recorded: boolean
   /** Milliseconds from the first event to reaching `ready`, when it did. */
   readonly msToReady: number | undefined
   readonly reachedReady: boolean
@@ -44,8 +53,15 @@ export interface FieldTestSessionSummary {
 export interface FieldTestSummary {
   readonly sessions: readonly FieldTestSessionSummary[]
   readonly totalSessions: number
+  /** Sessions with no events at all — evidence of nothing, either way. */
+  readonly sessionsWithoutData: number
   readonly sessionsReachingReady: number
-  /** The longest run of consecutive sessions that reached ready. */
+  /**
+   * The longest run of consecutive sessions that reached ready, counted
+   * over sessions that recorded something. An unrecorded session neither
+   * extends the run nor breaks it: both would be claims the data does not
+   * support, so it is left out and counted separately instead.
+   */
   readonly longestReadyStreak: number
   readonly totalDrops: number
   readonly totalRecoveries: number
@@ -101,6 +117,7 @@ export function summariseSession(
   return {
     sessionId,
     startedAt,
+    recorded: ordered.length > 0,
     msToReady: ready?.elapsedMs,
     reachedReady: ready !== undefined,
     errorPhases,
@@ -122,6 +139,10 @@ export function summariseFieldTest(
   let longestReadyStreak = 0
 
   for (const session of sessions) {
+    if (!session.recorded) {
+      continue
+    }
+
     streak = session.reachedReady ? streak + 1 : 0
     longestReadyStreak = Math.max(longestReadyStreak, streak)
   }
@@ -129,6 +150,7 @@ export function summariseFieldTest(
   return {
     sessions,
     totalSessions: sessions.length,
+    sessionsWithoutData: sessions.filter(s => !s.recorded).length,
     sessionsReachingReady: sessions.filter(s => s.reachedReady).length,
     longestReadyStreak,
     totalDrops: sessions.reduce((sum, s) => sum + s.dropsDetected, 0),
@@ -153,11 +175,20 @@ export function formatFieldTestReport(summary: FieldTestSummary): string {
 
   lines.push('INFORME DE CAMPO')
   lines.push('')
+  const withData = summary.totalSessions - summary.sessionsWithoutData
+
   lines.push(`Sesiones registradas: ${summary.totalSessions}`)
   lines.push(
-    `Llegaron a preparado: ${summary.sessionsReachingReady} de ${summary.totalSessions}`
+    `Llegaron a preparado: ${summary.sessionsReachingReady} de ${withData} con datos`
   )
   lines.push(`Racha seguida sin fallo: ${summary.longestReadyStreak}`)
+
+  if (summary.sessionsWithoutData > 0) {
+    lines.push(
+      `Sin datos: ${summary.sessionsWithoutData}`
+      + ' (no dicen nada del vehículo, ni a favor ni en contra)'
+    )
+  }
   lines.push(
     `Caídas detectadas: ${summary.totalDrops} · recuperadas: ${summary.totalRecoveries}`
   )
@@ -174,6 +205,11 @@ export function formatFieldTestReport(summary: FieldTestSummary): string {
   lines.push('Por sesión:')
 
   for (const [index, session] of summary.sessions.entries()) {
+    if (!session.recorded) {
+      lines.push(`${index + 1}. sin eventos registrados`)
+      continue
+    }
+
     const parts: string[] = [
       session.reachedReady
         ? `preparado en ${session.msToReady === undefined ? '?' : seconds(session.msToReady)}`
