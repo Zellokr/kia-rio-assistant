@@ -39,31 +39,33 @@ const tone = computed(() => {
     The label hides on a narrow header, so the icon carries the meaning
     alongside the colour rather than the colour carrying it alone. The full
     sentence stays in `aria-label` either way.
+
+    It is a circle without the label and a pill with it. There used to be a
+    separate status dot beside the icon, which left a capsule 52 px wide and
+    36 px tall on a phone — the padding and gap of a label that was no
+    longer there, with two small marks adrift inside it. The icon already
+    distinguishes the states by shape, so it took over the dot's other job
+    too: the pulse now rings the icon.
   -->
   <span
-    class="flex min-h-9 items-center gap-2 rounded-full border border-default bg-elevated px-2.5"
+    class="flex size-9 items-center justify-center rounded-full border border-default bg-elevated sm:w-auto sm:justify-start sm:gap-2 sm:px-2.5"
     role="status"
     aria-live="polite"
     :aria-label="`Estado de la conexión: ${status.label}`"
   >
-    <span class="relative flex size-2 shrink-0">
+    <span class="relative flex size-4 shrink-0 items-center justify-center">
       <span
         v-if="status.busy"
         class="absolute inline-flex size-full animate-ping rounded-full motion-reduce:hidden"
         :class="tone.ring"
       />
-      <span
-        class="relative inline-flex size-2 rounded-full"
-        :class="tone.dot"
+      <UIcon
+        :name="status.icon"
+        class="relative size-4"
+        :class="tone.text"
+        aria-hidden="true"
       />
     </span>
-
-    <UIcon
-      :name="status.icon"
-      class="size-4 shrink-0"
-      :class="tone.text"
-      aria-hidden="true"
-    />
 
     <span
       class="hidden truncate text-xs font-medium sm:inline"
