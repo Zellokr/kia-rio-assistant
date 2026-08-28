@@ -4,6 +4,16 @@ This first Capacitor Android slice discovers only the BLE structure advertised
 by the VEEPEAK. It does **not** read or write characteristic values, subscribe
 to notifications, send ELM commands, or use `ObdTransport`.
 
+> **The in-app inspector was removed on 2026-08-28.** `GattInspectorPanel`,
+> `useGattInspector`, `GattInspectorController` and `GattInspectorPlugin` are
+> gone: the inspection below completed, its result is the constant
+> `VEEPEAK_BLE_PROFILE`, and what remained on the connection screen was a
+> second "Buscar…" button beside the real one doing something entirely
+> different. To re-run this for another adapter or after a firmware change,
+> restore them from git — `git log --diff-filter=D -- '*GattInspector*'`
+> finds the commit — or capture the inventory with nRF Connect and review it
+> against [GATT_INVENTORY_SCHEMA.md](GATT_INVENTORY_SCHEMA.md).
+
 Physical inspection status: **COMPLETE** (2026-08-24, Google Pixel 9A /
 Android 17). The captured inventory was reviewed against
 [GATT_INVENTORY_SCHEMA.md](GATT_INVENTORY_SCHEMA.md) and the resulting serial

@@ -1,16 +1,6 @@
 <script setup lang="ts">
 import type { ObdSessionState } from '~~/core/obd/session/ObdSessionStateMachine'
-import type { ObdTransportState } from '~~/core/obd/transport/ObdTransport'
 import type { ObdTransportChoice } from '~/utils/obdTransportChoice'
-import ElmPipeProbePanel from '~/components/ElmPipeProbePanel.vue'
-import GattInspectorPanel from '~/components/GattInspectorPanel.vue'
-
-export type ConnectionBadgeColor
-  = | 'neutral'
-    | 'warning'
-    | 'primary'
-    | 'success'
-    | 'error'
 
 /**
  * The select that used to write this is gone: it offered exactly one option,
@@ -26,11 +16,8 @@ defineModel<ObdTransportChoice>('transportChoice', { required: true })
 defineProps<{
   sessionState: ObdSessionState
   sessionStateLabel: string
-  transportState: ObdTransportState
   transportError: string
-
   sessionBusy: boolean
-  sessionBadgeColor: ConnectionBadgeColor
 }>()
 
 const emit = defineEmits<{
@@ -188,53 +175,20 @@ const emit = defineEmits<{
     </p>
 
     <!--
-      One door, not two. "Comprobaciones técnicas" and "Controles técnicos"
-      sat side by side at the same level, asking a driver to tell apart two
-      things neither of which was meant for them.
+      There is no advanced door any more.
+
+      It held the GATT inspector and the BLE pipe probe — the tools that
+      discovered which characteristic to write and which to listen on. That
+      inspection completed on 2026-08-24 and its result is a constant,
+      `VEEPEAK_BLE_PROFILE`, so the app never needs to run it again. What was
+      left on screen was a second "Buscar…" button beside the real one, doing
+      something entirely different and saying so only in small print.
+
+      The procedure survives in docs/STEP_19_GATT_INSPECTION.md for the next
+      adapter or a firmware change, and the code is in git.
+
+      The link state it also showed was a third copy of what the button and
+      the line under it already say.
     -->
-    <details class="group rounded-xl border border-default bg-default">
-      <summary class="flex min-h-14 cursor-pointer list-none items-center gap-3 px-4 py-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
-        <UIcon
-          name="i-lucide-wrench"
-          class="size-5 shrink-0 text-muted"
-          aria-hidden="true"
-        />
-        <span class="min-w-0 flex-1">
-          <span class="block font-semibold text-highlighted">
-            Opciones avanzadas
-          </span>
-          <span class="block text-sm text-muted">
-            Detalles del adaptador Bluetooth
-          </span>
-        </span>
-        <UIcon
-          name="i-lucide-chevron-down"
-          class="size-5 shrink-0 text-muted transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none"
-          aria-hidden="true"
-        />
-      </summary>
-
-      <div class="flex flex-col gap-4 border-t border-default p-4">
-        <div class="flex items-center justify-between gap-3 rounded-xl border border-default bg-elevated p-4">
-          <div class="min-w-0">
-            <p class="text-sm font-medium text-highlighted">
-              Estado del enlace
-            </p>
-            <p class="text-sm text-muted">
-              {{ transportState }}
-            </p>
-          </div>
-          <UBadge
-            :color="sessionBadgeColor"
-            variant="solid"
-          >
-            {{ sessionStateLabel }}
-          </UBadge>
-        </div>
-
-        <GattInspectorPanel />
-        <ElmPipeProbePanel />
-      </div>
-    </details>
   </section>
 </template>

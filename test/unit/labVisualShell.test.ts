@@ -94,10 +94,8 @@ const CONNECTION_PROPS = {
   transportChoice: 'android-ble',
   sessionState: 'idle',
   sessionStateLabel: 'Inactivo',
-  transportState: 'disconnected',
   transportError: '',
-  sessionBusy: false,
-  sessionBadgeColor: 'neutral'
+  sessionBusy: false
 } as const
 
 const DATA_PROPS = {
@@ -275,19 +273,29 @@ describe('lab destinations', () => {
   })
 
   /**
-   * One door for the technical surface, not two competing ones at the same
-   * level ("Comprobaciones técnicas" and "Controles técnicos"), and its
-   * label no longer claims the controls a driver needs are inside it.
+   * There is no technical surface here any more.
+   *
+   * The disclosure held the GATT inspector and the BLE pipe probe — tools
+   * that discovered which characteristic to write and which to listen on.
+   * That inspection completed on 2026-08-24 and its result is a constant,
+   * so what was left was a second "Buscar…" button beside the real one,
+   * doing something entirely different and saying so only in small print.
    */
-  it('collects the technical surface behind a single disclosure', () => {
+  it('offers no second search competing with the connect action', () => {
     const wrapper = mount(ConnectionView, {
       props: CONNECTION_PROPS,
       global: { stubs }
     })
 
-    expect(wrapper.findAll('details')).toHaveLength(1)
-    expect(wrapper.text()).toContain('Opciones avanzadas')
-    expect(wrapper.text()).not.toContain('Controles técnicos')
+    expect(wrapper.findAll('details')).toHaveLength(0)
+    expect(wrapper.text()).not.toContain('Buscar VEEPEAK')
+    expect(wrapper.text()).not.toContain('Opciones avanzadas')
+    expect(wrapper.text()).not.toContain('Inventario Bluetooth')
+
+    const searches = wrapper.findAll('button')
+      .filter(button => button.text().includes('Buscar'))
+
+    expect(searches).toHaveLength(1)
   })
 
   /**

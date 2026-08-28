@@ -30,7 +30,6 @@ const session = useObdLabSession()
 const {
   sessionState,
   sessionBusy,
-  transportState,
   transportChoice,
   transportError,
   supportedPids,
@@ -170,10 +169,8 @@ async function sendLogToTelegram(): Promise<void> {
           v-model:transport-choice="transportChoice"
           :session-state="sessionState"
           :session-state-label="sessionStateLabel"
-          :transport-state="transportState"
           :transport-error="transportError"
           :session-busy="sessionBusy"
-          :session-badge-color="sessionBadgeColor"
           @select-device="selectDevice"
           @connect="connect"
           @disconnect="disconnect"

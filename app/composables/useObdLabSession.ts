@@ -100,7 +100,6 @@ export function useObdLabSession(options: ObdLabSessionOptions = {}) {
 
   const supportedPids = ref<string[]>([])
   const sessionState = ref<ObdSessionState>(session.state)
-  const transportState = ref<ObdTransportState>(transport.value.state)
   const transportChoice = ref<ObdTransportChoice>('android-ble')
   const transportError = ref('')
 
@@ -154,16 +153,6 @@ export function useObdLabSession(options: ObdLabSessionOptions = {}) {
       'disconnecting'
     ].includes(sessionState.value)
   })
-
-  /**
-   * The transport reports its own transitions through `subscribeState`, but
-   * `select`, `connect` and `disconnect` also read it back once they return
-   * so the view never lags a resolved promise. One helper instead of nine
-   * copies of the same assignment.
-   */
-  function syncTransportState(): void {
-    transportState.value = transport.value.state
-  }
 
   /**
    * Driver-facing diagnostic reads.
@@ -225,8 +214,6 @@ export function useObdLabSession(options: ObdLabSessionOptions = {}) {
   let unsubscribeTransportState = () => {}
 
   function handleTransportStateChange(state: ObdTransportState): void {
-    syncTransportState()
-
     if (
       !isObdTransportUnavailable(state)
       || sessionState.value !== 'ready'
@@ -280,7 +267,6 @@ export function useObdLabSession(options: ObdLabSessionOptions = {}) {
     )
 
     attachObservers()
-    syncTransportState()
   }
 
   function prepareSelectedTransport(): void {
@@ -336,7 +322,6 @@ export function useObdLabSession(options: ObdLabSessionOptions = {}) {
     onTelemetryStopped: markTelemetryStopped,
     onTransportConnected: (metadata) => {
       selectedTransport = metadata
-      syncTransportState()
       sessionLog.updateTransport(metadata)
     },
     onSupportedPidsResolved: (pids) => {
@@ -369,7 +354,6 @@ export function useObdLabSession(options: ObdLabSessionOptions = {}) {
       transitionSession('selecting')
 
       selectedTransport = await transport.value.select()
-      syncTransportState()
       sessionLog.updateTransport(selectedTransport)
 
       transitionSession('selected')
@@ -380,7 +364,6 @@ export function useObdLabSession(options: ObdLabSessionOptions = {}) {
       })
     } catch (error) {
       transportError.value = toError(error).message
-      syncTransportState()
       failSession()
 
       recordError(error, 'selection')
@@ -398,7 +381,6 @@ export function useObdLabSession(options: ObdLabSessionOptions = {}) {
       transitionSession('connecting')
 
       selectedTransport = await transport.value.connect()
-      syncTransportState()
       sessionLog.updateTransport(selectedTransport)
 
       sessionLog.record({
@@ -472,7 +454,6 @@ export function useObdLabSession(options: ObdLabSessionOptions = {}) {
       transitionSession('ready')
     } catch (error) {
       transportError.value = toError(error).message
-      syncTransportState()
       failSession()
 
       recordError(error, 'connection')
@@ -490,7 +471,6 @@ export function useObdLabSession(options: ObdLabSessionOptions = {}) {
       transitionSession('disconnecting')
 
       await transport.value.disconnect()
-      syncTransportState()
 
       supportedPids.value = []
 
@@ -504,7 +484,6 @@ export function useObdLabSession(options: ObdLabSessionOptions = {}) {
       sessionLog.finish()
     } catch (error) {
       transportError.value = toError(error).message
-      syncTransportState()
       failSession()
 
       recordError(error, 'disconnect')
@@ -530,7 +509,6 @@ export function useObdLabSession(options: ObdLabSessionOptions = {}) {
   return {
     sessionState,
     sessionBusy,
-    transportState,
     transportChoice,
     transportError,
     supportedPids,
