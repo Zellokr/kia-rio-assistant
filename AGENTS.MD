@@ -50,7 +50,15 @@ Implementa:
 9. Pruebas unitarias con respuestas fragmentadas.
 10. Instrucciones para la prueba física.
 
-## Comandos permitidos inicialmente
+## Política de comandos físicos permitidos
+
+La aplicación física debe seguir siendo exclusivamente de lectura. La allowlist
+actual de comandos que pueden llegar a un vehículo real vive en
+`core/obd/policy/PhysicalObdCommandPolicy.ts` y debe mantenerse sincronizada con
+la defensa nativa en
+`android/app/src/main/java/dev/krist/kiarioassistant/plugins/BleObdBridgePlugin.kt`.
+
+Comandos originales de Fase 0:
 
 - `ATZ`
 - `ATE0`
@@ -62,6 +70,21 @@ Implementa:
 - `010C`
 - `0105`
 - `03`
+
+Ampliaciones read-only posteriores:
+
+- `0120`
+- `0140`
+- `0160`
+- `0180`
+- `01A0`
+- `01C0`
+- `07`
+- `0A`
+
+Estas ampliaciones solo permiten lecturas: rangos de descubrimiento de PIDs y
+lecturas DTC pendientes/permanentes. No implican validación física con el Kia Rio
+hasta que el usuario ejecute la prueba real documentada.
 
 No expongas un campo que permita enviar comandos arbitrarios en
 una versión destinada a conducción.
