@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ObdSessionState } from '~~/core/obd/session/ObdSessionStateMachine'
 import type { ObdTransportChoice } from '~/utils/obdTransportChoice'
+import ConnectionStatus from '~/components/ConnectionStatus.vue'
 
 /**
  * The select that used to write this is gone: it offered exactly one option,
@@ -147,14 +148,9 @@ const emit = defineEmits<{
       >
         Desconectar
       </UButton>
-
-      <p
-        class="px-1 text-center text-sm text-muted"
-        aria-live="polite"
-      >
-        {{ sessionStateLabel }}
-      </p>
     </div>
+
+    <ConnectionStatus :session-state="sessionState" />
 
     <!--
       The safety promise, in the vocabulary of the person being reassured.

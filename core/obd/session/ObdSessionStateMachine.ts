@@ -76,6 +76,21 @@ const transitions: Record<
   ]
 }
 
+/**
+ * Every state the machine can be in.
+ *
+ * Derived from the transition table, not written out beside it, so the two
+ * cannot drift apart: adding a state to `transitions` adds it here. The
+ * table's keys are the whole union — `Record<ObdSessionState, …>` makes a
+ * missing key a build error.
+ *
+ * Presentation layers iterate this to prove they cover the union at runtime
+ * as well as at compile time.
+ */
+export const OBD_SESSION_STATES = Object.keys(
+  transitions
+) as readonly ObdSessionState[]
+
 export class ObdSessionStateMachine {
   state: ObdSessionState = 'idle'
 

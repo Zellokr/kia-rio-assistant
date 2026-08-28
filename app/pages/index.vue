@@ -4,10 +4,11 @@ import { computed, ref } from 'vue'
 import {
   kiaRioWarningLightsCatalog
 } from '~~/catalog/kia-rio/warning-lights'
-import type {
-  ObdSessionState
-} from '~~/core/obd/session/ObdSessionStateMachine'
 import { useObdLabSession } from '~/composables/useObdLabSession'
+import {
+  describeSessionStatus,
+  sessionToneColor
+} from '~/utils/sessionStatusPresentation'
 import { labViews } from '~/utils/labNav'
 import type { LabViewId } from '~/utils/labNav'
 import BottomTabBar from '~/components/BottomTabBar.vue'
@@ -62,48 +63,14 @@ function setActiveView(view: LabViewId): void {
   activeView.value = view
 }
 
-/**
- * Keyed by the full `ObdSessionState` union rather than by `string`, so a
- * state added to the machine is a build error here instead of a raw
- * identifier rendered at a driver.
- */
-const SESSION_STATE_LABELS: Record<ObdSessionState, string> = {
-  idle: 'Sin conexión',
-  selecting: 'Seleccionando adaptador',
-  selected: 'Adaptador seleccionado',
-  connecting: 'Conectando',
-  initializing: 'Inicializando ELM327',
-  discovering: 'Descubriendo PIDs',
-  ready: 'Preparado',
-  reconnecting: 'Reconectando',
-  disconnecting: 'Desconectando',
-  disconnected: 'Desconectado',
-  error: 'Necesita atención'
-}
-
-const SESSION_STATE_COLORS: Record<
-  ObdSessionState,
-  'neutral' | 'warning' | 'primary' | 'success' | 'error'
-> = {
-  idle: 'neutral',
-  selecting: 'warning',
-  selected: 'primary',
-  connecting: 'warning',
-  initializing: 'neutral',
-  discovering: 'neutral',
-  ready: 'success',
-  reconnecting: 'warning',
-  disconnecting: 'warning',
-  disconnected: 'neutral',
-  error: 'error'
-}
-
-const sessionStateLabel = computed(
-  () => SESSION_STATE_LABELS[sessionState.value]
+const sessionStatus = computed(
+  () => describeSessionStatus(sessionState.value)
 )
 
+const sessionStateLabel = computed(() => sessionStatus.value.label)
+
 const sessionBadgeColor = computed(
-  () => SESSION_STATE_COLORS[sessionState.value]
+  () => sessionToneColor(sessionStatus.value.tone)
 )
 
 const logCopyStatus = ref('')

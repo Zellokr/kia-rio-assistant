@@ -5,6 +5,7 @@ import {
 } from 'vitest'
 
 import {
+  OBD_SESSION_STATES,
   ObdSessionStateMachine
 } from '../../core/obd/session/ObdSessionStateMachine'
 
@@ -235,5 +236,26 @@ describe('ObdSessionStateMachine', () => {
     }).toThrow(
       'Invalid OBD session transition: reconnecting -> connecting'
     )
+  })
+})
+
+describe('OBD_SESSION_STATES', () => {
+  /**
+   * Derived from the transition table, whose type is
+   * `Record<ObdSessionState, …>` — so the compiler already guarantees it
+   * holds every member of the union, and asserting that here would only
+   * restate what the type system enforces.
+   *
+   * What a test can still catch is the derivation itself breaking: an empty
+   * or wrong object would produce a silently empty list, and every
+   * exhaustiveness check built on it would pass over nothing.
+   */
+  it('is not silently empty', () => {
+    expect(OBD_SESSION_STATES.length).toBeGreaterThan(0)
+    expect(new Set(OBD_SESSION_STATES).size).toBe(OBD_SESSION_STATES.length)
+  })
+
+  it('contains the state the machine boots in', () => {
+    expect(OBD_SESSION_STATES).toContain(new ObdSessionStateMachine().state)
   })
 })
