@@ -31,4 +31,34 @@ describe('buffered OBD session recorder', () => {
     recorder.finish()
     expect(appendEvents).toHaveBeenCalledOnce()
   })
+
+  /**
+   * A failed write is reported as an `error` event on the `persistence`
+   * phase, and that report travels through the same subscription every other
+   * event does — so without this exclusion it would be queued for the store
+   * that just rejected it. Each rejected flush would raise another one: the
+   * buffer never drains while the store is broken, and it grows.
+   *
+   * Errors from every other phase are still stored; only the report of a
+   * failure to store is not.
+   */
+  it('never stores the report of a failed write', () => {
+    const { appendEvents, recorder } = setup()
+
+    const errorEvent = (phase: 'persistence' | 'poll') => ({
+      type: 'error' as const,
+      error: { name: 'Error', message: 'quota', phase },
+      sequence: 1,
+      timestamp: '2026-08-25T20:00:00.000Z',
+      elapsedMs: 0
+    })
+
+    recorder.record(errorEvent('persistence'))
+    recorder.finish()
+    expect(appendEvents).not.toHaveBeenCalled()
+
+    recorder.record(errorEvent('poll'))
+    recorder.finish()
+    expect(appendEvents).toHaveBeenCalledOnce()
+  })
 })

@@ -27,7 +27,8 @@ const phaseLabels: Record<ObdErrorPhase, string> = {
   'timeout': 'Tiempo de espera',
   'decode': 'Decodificación',
   'poll': 'Telemetría',
-  'disconnect': 'Desconexión'
+  'disconnect': 'Desconexión',
+  'persistence': 'Almacenamiento'
 }
 
 const stateLabels: Record<

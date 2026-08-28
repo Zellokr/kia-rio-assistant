@@ -3,7 +3,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 
 import LabPage from '~/pages/lab/index.vue'
+import BottomTabBar from '~/components/BottomTabBar.vue'
 import ConnectionView from '~/components/ConnectionView.vue'
+import LogView from '~/components/LogView.vue'
 import { InMemoryObdPersistenceAdapter } from '~~/core/obd/persistence/InMemoryObdPersistenceAdapter'
 import type { ObdPersistence } from '~~/data/repositories/createObdPersistence'
 import { provideNuxtInjections } from '../setup/nuxtMacros'
@@ -93,25 +95,36 @@ describe('lab page persistence', () => {
   })
 
   /**
-   * The non-blocking guarantee, in both halves: a rejected write is routed
-   * to the handler instead of escaping as an unhandled rejection, and it
-   * does not stop the adapter's own error reaching the driver.
+   * The non-blocking guarantee, in both halves: a rejected write is reported
+   * instead of escaping as an unhandled rejection, and it does not stop the
+   * adapter's own error reaching the driver.
+   *
+   * The report used to be a `console.warn`, which this test spied on. That
+   * left the exported session log — the artefact this project argues from —
+   * silent about a failed write, so a reader could not tell a missing
+   * observation from a missing write. It is an `error` event on the
+   * `persistence` phase now, and the assertion reads the log the driver
+   * would export.
    */
-  it('routes a rejected write away from the session', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-
+  it('reports a rejected write in the session log', async () => {
     provideNuxtInjections({ $obdPersistence: rejectingPersistence() })
 
     const wrapper = mountLabPage()
 
     await selectAdapter(wrapper)
 
-    expect(warn).toHaveBeenCalledWith(
-      'OBD persistence failed without affecting the active session',
-      expect.any(Error)
-    )
     expect(wrapper.findComponent(ConnectionView).props('transportError'))
       .toBe(ADAPTER_UNAVAILABLE)
+
+    await wrapper.findComponent(BottomTabBar).vm.$emit('select', 'log')
+
+    await vi.waitFor(() => {
+      const events = wrapper.findComponent(LogView).props('events')
+        .map(event => JSON.stringify(event))
+        .join('\n')
+
+      expect(events).toContain('persistence')
+    })
   })
 
   /**

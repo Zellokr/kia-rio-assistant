@@ -273,10 +273,18 @@ export function useObdLabSession(options: ObdLabSessionOptions = {}) {
 
   /**
    * Persistence is a recording of the session, never a participant in it: a
-   * failed write must not interrupt a driver mid-read.
+   * failed write must not interrupt a driver mid-read, so this swallows the
+   * rejection.
+   *
+   * It still goes into the session log. The exported log is the evidence
+   * artefact this project argues from, and a failed write that only ever
+   * reached `console.warn` left a hole in that artefact which nobody
+   * reading it afterwards could see — including the reader deciding whether
+   * a missing observation means the vehicle stayed quiet or the write
+   * failed.
    */
   function recordPersistenceError(error: unknown): void {
-    console.warn('OBD persistence failed without affecting the active session', error)
+    recordError(error, 'persistence')
   }
 
   function persist(operation: Promise<void>): void {

@@ -108,6 +108,7 @@ export type ObdErrorPhase
     | 'decode'
     | 'poll'
     | 'disconnect'
+    | 'persistence'
 
 export interface ObdErrorEvent
   extends ObdSessionEventBase {
