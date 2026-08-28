@@ -1,7 +1,7 @@
 # DTC physical validation
 
-**Status: OPEN — NOT RUN.** This document is live. Nothing here has been
-executed against the Kia Rio.
+**Status: PARTLY RUN, 2026-08-28.** Check 2 is closed; check 1 is not
+executable on this car. See the per-check status below.
 
 It holds the vehicle checks the DTC decoders need before their unvalidated
 branches can be trusted. The step-by-step procedure that runs them, together
@@ -21,7 +21,10 @@ in `PHYSICAL_TRANSPORT_KINDS`.
 
 ## Check 1 — Mode 03 multi-frame framing
 
-**Status: OPEN.** Blocks widening `decodeMode03Response`.
+**Status: NOT EXECUTABLE on this vehicle, 2026-08-28.** Mode 03 answered
+with zero stored codes, so there is no multi-frame response to read. Still
+blocks widening `decodeMode03Response` — it waits for a car with a real
+fault, not for a decision.
 
 `decodeMode03Response` is validated for a single-frame SAE J1979 / ISO 15765-4
 response only: up to three 2-byte DTC pairs following `0x43` directly, unused
@@ -50,7 +53,16 @@ induces faults. Take the opportunity if it ever arises.
 
 ## Check 2 — Mode 07 and Mode 0A empty-result behaviour
 
-**Status: OPEN.** Blocks any assumption about pending and permanent reads.
+**Status: CLOSED 2026-08-28.** This ECU answers `03`, `07` and `0A` with a
+padded frame — a decodable response carrying zero codes — not `NO DATA` and
+not `?`.
+
+The evidence is that the reads were logged at all:
+`readDiagnosticTroubleCodes` records a `decoded-value` event only when the
+outcome is `codes`, and returns before that for the other two branches.
+Eight such events sit in the 16:48 session — two for `03`, three for `07`,
+three for `0A`. All three branches remain implemented; this records which
+one this car takes, not that the others are dead code.
 
 Neither Mode 07 (pending) nor Mode 0A (permanent) has ever been sent to this
 vehicle. Both are now in `PHYSICAL_ALLOWED_COMMANDS` — the allowlist was

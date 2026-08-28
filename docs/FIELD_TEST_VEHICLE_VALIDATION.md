@@ -1,14 +1,25 @@
-# Vehicle field test — everything still unvalidated
+# Vehicle field test
 
-**Status: OPEN — NOT RUN.** Nothing in this document has been executed
-against the Kia Rio. Change a section's status only by attaching the raw
+**Status: RUN on 2026-08-28.** Two runs against the Kia Rio, twenty-one
+sessions in total. Change a section's status only by attaching the raw
 evidence it asks for, never by deciding it probably works.
+
+| Part | Status | On what |
+|---|---|---|
+| A1 | **Closed** | Criteria met — eleven consecutive connections |
+| A2 | **Closed** | Owner waiver, `ADR-004`: one of two recoveries observed |
+| B | **Closed** | Criteria met — all three modes answered |
+| C | **Partly** | Cluster photographed and compared; guided identifier not run |
+| D | **Not executable** | The car has no stored codes to multi-frame |
+
+Evidence lives in the Telegram field-test channel: two reports and
+twenty-one session JSON files, sent by the app itself.
 
 This is one trip to the car. It closes, in order:
 
 | Part | Closes | Blocking? |
 |---|---|---|
-| A | Sprint 0 task 8 — the Fase 1 exit criterion, waived by ADR-003 rather than met | **Yes** |
+| A | Sprint 0 task 8 — the Fase 1 exit criterion, waived by ADR-003 rather than met. **Closed 2026-08-28; see `ADR-004`** | **Yes** |
 | B | `DTC_PHYSICAL_VALIDATION.md` check 2 — Mode 07/0A empty-result behaviour | No |
 | C | The Rio warning-light catalogue, never compared to the real cluster | No |
 | D | `DTC_PHYSICAL_VALIDATION.md` check 1 — Mode 03 multi-frame | Opportunistic only |
@@ -54,7 +65,19 @@ Unchanged from every physical procedure in this project.
 
 ## Part A — Sprint 0 task 8 (blocking)
 
-**What is unknown.** Reconnection has never run against this car. No drop,
+> **CLOSED 2026-08-28.** A1 on met criteria: eleven consecutive connections,
+> no errors, 7.7–10.4 s to ready with no drift across the run. A2 on an
+> owner waiver recorded in `ADR-004`: two drops were detected and one
+> recovery observed — 4.4 s from detection to `ready`, with telemetry
+> resuming 2.5 s later, the first time reconnection has ever run against
+> this car.
+>
+> The second drop was a Bluetooth toggle and did not recover. Root cause is
+> understood and fixed in `8c88f1d` and `7b2792d`; **those fixes have not
+> been run on the vehicle**. The procedure below is kept as written so the
+> gap stays legible.
+
+**What was unknown.** Reconnection has never run against this car. No drop,
 so no recovery, has ever been observed on the vehicle: it is proven only
 against `ReplayObdTransport` and fake timers. Persistence has never run in
 the Android WebView, only against `fake-indexeddb` in Node. The sole
@@ -152,7 +175,20 @@ telemetry resumed afterwards or stayed dead behind a ready badge. See
 
 ## Part B — Mode 07 and 0A empty-result behaviour
 
-**What is unknown.** Whether this ECU answers `07` and `0A` with a padded
+> **CLOSED 2026-08-28.** This ECU answers `03`, `07` and `0A` with a padded
+> frame: a decodable response carrying zero codes. Not `NO DATA`, and not
+> `?` for an unsupported mode.
+>
+> The evidence is that the reads were logged at all.
+> `readDiagnosticTroubleCodes` records a `decoded-value` event only when the
+> outcome is `codes`; a `NO DATA` or a `?` returns before reaching it. Eight
+> such events are in the session of 16:48 — two for `03`, three for `07`,
+> three for `0A`.
+>
+> The copy can stop hedging for this vehicle. It must keep hedging in
+> general: one ECU is not the standard.
+
+**What was unknown.** Whether this ECU answers `07` and `0A` with a padded
 frame, with `NO DATA`, or with `?` because it does not implement the mode.
 
 **Why it cannot go wrong.** All three branches ship implemented. A padded
@@ -183,6 +219,23 @@ convenient summary of it.
 ---
 
 ## Part C — Warning-light catalogue
+
+> **PARTLY DONE 2026-08-28.** The cluster was photographed during the lamp
+> test and compared against the sixteen catalogue entries. Confirmed
+> present: ABS, stability control, brake system, airbags, oil pressure,
+> charging system, and the engine MIL.
+>
+> Three candidates appear on the cluster and are **not** in the catalogue: a
+> second `(!)` in brackets in **amber** — the catalogue holds that shape only
+> in red — what appears to be an ESC OFF lamp, and one or two red lamps in
+> the lower row that look like a seatbelt and a door.
+>
+> Those are candidates read off a photograph, not identifications. And
+> absence from a lamp test proves nothing: TPMS, GPF and others illuminate
+> only on a real fault, so no catalogue entry has been marked as missing
+> from this car.
+>
+> Step 3 — the guided identifier against real lamps — has not been run.
 
 **What is unknown.** `catalog/kia-rio/warning-lights/` holds 16 entries,
 already compared against the owner's manual — eleven confirmed, two the
@@ -221,7 +274,13 @@ equipado" runs through it — including all three of the new entries.
 
 ---
 
-## Part D — Mode 03 multi-frame (opportunistic only)
+## Part D — Mode 03 multi-frame
+
+> **NOT EXECUTABLE on this vehicle, 2026-08-28.** Mode 03 answered with zero
+> stored codes, so there is no multi-frame response to validate. This is not
+> a failure and does not block: it waits for a car with a real fault, or for
+> a different vehicle.
+ (opportunistic only)
 
 **Run this only if Part B reported more than three stored codes.** This
 project never induces faults, and a healthy car will not produce them on
