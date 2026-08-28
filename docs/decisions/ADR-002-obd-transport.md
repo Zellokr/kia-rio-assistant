@@ -5,6 +5,16 @@
 **Supersedes**: ADR-002 in the v2.0 spec (`docs/Especificacion_Final_Asistente_Kia_Rio_v2.0.pdf`, Annex A), which named Web Serial/RFCOMM as the primary Android transport
 **Related**: `docs/ANDROID_BLE_CONTRACT.md`, `docs/SPEC_DEVIATIONS.md`, Sprint 0 task 10 (spec Annex B.1)
 
+> **Current-status note (2026-08-28):** the original ADR body below is preserved
+> as the 2026-08-25 transport decision and evidence history. Its statements that
+> `WebSerialRfcommTransport` existed, stayed dormant, Sprint 0 task 8 remained
+> open, and reconnection had no vehicle evidence are historical where they
+> conflict with the amendment below and ADR-004. Current state: the Web
+> Serial/RFCOMM transport has been deleted; `AndroidBleObdTransport` is the only
+> physical transport; Sprint 0 task 8 is closed with A1 met and A2 owner-waived;
+> reconnection has limited vehicle evidence with one post-fix Bluetooth-toggle
+> recovery gap still not rerun on the car.
+
 ## Decision
 
 `AndroidBleObdTransport` (the Capacitor Android BLE bridge, configured with
@@ -52,24 +62,27 @@ Kia Rio. The RFCOMM path was never attempted on the vehicle at all.
   suite (`test/unit/webSerialRfcommTransport.test.ts`) exercises a fake
   serial port only.
 
-### What this evidence does NOT cover
+### What this evidence did NOT cover on 2026-08-25
 
-One confirmed session is enough to decide transport primacy; it is not enough
-to declare Fase 1 validated. Sprint 0 task 8 (spec Annex B.1) asks for **ten
-consecutive connections and one 30-minute session**, and remains **open** —
-only the single 91-event session above exists. Reconnection behaviour in
-particular has no vehicle evidence at all and is proven only against replay
-and mock transports.
+One confirmed session was enough to decide transport primacy; it was not enough
+to declare Fase 1 validated. At the time this ADR was accepted, Sprint 0 task 8
+(spec Annex B.1) asked for **ten consecutive connections and one 30-minute
+session** and remained **open** — only the single 91-event session above
+existed. Reconnection behaviour in particular had no vehicle evidence at all
+and was proven only against replay and mock transports.
 
-## Consequences
+Later field evidence and the owner waiver are recorded in ADR-004; the summary
+above is intentionally historical.
 
-- New transport-facing work (lab UI, reconnection, persistence) targets
+## Historical consequences on 2026-08-25
+
+- New transport-facing work (lab UI, reconnection, persistence) targeted
   `AndroidBleObdTransport` as the vehicle-proven path.
-- `WebSerialRfcommTransport` stays in the codebase as a dormant, unproven
-  alternative. It is not deleted — a future adapter change or a different
-  Android BLE limitation could revive the RFCOMM path — but no feature work
-  should assume it is vehicle-ready without first running the same hardware
-  validation the BLE path went through.
+- `WebSerialRfcommTransport` stayed in the codebase as a dormant, unproven
+  alternative. It was not deleted by this original decision — a future adapter
+  change or a different Android BLE limitation could have revived the RFCOMM
+  path — but no feature work could assume it was vehicle-ready without first
+  running the same hardware validation the BLE path went through.
 - `docs/SPEC_DEVIATIONS.md` records the specific spec sections this decision
   supersedes so a future reader does not have to reconcile the two documents
   by hand.

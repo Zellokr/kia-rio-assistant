@@ -2,17 +2,21 @@
 
 ## Misión actual
 
-Implementa exclusivamente la Fase 0 del laboratorio OBD-II.
+Mantén el laboratorio OBD-II Android para el Kia Rio YB 2019 1.2 MPI,
+con comunicación física exclusivamente mediante BLE nativo en Android.
 
-El objetivo es comprobar la comunicación entre:
+Estado actual:
 
-- Android y Chrome
-- Web Serial sobre Bluetooth RFCOMM
-- Veepeak OBDCheck BLE+
-- Kia Rio YB 2019 1.2 MPI
-
-No implementes todavía IA, Convex, voz, mantenimiento ni el
-dashboard definitivo.
+- `AndroidBleObdTransport` es el único transporte físico de la aplicación.
+- `WebSerialRfcommTransport` fue eliminado; Web Serial/RFCOMM no es una ruta
+  ejecutable para la app Capacitor Android ni para el adaptador BLE disponible.
+- La validación física A1 está cerrada con once conexiones consecutivas.
+- La validación física A2 está cerrada por waiver del propietario en ADR-004:
+  queda visible la brecha de una recuperación post-fix por toggle de Bluetooth
+  no repetida en el vehículo.
+- Las partes B y C están cerradas; C combina fotografía del cuadro con reporte
+  del propietario para el identificador guiado de ABS, cinturón e inmovilizador.
+- La parte D no es ejecutable en este coche porque no hay DTC almacenados.
 
 ## Stack
 
@@ -37,18 +41,9 @@ dashboard definitivo.
 
 ## Tarea de esta iteración
 
-Implementa:
-
-1. `ObdTransport`.
-2. `MockObdTransport`.
-3. `WebSerialRfcommTransport`.
-4. Parser incremental hasta el prompt `>`.
-5. Cola FIFO de comandos.
-6. Estados explícitos de conexión.
-7. Logs exportables.
-8. Página `/`.
-9. Pruebas unitarias con respuestas fragmentadas.
-10. Instrucciones para la prueba física.
+No hay una tarea fija de Fase 0 pendiente en este archivo. Sigue la tarea
+concreta delegada por el usuario o el orquestador y conserva el estado físico
+registrado en la documentación.
 
 ## Política de comandos físicos permitidos
 
@@ -83,24 +78,25 @@ Ampliaciones read-only posteriores:
 - `0A`
 
 Estas ampliaciones solo permiten lecturas: rangos de descubrimiento de PIDs y
-lecturas DTC pendientes/permanentes. No implican validación física con el Kia Rio
-hasta que el usuario ejecute la prueba real documentada.
+lecturas DTC pendientes/permanentes. La lectura vacía de DTC pendientes y
+permanentes ya fue observada en la parte B; cualquier otra afirmación física
+requiere evidencia real del vehículo.
 
 No expongas un campo que permita enviar comandos arbitrarios en
 una versión destinada a conducción.
 
-## Finalización de la Fase 0
+## Estado de cierre físico
 
-La tarea queda terminada cuando:
+La prueba física ya no está marcada como `NOT RUN` globalmente:
 
-- El laboratorio funciona con el transporte simulado.
-- El parser reconstruye respuestas fragmentadas.
-- Los comandos se ejecutan secuencialmente.
-- Los timeouts y desconexiones se controlan.
-- El log puede exportarse.
-- Las pruebas automatizadas pasan.
-- La prueba física queda marcada como `NOT RUN` hasta que el usuario
-  la realice en el coche.
+- A1, B y C están cerradas por evidencia registrada.
+- A2 está cerrada por waiver del propietario en ADR-004, con la brecha concreta
+  de recuperación post-fix por toggle de Bluetooth todavía sin rerun en el
+  vehículo.
+- D queda como no ejecutable hasta que exista un vehículo con DTC almacenados.
+
+No afirmes evidencia física nueva sin una ejecución real contra el coche y sus
+artefactos.
 
 ## Forma de trabajar
 
@@ -112,5 +108,3 @@ Antes de cambiar código:
 4. Implementa cambios pequeños y comprobables.
 5. Ejecuta lint, typecheck y tests.
 6. Resume archivos modificados, pruebas y bloqueos reales.
-
-Detente al completar la Fase 0.

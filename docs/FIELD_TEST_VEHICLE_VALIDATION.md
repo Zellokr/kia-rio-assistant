@@ -34,7 +34,8 @@ driver's hands.
    the report sender. See `docs/FIELD_TEST_TELEGRAM.md`; an ordinary build
    has no way to get evidence off the phone, because the Android WebView
    ignores `<a download>` on a `blob:` URL.
-2. Charge the phone. Part A runs 20–25 minutes with the screen on.
+2. Charge the phone. The original Part A plan ran 20–25 minutes with the
+   screen on; the executed A2 was deliberately shortened to about ten minutes.
 3. **No notebook.** The app records every observation the procedure used to
    ask for, and sends them as a report. Transcribing timings off a small
    screen next to a running engine was the least reliable instrument in
@@ -58,15 +59,16 @@ Unchanged from every physical procedure in this project.
 
 ---
 
-> **UI note.** Android BLE is now the only transport the app ships and the
-> only transport the app ships, and the selector that used to offer it is gone, so nothing has to be set before connecting.
+> **UI note.** Android BLE is now the only transport the app ships, and the
+> selector that used to offer alternatives is gone, so nothing has to be set
+> before connecting.
 > The technical panel that holds it is **Controles técnicos** — it was
 > called "Herramientas OBD avanzadas" when this document was first written.
 
 ## Part A — Sprint 0 task 8 (blocking)
 
-> **CLOSED 2026-08-28.** A1 on met criteria: eleven consecutive connections,
-> no errors, 7.7–10.4 s to ready with no drift across the run. A2 on an
+> **CLOSED 2026-08-28.** A1 met criteria: eleven consecutive connections,
+> no errors, 7.7–10.4 s to ready with no drift across the run. A2 closed by an
 > owner waiver recorded in `ADR-004`: two drops were detected and one
 > recovery observed — 4.4 s from detection to `ready`, with telemetry
 > resuming 2.5 s later, the first time reconnection has ever run against
@@ -84,10 +86,12 @@ Persistence had never run in the Android WebView, only against
 `fake-indexeddb` in Node. The sole vehicle evidence before 2026-08-28 was one
 91-event session on 2026-08-24, during which nothing disconnected.
 
-**What closes it.** Ten consecutive connections, plus one session
+**Original closure criterion.** Ten consecutive connections, plus one session
 containing at least one drop and its recovery. That session was specified
 as thirty minutes and was shortened to ten with two drops on 2026-08-28;
-the reasoning, and what the shortening gives up, are in A2 below.
+the reasoning, and what the shortening gives up, are in A2 below. The current
+closure is the explicit A2 waiver in `ADR-004`, not hidden direct evidence for
+both recoveries.
 
 ### A1 — Ten consecutive connections
 
@@ -147,9 +151,14 @@ Start the engine. Ventilated space.
    writes nothing.
 4. Watch it recover, and confirm the readings come back and stay live for a
    couple of minutes.
-5. Around minute eight, **induce a second drop by a different cause**:
-   walk ~20 m away from the car with the phone until the link drops, then
-   come back. Using the same cause twice tests one path twice.
+5. Around minute eight, **induce a second drop by a different cause**. The
+   original procedure was to walk ~20 m away from the car with the phone until
+   the link dropped, then come back, because using the same cause twice tests
+   one path twice.
+
+   The executed 2026-08-28 run used a Bluetooth toggle for this second drop
+   instead. That path did not recover on the vehicle; the later fixes are the
+   specific post-fix gap that has not been rerun.
 
    > **Not by turning the screen off**, which this document used to offer.
    > The BLE link is held natively in `BleObdBridgePlugin` and survives
@@ -161,10 +170,11 @@ Start the engine. Ventilated space.
 6. Press **Pausar lecturas**, disconnect, and press **Registro → Enviar
    informe**.
 
-**A2 is closed only if both drops were detected and both recoveries
-observed.** A session where nothing dropped is not a pass — it is an
-unfinished test, and you should induce a drop before stopping. The report
-says so on its own when no drop is on record.
+**Original A2 evidence criterion:** both drops detected and both recoveries
+observed. The current 2026-08-28 status is different and explicit: A2 is closed
+by owner waiver in `ADR-004`, with one observed recovery and one unrepeated
+post-fix Bluetooth-toggle recovery gap. A future rerun can use the original
+criterion to replace the waiver with direct evidence.
 
 **Nothing here needs writing down.** The report computes what the old
 version asked a human to observe — whether the state stopped claiming

@@ -36,10 +36,9 @@ intent.
 
 The spec's `SessionController` names 9 states. The repository's
 `ObdSessionStateMachine` (`core/obd/session/ObdSessionStateMachine.ts`) has
-10 today, going to 11 once `reconnecting` ships (see the `close-phase-1`
-design). The repo model is not a rename of the spec model — it splits two
-spec states into finer-grained repo states and adds two repo-only states
-that have no spec equivalent.
+11 states today, including `reconnecting`. The repo model is not a rename of the
+spec model — it splits two spec states into finer-grained repo states and adds
+repo-only states that have no spec equivalent.
 
 | Spec state | Repo equivalent | Why they differ |
 |---|---|---|
@@ -53,7 +52,7 @@ that have no spec equivalent.
 | — | `disconnecting` (repo-only) | RF-005's safe-close window (draining in-flight commands before the link closes) is a distinct phase with no spec equivalent |
 | `stopped` | `disconnected` | Same meaning, different name |
 | `error` | `error` | Same |
-| (not modeled) | `reconnecting` (added by `close-phase-1`) | RF-004 (reconnection) has no home in either the spec's 9 states or the repo's original 10; this change adds the one state genuinely missing from both |
+| (not modeled) | `reconnecting` (repo-only) | RF-004 (reconnection) has no home in the spec's 9 states; the repo now models it explicitly between a detected drop and either recovered initialization, error, or manual disconnect |
 
 **Directory naming**: spec section 16.1 names the test directory `tests/`.
 The repository uses `test/`. This is intentional — no file move is planned
@@ -63,11 +62,11 @@ paths.
 
 ## What is not a deviation
 
-Everything not listed above — the read-only scope (ADR-003), local-first
-architecture (ADR-001), mock/replay-first development (ADR-007), the
-mandatory Convex backend (ADR-006), and the manual-knowledge-base design —
-still matches the spec as written. This document only tracks points where
-implementation reality has overtaken the PDF text.
+Everything not listed above — the read-only scope, local-first architecture
+(ADR-001), mock/replay-first development (ADR-007), the mandatory Convex backend
+(ADR-006), and the manual-knowledge-base design — still matches the spec as
+written. This document only tracks points where implementation reality has
+overtaken the PDF text.
 
 ## Next step
 

@@ -1,8 +1,11 @@
 # Field-test evidence over Telegram — TEMPORARY
 
-**This exists to get session JSON off the phone during vehicle validation,
-and is meant to be deleted afterwards.** Removal instructions are at the
-bottom; nothing else in the project depends on it.
+**This exists to get session JSON off the phone during vehicle validation.**
+A/B/C are now closed and D is not executable on the current car, so keep this
+field-test path only if future post-fix Bluetooth-toggle rerun evidence or a
+new field session still needs phone-side export. Ordinary builds must not carry
+Telegram credentials or sender code; removal instructions are at the bottom and
+nothing else in the project depends on it.
 
 ## Why it exists
 
@@ -40,8 +43,8 @@ The whole session export: timestamps, the Bluetooth adapter's name, the
 supported-PID map, and every trouble code read from the car. **No VIN** —
 `PHYSICAL_ALLOWED_COMMANDS` contains no Mode 09, so the app cannot read one.
 
-It goes to Telegram's servers. That is a deliberate trade for the field test
-and the reason this is temporary.
+It goes to Telegram's servers. That was a deliberate trade for field evidence,
+and is the reason this remains temporary rather than part of ordinary builds.
 
 ## Setting it up, once
 
@@ -128,8 +131,9 @@ already arrived. The status line under the buttons says what happened.
    `useObdSessionRecording`, both from `useObdLabSession`, the `telegram`
    prop and emit from `LogView` and `SessionLogPanel`, and
    `sendLogToTelegram` from `app/pages/index.vue`. That leaves **Copiar
-   registro** as the only way to get a session off the phone, which is why
-   this should not be removed until the field test is finished.
+   registro** as the only way to get a session off the phone, so remove this
+   only after deciding no post-fix Bluetooth-toggle rerun or other field
+   evidence still needs Telegram export.
 7. Delete this file.
 
 Every one of those carries a `TEMPORARY` comment pointing back here, so

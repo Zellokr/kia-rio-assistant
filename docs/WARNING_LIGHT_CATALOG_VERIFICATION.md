@@ -45,9 +45,15 @@ that part of the physical record is owner-reported rather than image-backed.
 
 ## Result
 
-**Eleven of the thirteen entries are confirmed.** The manual documents a
-tell-tale for each, and the catalogue's severity and description are
-consistent with what it says.
+**Manual-backed result:** eleven of the original thirteen entries are confirmed
+by the owner's manual. The manual documents a tell-tale for each, and the
+catalogue's severity and description are consistent with what it says.
+
+**Physical-cluster result:** the later 2026-08-28 vehicle evidence confirmed ten
+existing entries by photograph, added photo-backed `esc-off` and `seatbelt`, and
+recorded owner-reported guided-identifier success for `abs`, `seatbelt`, and
+`immobilizer` without screenshots. Do not read the manual-backed count as the
+full physical closure status.
 
 | Catalogue entry | Manual tell-tale | |
 |---|---|---|

@@ -37,7 +37,12 @@ procedure for any other adapter, or after a firmware change.
 
 4. Build and install the debug application on the Android device.
 
-## Inspect the adapter
+## Inspect the adapter (historical in-app procedure)
+
+The steps below describe the removed in-app **Inventario Bluetooth** workflow.
+They are non-executable in the current app unless the inspector is restored from
+git. For a current rerun without restoring code, capture the same inventory with
+nRF Connect and compare it to [GATT_INVENTORY_SCHEMA.md](GATT_INVENTORY_SCHEMA.md).
 
 1. Park the vehicle completely and apply the parking brake.
 2. Keep the engine off. Plug the VEEPEAK into the OBD-II port only to power it.
