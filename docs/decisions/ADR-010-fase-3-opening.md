@@ -48,6 +48,13 @@ at the front of Fase 3 satisfies Fase 2's criterion with the same work rather
 than duplicating it. Fase 2 is therefore closed on delivery of that item, not
 on this ADR.
 
+> **Amendment, 2026-08-28.** "On delivery" was too loose, and ADR-012 — written
+> the same day — is why. The TTS work has landed and is unit-tested, but every
+> one of those tests runs against an injected fake host, which is exactly what
+> was true of `WebSerialRfcommTransport` before it was deleted. Fase 2 closes
+> when `docs/SPEECH_DEVICE_VALIDATION.md` check 1 passes on the phone. It needs
+> no car and takes seconds; it is a gate, not a ceremony.
+
 ## Why the Fase 1 waiver is acceptable here
 
 §3.1's second sentence names the failure it exists to prevent: *"Nuxt, Convex,
