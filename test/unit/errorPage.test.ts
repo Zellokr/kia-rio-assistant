@@ -90,6 +90,6 @@ describe('the error page', () => {
 
     await wrapper.find('button').trigger('click')
 
-    expect(clearErrorMock).toHaveBeenCalledWith({ redirect: '/lab' })
+    expect(clearErrorMock).toHaveBeenCalledWith({ redirect: '/' })
   })
 })

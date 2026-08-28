@@ -117,7 +117,7 @@ The inventory sequence this document was written to gate is complete:
 2. ~~Choose write + notify characteristics from that evidence.~~ Done.
 3. ~~Implement the real Capacitor plugin behind `AndroidBleBridge`.~~ Done —
    `android/app/src/main/java/dev/krist/kiarioassistant/plugins/BleObdBridgePlugin.kt`.
-4. ~~Expose the transport in `/lab` and run a physical checklist.~~ Exposed, and
+4. ~~Expose the transport in `/` and run a physical checklist.~~ Exposed, and
    run once on 2026-08-24.
 
 Still outstanding: Sprint 0 task 8 — ten consecutive connections plus one

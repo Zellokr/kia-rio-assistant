@@ -51,7 +51,7 @@ const MAX_CONSECUTIVE_POLL_ERRORS = 5
 /**
  * Everything the lab page needs to drive one OBD-II session.
  *
- * This used to live inline in `pages/lab/index.vue`, which made the route
+ * This used to live inline in the lab page component, which made the route
  * the owner of the transport, the executor, the poll scheduler, the session
  * log, persistence and their teardown — roughly a thousand lines in which
  * the only part that belonged to a page was the template. Pulling it here

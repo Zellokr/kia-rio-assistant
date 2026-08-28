@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 
-import LabPage from '~/pages/lab/index.vue'
+import LabPage from '~/pages/index.vue'
 import ConnectionView from '~/components/ConnectionView.vue'
 import BottomTabBar from '~/components/BottomTabBar.vue'
 
@@ -47,15 +47,20 @@ describe('lab page', () => {
     expect(wrapper.text()).toContain('Registro')
   })
 
-  it('shows the diagnostic reads only on the data view', async () => {
+  it('asks for a prepared connection before showing diagnostic read actions', async () => {
     const wrapper = mountLabPage()
 
     expect(wrapper.text()).not.toContain('Leer códigos de avería')
 
     await wrapper.findComponent(BottomTabBar).vm.$emit('select', 'data')
+    expect(wrapper.text()).not.toContain('Leer códigos de avería')
 
-    expect(wrapper.text()).toContain('Leer códigos de avería')
-    expect(wrapper.text()).toContain('Códigos almacenados')
+    await wrapper.findComponent(BottomTabBar).vm.$emit('select', 'diagnostics')
+
+    expect(wrapper.text()).toContain('Primero prepara una conexión')
+    expect(wrapper.text()).toContain('Las lecturas de averías permanecerán bloqueadas')
+    expect(wrapper.text()).toContain('Ir a Conexión')
+    expect(wrapper.text()).not.toContain('Códigos almacenados')
   })
 
   /**

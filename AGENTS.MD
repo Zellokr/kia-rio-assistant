@@ -46,7 +46,7 @@ Implementa:
 5. Cola FIFO de comandos.
 6. Estados explícitos de conexión.
 7. Logs exportables.
-8. Página `/lab/obd`.
+8. Página `/`.
 9. Pruebas unitarias con respuestas fragmentadas.
 10. Instrucciones para la prueba física.
 

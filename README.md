@@ -24,9 +24,9 @@ pnpm install
 pnpm dev
 ```
 
-Open `http://localhost:3000/lab` for the OBD lab UI.
+Open `http://localhost:3000/` for the OBD lab UI.
 
-## OBD lab (`/lab`)
+## OBD lab (`/`)
 
 Supported transports today:
 

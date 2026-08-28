@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 
-import LabPage from '~/pages/lab/index.vue'
+import LabPage from '~/pages/index.vue'
 import ConnectionView from '~/components/ConnectionView.vue'
 import BottomTabBar from '~/components/BottomTabBar.vue'
 import LogView from '~/components/LogView.vue'
@@ -133,7 +133,7 @@ describe('lab page session', () => {
 
     await connectSession(wrapper)
 
-    await wrapper.findComponent(BottomTabBar).vm.$emit('select', 'data')
+    await wrapper.findComponent(BottomTabBar).vm.$emit('select', 'diagnostics')
     await wrapper.findAll('button')
       .find(button => button.text().includes('Códigos almacenados'))
       ?.trigger('click')

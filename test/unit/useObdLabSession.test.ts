@@ -12,7 +12,7 @@ import { provideObdPersistence } from './support/obdPersistenceInjection'
 import { createSession, responseEvents } from '../fixtures/obdReplaySessions'
 
 /**
- * The session used to live inside `pages/lab/index.vue`, so the only way to
+ * The session used to live inside the lab page component, so the only way to
  * reach a connected adapter was to mount a page, stub eight Nuxt UI
  * primitives and drive child components by emitting events at them. Those
  * page tests still exist and still matter — they prove the wiring between

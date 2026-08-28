@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 
-import LabPage from '~/pages/lab/index.vue'
+import LabPage from '~/pages/index.vue'
 import BottomTabBar from '~/components/BottomTabBar.vue'
 import ConnectionView from '~/components/ConnectionView.vue'
 import LogView from '~/components/LogView.vue'

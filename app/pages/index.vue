@@ -13,14 +13,10 @@ import type { LabViewId } from '~/utils/labNav'
 import BottomTabBar from '~/components/BottomTabBar.vue'
 import ConnectionView from '~/components/ConnectionView.vue'
 import DataView from '~/components/DataView.vue'
-import DiagnosticAssessmentCard from '~/components/DiagnosticAssessmentCard.vue'
+import DiagnosticsView from '~/components/DiagnosticsView.vue'
 import LogView from '~/components/LogView.vue'
 import NavRail from '~/components/NavRail.vue'
-import WarningLightIdentifier from '~/components/WarningLightIdentifier.vue'
-
-definePageMeta({
-  alias: ['/']
-})
+import WarningLightsView from '~/components/WarningLightsView.vue'
 
 /**
  * The page is a view again: it chooses which panel is on screen and how the
@@ -137,14 +133,17 @@ async function copyLog(): Promise<void> {
               class="size-5 shrink-0 text-success"
               aria-hidden="true"
             />
-            <div class="min-w-0">
-              <p class="font-semibold text-highlighted">
-                Diagnóstico · Solo lectura
-              </p>
-              <p class="text-xs text-muted">
-                Sin Mode 04, programación ni escritura en ECU
-              </p>
-            </div>
+            <!--
+              A short persistent marker, not an explanation. The line under
+              it read "Sin Mode 04, programación ni escritura en ECU" — a
+              promise written in the vocabulary of the thing it promises
+              about, on every screen. The full explanation now lives once,
+              in plain language, on the connection view where a driver is
+              deciding whether to trust this.
+            -->
+            <p class="min-w-0 font-semibold text-highlighted">
+              Solo lectura
+            </p>
           </div>
           <UBadge
             :color="sessionBadgeColor"
@@ -185,81 +184,28 @@ async function copyLog(): Promise<void> {
           @run-queue-test="runQueueTest"
         />
 
-        <template v-if="activeView === 'data'">
-          <UCard>
-            <div class="flex flex-col gap-4">
-              <div class="flex flex-col gap-1">
-                <h2 class="text-lg font-semibold text-highlighted">
-                  Leer códigos de avería
-                </h2>
-                <p class="text-sm leading-6 text-muted">
-                  Lectura únicamente. Este laboratorio no borra códigos
-                  ni escribe nada en la centralita.
-                </p>
-              </div>
+        <DiagnosticsView
+          v-else-if="activeView === 'diagnostics'"
+          :busy="diagnostics.busy.value"
+          :adapter-connected="sessionState === 'ready'"
+          :error-message="diagnostics.errorMessage.value"
+          :assessment="diagnostics.assessment.value"
+          :reads="diagnostics.reads.value"
+          @back-to-connection="activeView = 'connection'"
+          @read-stored="readDiagnosticTroubleCodes('stored')"
+          @read-pending="readDiagnosticTroubleCodes('pending')"
+          @read-permanent="readDiagnosticTroubleCodes('permanent')"
+          @reset="diagnostics.reset()"
+        />
 
-              <div class="grid gap-2 sm:grid-cols-2">
-                <UButton
-                  color="primary"
-                  variant="solid"
-                  size="lg"
-                  :disabled="diagnostics.busy.value"
-                  @click="readDiagnosticTroubleCodes('stored')"
-                >
-                  Códigos almacenados
-                </UButton>
-                <UButton
-                  color="neutral"
-                  variant="soft"
-                  size="lg"
-                  :disabled="diagnostics.busy.value"
-                  @click="readDiagnosticTroubleCodes('pending')"
-                >
-                  Códigos pendientes
-                </UButton>
-                <UButton
-                  color="neutral"
-                  variant="soft"
-                  size="lg"
-                  :disabled="diagnostics.busy.value"
-                  @click="readDiagnosticTroubleCodes('permanent')"
-                >
-                  Códigos permanentes
-                </UButton>
-                <UButton
-                  color="neutral"
-                  variant="ghost"
-                  size="lg"
-                  :disabled="diagnostics.busy.value"
-                  @click="diagnostics.reset()"
-                >
-                  Limpiar resultados
-                </UButton>
-              </div>
-
-              <UAlert
-                v-if="diagnostics.errorMessage.value"
-                color="error"
-                variant="soft"
-                icon="i-lucide-triangle-alert"
-                :description="diagnostics.errorMessage.value"
-              />
-            </div>
-          </UCard>
-
-          <DiagnosticAssessmentCard
-            :assessment="diagnostics.assessment.value"
-            :reads="diagnostics.reads.value"
-          />
-
-          <WarningLightIdentifier
-            :catalog="kiaRioWarningLightsCatalog"
-            :adapter-connected="sessionState === 'ready'"
-          />
-        </template>
+        <WarningLightsView
+          v-else-if="activeView === 'warnings'"
+          :catalog="kiaRioWarningLightsCatalog"
+          :adapter-connected="sessionState === 'ready'"
+        />
 
         <LogView
-          v-if="activeView === 'log'"
+          v-else-if="activeView === 'log'"
           :events="sessionEvents"
           :dropped-events="droppedEvents"
           :truncated="logTruncated"

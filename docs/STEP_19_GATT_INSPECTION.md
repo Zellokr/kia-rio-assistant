@@ -33,7 +33,7 @@ procedure for any other adapter, or after a firmware change.
 2. Keep the engine off. Plug the VEEPEAK into the OBD-II port only to power it.
 3. Completely close every other OBD or Bluetooth scanner application. Only one
    application may hold the adapter connection.
-4. Open **Kia Rio Assistant**, navigate to `/lab`, and select the **Conexión**
+4. Open **Kia Rio Assistant**, navigate to `/`, and select the **Conexión**
    tab, which is the view the lab opens on. Locate the **Inventario Bluetooth**
    card, badged *No lee ni escribe datos del vehículo*.
 5. Confirm that the card does not show the *Abre esta sección desde la

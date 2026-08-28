@@ -17,8 +17,7 @@ export default defineNuxtConfig({
   },
 
   routeRules: {
-    '/': { prerender: true },
-    '/lab': { prerender: true }
+    '/': { prerender: true }
   },
 
   compatibilityDate: '2026-06-30',
@@ -38,7 +37,13 @@ export default defineNuxtConfig({
       scan: true,
       // labNav.ts binds these dynamically (:icon="view.icon"), so the
       // template scanner can't detect them statically — list explicitly.
-      icons: ['lucide:plug-zap', 'lucide:gauge', 'lucide:scroll-text']
+      icons: [
+        'lucide:plug-zap',
+        'lucide:gauge',
+        'lucide:stethoscope',
+        'lucide:triangle-alert',
+        'lucide:scroll-text'
+      ]
     }
   }
 })

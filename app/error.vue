@@ -34,7 +34,7 @@ const description = computed(() => (
 ))
 
 function backToLab(): void {
-  clearError({ redirect: '/lab' })
+  clearError({ redirect: '/' })
 }
 </script>
 

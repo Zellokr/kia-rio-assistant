@@ -40,7 +40,7 @@ y [serial Bluetooth RFCOMM en Chrome](https://developer.chrome.com/blog/serial-o
 
 ## Recorrido seguro
 
-1. Abre `/lab` y selecciona **Web Serial / Bluetooth RFCOMM (real)**.
+1. Abre `/` y selecciona **Web Serial / Bluetooth RFCOMM (real)**.
 2. Pulsa **Seleccionar adaptador** y elige únicamente el adaptador ya
    emparejado. El selector debe abrirse desde este gesto del usuario.
 3. Confirma que la sesión queda en `selected` y registra el nombre mostrado.
