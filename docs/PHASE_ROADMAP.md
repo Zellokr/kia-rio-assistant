@@ -157,4 +157,9 @@ whether it means the spec's or the repository's.
 Fase 3 is open. Its first work item is local TTS (RF-031), which also closes
 Fase 2's outstanding exit criterion.
 
+Speech uses the device's own engines, not a bundled model
+([ADR-012](decisions/ADR-012-on-device-speech.md)). Whether those engines are
+reachable from inside the Capacitor WebView is **unverified**, and checking it
+on the device is the first thing that work item does — not something to assume.
+
 The wake-word viability gate (ADR-011) is unscheduled and blocks nothing.
