@@ -221,57 +221,41 @@ convenient summary of it.
 
 ## Part C — Warning-light catalogue
 
-> **PARTLY DONE 2026-08-28.** The cluster was photographed during the lamp
-> test and compared against the sixteen catalogue entries. Confirmed
-> present: ABS, stability control, brake system, airbags, oil pressure,
-> charging system, and the engine MIL.
+> **PARTLY DONE 2026-08-28.** A high-resolution cluster photograph was
+> captured with the ignition on, engine off, at 76066 km. Nine existing
+> entries are confirmed present: `abs`, `tpms`, `esc-traction`,
+> `power-steering`, `charging-system`, `oil-pressure`, `brake-system`,
+> `airbag-srs`, and `check-engine`.
 >
-> Three candidates appear on the cluster and are **not** in the catalogue: a
-> second `(!)` in brackets in **amber** — the catalogue holds that shape only
-> in red — what appears to be an ESC OFF lamp, and one or two red lamps in
-> the lower row that look like a seatbelt and a door.
+> Two physical findings are now catalogue entries: amber `esc-off`
+> (`car-with-skid-marks-off`) and red `seatbelt`
+> (`seated-person-with-belt`). The shape values are descriptive catalogue
+> identifiers, not Kia document names.
 >
-> Those are candidates read off a photograph, not identifications. And
-> absence from a lamp test proves nothing: TPMS, GPF and others illuminate
-> only on a real fault, so no catalogue entry has been marked as missing
-> from this car.
+> The amber lamp below ABS is the already-catalogued TPMS lamp, not a second
+> amber `(!)`, and there is no door-ajar lamp. The ambiguous amber
+> lozenge or hook remains unidentified rather than guessed as GPF or
+> immobilizer. `(A)` Auto Stop/Start is a status indicator, not a warning.
+> No other lamps are marked absent because a lamp test does not illuminate
+> every fault-dependent tell-tale.
 >
-> Step 3 — the guided identifier against real lamps — has not been run.
+> The guided identifier has still not been physically run.
 
-**What is unknown.** `catalog/kia-rio/warning-lights/` holds 16 entries,
-already compared against the owner's manual — eleven confirmed, two the
-manual does not support, three added because it named them (see
-`docs/WARNING_LIGHT_CATALOG_VERIFICATION.md`). What no document can settle
-is which lamps **this** car physically has: the manual covers the YB
-generation across trims and markets, and "si está equipado" runs through
-it. The `shape` values also remain descriptive identifiers chosen for the
-catalogue, not names from any Kia document.
+**What is unknown.** The manual covers the YB generation across trims and
+markets, and "si está equipado" runs through it, so this lamp test cannot
+establish which unlit tell-tales are fitted. The ambiguous amber lamp also
+remains deliberately unidentified. The `shape` values are descriptive
+identifiers chosen for the catalogue, not names from any Kia document.
 
-With the ignition on and the engine off, the cluster performs its lamp
-test — most tell-tales illuminate for a few seconds. That is the moment to
-photograph.
+The photograph has completed the physical catalogue comparison. The remaining
+Part C work is to open **Datos** → the warning-light section, answer the
+guided questions for two or three real lights, and confirm that the flow
+reaches the right result. An unknown light must remain "sin identificar" with
+the safe alternative, not be matched to a plausible-looking catalogue entry.
 
-1. Turn the ignition on **without starting the engine** and photograph the
-   full cluster during the lamp test. Take several; they go out fast.
-2. Compare against the 16 entries in the catalogue and list:
-   - Tell-tales on the cluster that are **not** in the catalogue.
-   - Catalogue entries this car does **not** have.
-   - Any whose colour differs from what the catalogue claims.
-3. Then open **Datos** → the warning-light section, answer the guided
-   questions for two or three real lights, and check whether it reaches
-   the right one.
-
-Missing entries are the expected finding, not a bug: an unknown light
-correctly surfaces as "sin identificar" with the safe alternative.
-
-Step 2 of this part used to say "photograph the manual's warning-light
-pages". That comparison is done — see
-`docs/WARNING_LIGHT_CATALOG_VERIFICATION.md`, which confirmed eleven
-entries against the manual, found two the manual does not support, and
-added the three it named that the catalogue lacked. What is left here is
-the part no document can answer: which lamps **this** car physically has.
-The manual covers the YB generation across trims and markets, and "si está
-equipado" runs through it — including all three of the new entries.
+The owner's-manual comparison remains recorded in
+`docs/WARNING_LIGHT_CATALOG_VERIFICATION.md`; this physical result adds only
+the observations the photograph supports and makes no absence claim.
 
 ---
 
