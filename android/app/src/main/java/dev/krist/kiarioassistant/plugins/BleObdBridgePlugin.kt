@@ -24,6 +24,8 @@ import com.getcapacitor.PluginMethod
 import com.getcapacitor.annotation.CapacitorPlugin
 import com.getcapacitor.annotation.Permission
 import com.getcapacitor.annotation.PermissionCallback
+import java.nio.charset.StandardCharsets
+import java.util.Locale
 import java.util.UUID
 
 /**
@@ -35,7 +37,8 @@ import java.util.UUID
  * no vendor default and refuses to guess one.
  *
  * The read-only command policy is enforced above this layer, in
- * `AndroidBleObdTransport.write`. This plugin moves bytes and nothing else.
+ * `AndroidBleObdTransport.write`, and repeated here as defense in depth before
+ * any decoded command bytes reach the GATT write characteristic.
  */
 @CapacitorPlugin(
     name = "BleObdBridge",
@@ -339,6 +342,12 @@ class BleObdBridgePlugin : Plugin() {
             return
         }
 
+        val command = normalizeElmCommand(bytes)
+        if (!isPhysicalCommandAllowed(command)) {
+            call.reject("Physical command \"$command\" is not allowed on this read-only transport")
+            return
+        }
+
         // Prefer an acknowledged write when the characteristic offers one: the
         // ELM327 needs flow control, and a silent no-response write that never
         // lands is indistinguishable from an adapter that simply said nothing.
@@ -510,8 +519,43 @@ class BleObdBridgePlugin : Plugin() {
     private fun hasBluetoothPermission(): Boolean =
         getPermissionState(permissionAlias()) == PermissionState.GRANTED
 
+    private fun normalizeElmCommand(bytes: ByteArray): String {
+        return String(bytes, StandardCharsets.US_ASCII)
+            .replace(ELM_COMMAND_WHITESPACE, "")
+            .uppercase(Locale.ROOT)
+    }
+
+    private fun isPhysicalCommandAllowed(command: String): Boolean {
+        if (command.startsWith(MODE_04_PREFIX)) return false
+        return PHYSICAL_ALLOWED_COMMANDS.contains(command)
+    }
+
     private companion object {
         const val SCAN_DURATION_MS = 5_000L
+        const val MODE_04_PREFIX = "04"
         val CCCD_UUID: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
+        val ELM_COMMAND_WHITESPACE = Regex("\\s+")
+        // Mirrors core/obd/policy/PhysicalObdCommandPolicy.ts so the native
+        // bridge also fails closed if a caller bypasses AndroidBleObdTransport.
+        val PHYSICAL_ALLOWED_COMMANDS = setOf(
+            "ATZ",
+            "ATE0",
+            "ATL0",
+            "ATS0",
+            "ATH0",
+            "ATSP0",
+            "0100",
+            "0120",
+            "0140",
+            "0160",
+            "0180",
+            "01A0",
+            "01C0",
+            "010C",
+            "0105",
+            "03",
+            "07",
+            "0A"
+        )
     }
 }
