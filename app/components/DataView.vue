@@ -1,17 +1,15 @@
 <script setup lang="ts">
 import type { ObdSessionState } from '~~/core/obd/session/ObdSessionStateMachine'
-import type { ObdTelemetryMetric } from '~~/core/obd/telemetry/ObdTelemetryStore'
 import { isPhysicalTransportKind } from '~~/core/obd/transport/ObdTransport'
+import type {
+  ObdTelemetryMetrics
+} from '~/composables/useObdTelemetry'
 import type { ObdTransportChoice } from '~/utils/obdTransportChoice'
 
 defineProps<{
   sessionState: ObdSessionState
   telemetryRunning: boolean
-  engineRpmMetric: ObdTelemetryMetric | undefined
-  vehicleSpeedMetric: ObdTelemetryMetric | undefined
-  coolantTemperatureMetric: ObdTelemetryMetric | undefined
-  engineLoadMetric: ObdTelemetryMetric | undefined
-  throttlePositionMetric: ObdTelemetryMetric | undefined
+  telemetry: ObdTelemetryMetrics
   supportedPids: string[]
   commands: string[]
   selectedCommand: string
@@ -134,15 +132,15 @@ const emit = defineEmits<{
             </div>
             <div>
               <span class="font-mono text-4xl font-bold tabular-nums text-highlighted">
-                {{ engineRpmMetric ? Math.round(engineRpmMetric.value) : '—' }}
+                {{ telemetry.engineRpm ? Math.round(telemetry.engineRpm.value) : '—' }}
               </span>
               <span
-                v-if="engineRpmMetric"
+                v-if="telemetry.engineRpm"
                 class="ml-1 text-xs text-muted"
               >rpm</span>
             </div>
             <span class="text-xs text-muted">
-              {{ engineRpmMetric ? `${engineRpmMetric.latencyMs} ms` : 'Sin muestra' }}
+              {{ telemetry.engineRpm ? `${telemetry.engineRpm.latencyMs} ms` : 'Sin muestra' }}
             </span>
           </div>
         </UCard>
@@ -159,15 +157,15 @@ const emit = defineEmits<{
             </div>
             <div>
               <span class="font-mono text-4xl font-bold tabular-nums text-highlighted">
-                {{ vehicleSpeedMetric ? Math.round(vehicleSpeedMetric.value) : '—' }}
+                {{ telemetry.vehicleSpeed ? Math.round(telemetry.vehicleSpeed.value) : '—' }}
               </span>
               <span
-                v-if="vehicleSpeedMetric"
+                v-if="telemetry.vehicleSpeed"
                 class="ml-1 text-xs text-muted"
               >km/h</span>
             </div>
             <span class="text-xs text-muted">
-              {{ vehicleSpeedMetric ? `${vehicleSpeedMetric.latencyMs} ms` : 'Sin muestra' }}
+              {{ telemetry.vehicleSpeed ? `${telemetry.vehicleSpeed.latencyMs} ms` : 'Sin muestra' }}
             </span>
           </div>
         </UCard>
@@ -193,7 +191,7 @@ const emit = defineEmits<{
               Refrigerante
             </p>
             <p class="mt-2 font-mono text-2xl font-bold tabular-nums text-highlighted">
-              {{ coolantTemperatureMetric ? `${coolantTemperatureMetric.value} °C` : '—' }}
+              {{ telemetry.coolantTemperature ? `${telemetry.coolantTemperature.value} °C` : '—' }}
             </p>
           </div>
           <div class="rounded-xl bg-elevated p-4">
@@ -201,7 +199,7 @@ const emit = defineEmits<{
               Carga del motor
             </p>
             <p class="mt-2 font-mono text-2xl font-bold tabular-nums text-highlighted">
-              {{ engineLoadMetric ? `${engineLoadMetric.value.toFixed(1)} %` : '—' }}
+              {{ telemetry.engineLoad ? `${telemetry.engineLoad.value.toFixed(1)} %` : '—' }}
             </p>
           </div>
           <div class="rounded-xl bg-elevated p-4">
@@ -209,7 +207,7 @@ const emit = defineEmits<{
               Acelerador
             </p>
             <p class="mt-2 font-mono text-2xl font-bold tabular-nums text-highlighted">
-              {{ throttlePositionMetric ? `${throttlePositionMetric.value.toFixed(1)} %` : '—' }}
+              {{ telemetry.throttlePosition ? `${telemetry.throttlePosition.value.toFixed(1)} %` : '—' }}
             </p>
           </div>
         </div>

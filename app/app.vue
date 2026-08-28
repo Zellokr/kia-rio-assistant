@@ -32,49 +32,8 @@ useSeoMeta({
 
 <template>
   <UApp>
-    <div class="min-h-dvh bg-muted">
-      <UHeader
-        class="border-b border-default bg-default/95 pt-[env(safe-area-inset-top)] backdrop-blur"
-        :toggle="false"
-      >
-        <template #left>
-          <NuxtLink
-            to="/lab"
-            class="flex min-h-12 items-center gap-3"
-            aria-label="Abrir laboratorio OBD-II"
-          >
-            <span class="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <UIcon
-                name="i-lucide-car-front"
-                class="size-5"
-                aria-hidden="true"
-              />
-            </span>
-            <span class="flex flex-col leading-tight">
-              <span class="font-semibold text-highlighted">Kia Rio Assistant</span>
-              <span class="text-xs text-muted">Área de diagnóstico local</span>
-            </span>
-          </NuxtLink>
-        </template>
-
-        <template #right>
-          <UBadge
-            color="success"
-            variant="subtle"
-            class="hidden sm:inline-flex"
-          >
-            Solo lectura
-          </UBadge>
-          <UColorModeButton
-            size="lg"
-            aria-label="Cambiar tema de color"
-          />
-        </template>
-      </UHeader>
-
-      <UMain>
-        <NuxtPage />
-      </UMain>
-    </div>
+    <NuxtLayout>
+      <NuxtPage />
+    </NuxtLayout>
   </UApp>
 </template>

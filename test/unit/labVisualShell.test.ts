@@ -43,7 +43,18 @@ const stubs = {
     template: '<button type="button" @click="$emit(\'click\')"><slot /></button>'
   },
   UInput: { template: '<input>' },
-  USelect: { template: '<select><slot /></select>' },
+  /**
+   * `USelect` takes its options as an `items` prop rather than as slotted
+   * `<option>` markup, so a slot-only stub renders an empty control and the
+   * assertions below would pass against nothing. This stub renders the
+   * items it is given, which is what the real component does.
+   */
+  USelect: {
+    props: ['items'],
+    template:
+      '<select><option v-for="item in items" :key="item.value"'
+      + ' :value="item.value">{{ item.label }}</option></select>'
+  },
   USelectMenu: { template: '<select><slot /></select>' },
   UFormField: { template: '<label><slot /></label>' },
   UTextarea: { template: '<textarea></textarea>' },
@@ -92,11 +103,13 @@ const CONNECTION_PROPS = {
 const DATA_PROPS = {
   sessionState: 'ready',
   telemetryRunning: false,
-  engineRpmMetric: undefined,
-  vehicleSpeedMetric: undefined,
-  coolantTemperatureMetric: undefined,
-  engineLoadMetric: undefined,
-  throttlePositionMetric: undefined,
+  telemetry: {
+    engineRpm: undefined,
+    vehicleSpeed: undefined,
+    coolantTemperature: undefined,
+    engineLoad: undefined,
+    throttlePosition: undefined
+  },
   supportedPids: [],
   commands: ['0100', '03'],
   selectedCommand: '0100',
@@ -308,7 +321,9 @@ describe('lab destinations', () => {
  * is more useful than dressing a text search up as a test:
  *
  * - `app/app.vue` calls `useColorMode`, `useHead` and `useSeoMeta`, and
- *   renders `NuxtPage`. Mounting it means standing up Nuxt itself.
+ *   renders `NuxtLayout`/`NuxtPage`. Mounting it means standing up Nuxt
+ *   itself, and the same goes for `app/layouts/default.vue`, which is only
+ *   ever rendered through that machinery.
  * - `nuxt.config.ts` is build configuration; there is no runtime to ask.
  * - `main.css` declares theme tokens, and no Tailwind pipeline runs in
  *   the test environment, so a computed style would be empty either way.
@@ -321,13 +336,25 @@ describe('lab destinations', () => {
  * through `labTransportFactoryKey` and drives the real handshake.
  */
 describe('what cannot be mounted', () => {
-  it('brands the shell as this project, not the starter template', () => {
+  it('brands the document as this project, not the starter template', () => {
     const source = readProjectFile('app/app.vue')
 
     expect(source).toContain('const title = \'Kia Rio Assistant\'')
-    expect(source).toContain('Área de diagnóstico local')
     expect(source).not.toContain('Nuxt Starter Template')
     expect(source).not.toContain('TemplateMenu')
+  })
+
+  /**
+   * The visible chrome moved out of `app.vue` and into the default layout,
+   * so that `error.vue` could render inside the same frame instead of
+   * dropping the driver onto Nuxt's own error screen.
+   */
+  it('brands the visible chrome from the default layout', () => {
+    const source = readProjectFile('app/layouts/default.vue')
+
+    expect(source).toContain('Kia Rio Assistant')
+    expect(source).toContain('Área de diagnóstico local')
+    expect(source).toContain('<slot />')
   })
 
   it('bundles interface icons for the offline Android shell', () => {

@@ -41,11 +41,7 @@ const {
   telemetryRunning,
   selectedCommand,
   commands,
-  engineRpmMetric,
-  vehicleSpeedMetric,
-  coolantTemperatureMetric,
-  engineLoadMetric,
-  throttlePositionMetric,
+  telemetry,
   sessionEvents,
   droppedEvents,
   logTruncated,
@@ -178,11 +174,7 @@ async function copyLog(): Promise<void> {
           v-model:selected-command="selectedCommand"
           :session-state="sessionState"
           :telemetry-running="telemetryRunning"
-          :engine-rpm-metric="engineRpmMetric"
-          :vehicle-speed-metric="vehicleSpeedMetric"
-          :coolant-temperature-metric="coolantTemperatureMetric"
-          :engine-load-metric="engineLoadMetric"
-          :throttle-position-metric="throttlePositionMetric"
+          :telemetry="telemetry"
           :supported-pids="supportedPids"
           :commands="commands"
           :transport-choice="transportChoice"

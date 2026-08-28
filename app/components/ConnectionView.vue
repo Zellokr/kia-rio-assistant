@@ -10,8 +10,22 @@ export type ConnectionBadgeColor
     | 'success'
     | 'error'
 
+/**
+ * `defineModel` instead of a prop plus an `update:` emit plus a change
+ * handler. The handler it replaces read `event.target as HTMLSelectElement`
+ * and then cast the string back into the union — two casts that told the
+ * compiler to trust markup it could not see.
+ */
+const transportChoice = defineModel<ObdTransportChoice>(
+  'transportChoice',
+  { required: true }
+)
+
+const TRANSPORT_OPTIONS: { label: string, value: ObdTransportChoice }[] = [
+  { label: 'Real · VEEPEAK Bluetooth LE', value: 'android-ble' }
+]
+
 defineProps<{
-  transportChoice: ObdTransportChoice
   sessionState: ObdSessionState
   sessionStateLabel: string
   transportState: ObdTransportState
@@ -22,18 +36,10 @@ defineProps<{
 }>()
 
 const emit = defineEmits<{
-  'update:transportChoice': [ObdTransportChoice]
   'select-device': []
   'connect': []
   'disconnect': []
-
 }>()
-
-function onTransportChoiceChange(event: Event): void {
-  const select = event.target as HTMLSelectElement
-
-  emit('update:transportChoice', select.value as ObdTransportChoice)
-}
 </script>
 
 <template>
@@ -112,17 +118,14 @@ function onTransportChoiceChange(event: Event): void {
           >
             Fuente de datos OBD
           </label>
-          <select
+          <USelect
             id="transport-choice"
-            :value="transportChoice"
-            class="min-h-12 w-full rounded-lg border border-default bg-default px-4 text-base text-highlighted outline-none transition focus-visible:ring-2 focus-visible:ring-primary"
+            v-model="transportChoice"
+            :items="TRANSPORT_OPTIONS"
+            class="min-h-12 w-full"
+            size="lg"
             :disabled="sessionState !== 'idle' && sessionState !== 'disconnected' && sessionState !== 'error'"
-            @change="onTransportChoiceChange"
-          >
-            <option value="android-ble">
-              Real · VEEPEAK Bluetooth LE
-            </option>
-          </select>
+          />
           <p class="text-sm text-muted">
             Habla con el VEEPEAK por Bluetooth LE. Solo en la aplicación
             Android, y únicamente con comandos de lectura.

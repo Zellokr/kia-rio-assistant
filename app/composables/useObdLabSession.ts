@@ -203,11 +203,7 @@ export function useObdLabSession(options: ObdLabSessionOptions = {}) {
   } = useObdSessionLog(sessionLog)
 
   const {
-    engineRpm: engineRpmMetric,
-    coolantTemperature: coolantTemperatureMetric,
-    engineLoad: engineLoadMetric,
-    vehicleSpeed: vehicleSpeedMetric,
-    throttlePosition: throttlePositionMetric,
+    metrics: telemetry,
     setSnapshot: setTelemetrySnapshot,
     clear: clearReactiveTelemetry
   } = useObdTelemetry()
@@ -968,11 +964,7 @@ export function useObdLabSession(options: ObdLabSessionOptions = {}) {
     selectedCommand,
     commands,
 
-    engineRpmMetric,
-    vehicleSpeedMetric,
-    coolantTemperatureMetric,
-    engineLoadMetric,
-    throttlePositionMetric,
+    telemetry,
 
     sessionEvents,
     droppedEvents,

@@ -70,8 +70,26 @@ export function provideNuxtInjections(injections: Record<string, unknown>): void
 
 (globalThis as Record<string, unknown>).useNuxtApp = () => nuxtApp
 
+/**
+ * `clearError` dismisses the error state and navigates. The stub records the
+ * argument so a test can assert where the page offers to send the user; the
+ * navigation itself belongs to a router no test here stands up.
+ */
+const clearedErrors: Record<string, unknown>[] = []
+
+export function recordedClearErrorCalls(): Record<string, unknown>[] {
+  return clearedErrors
+}
+
+(globalThis as Record<string, unknown>).clearError = (
+  options: Record<string, unknown> = {}
+) => {
+  clearedErrors.push(options)
+}
+
 beforeEach(() => {
   pageMeta.length = 0
   sharedState.clear()
   nuxtApp = {}
+  clearedErrors.length = 0
 })
