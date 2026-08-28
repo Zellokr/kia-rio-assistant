@@ -1,4 +1,6 @@
-import type { ObdSessionEvent } from '../logging/ObdSessionLog'
+import type {
+  PersistableObdSessionEvent
+} from '../persistence/persistedEventAllowlist'
 
 /**
  * TEMPORARY — field-test evidence delivery. Delete with
@@ -42,12 +44,26 @@ export interface FieldTestSessionSummary {
   /** Milliseconds from a drop being noticed to `reconnected`, per recovery. */
   readonly recoveryMs: readonly number[]
   /**
-   * Whether any telemetry reading arrived AFTER the last recovery. The
-   * question A2 exists to answer: a link that reconnects but never resumes
-   * polling looks identical to a healthy one from the badge alone.
+   * Whether telemetry started again AFTER the last recovery. The question
+   * A2 exists to answer: a link that reconnects but never resumes polling
+   * looks identical to a healthy one from the badge alone.
+   *
+   * `undefined` when it cannot be answered — no recovery happened, or
+   * telemetry was never running in the first place, in which case there was
+   * nothing to resume.
+   *
+   * Read from `telemetry-state` events, not from readings. Readings are
+   * `decoded-value` with `source: 'telemetry'`, and `isPersistableEvent`
+   * stores only the `manual` ones — so a summary built on them reported
+   * "LECTURAS NO REANUDADAS" for every session ever recorded, including the
+   * one on 2026-08-28 where the log plainly shows telemetry restarting 2.5
+   * seconds after the reconnection. Narrowing this function's input to
+   * `PersistableObdSessionEvent` is what makes that a compile error rather
+   * than a confident false claim about a car.
    */
   readonly telemetryResumedAfterRecovery: boolean | undefined
-  readonly telemetryReadings: number
+  /** How many times telemetry was started during the session. */
+  readonly telemetryRuns: number
 }
 
 export interface FieldTestSummary {
@@ -68,7 +84,7 @@ export interface FieldTestSummary {
 }
 
 function isActivity(
-  event: ObdSessionEvent,
+  event: PersistableObdSessionEvent,
   activity: string
 ): boolean {
   return event.type === 'activity' && event.activity === activity
@@ -77,7 +93,7 @@ function isActivity(
 export function summariseSession(
   sessionId: string,
   startedAt: string,
-  events: readonly ObdSessionEvent[]
+  events: readonly PersistableObdSessionEvent[]
 ): FieldTestSessionSummary {
   const ordered = [...events].sort((a, b) => a.sequence - b.sequence)
 
@@ -87,7 +103,7 @@ export function summariseSession(
 
   const errorPhases = ordered
     .filter(event => event.type === 'error')
-    .map(event => (event as Extract<ObdSessionEvent, { type: 'error' }>).error.phase)
+    .map(event => event.error.phase)
 
   const drops = ordered.filter(event => isActivity(event, 'reconnect-started'))
   const attempts = ordered.filter(event => isActivity(event, 'reconnect-attempt'))
@@ -110,9 +126,11 @@ export function summariseSession(
   }
 
   const lastRecovery = recovered[recovered.length - 1]
-  const telemetry = ordered.filter(
-    event => event.type === 'decoded-value' && event.source === 'telemetry'
+  const telemetryStarts = ordered.filter(
+    event => event.type === 'telemetry-state' && event.state === 'started'
   )
+  const startedBeforeRecovery = lastRecovery !== undefined
+    && telemetryStarts.some(event => event.sequence < lastRecovery.sequence)
 
   return {
     sessionId,
@@ -125,10 +143,13 @@ export function summariseSession(
     reconnectAttempts: attempts.length,
     recoveries: recovered.length,
     recoveryMs,
-    telemetryResumedAfterRecovery: lastRecovery === undefined
-      ? undefined
-      : telemetry.some(event => event.sequence > lastRecovery.sequence),
-    telemetryReadings: telemetry.length
+    telemetryResumedAfterRecovery:
+      lastRecovery === undefined || !startedBeforeRecovery
+        ? undefined
+        : telemetryStarts.some(
+            event => event.sequence > lastRecovery.sequence
+          ),
+    telemetryRuns: telemetryStarts.length
   }
 }
 
@@ -230,15 +251,21 @@ export function formatFieldTestReport(summary: FieldTestSummary): string {
         parts.push(`recuperación en ${session.recoveryMs.map(seconds).join(', ')}`)
       }
 
-      parts.push(
-        session.telemetryResumedAfterRecovery
-          ? 'lecturas reanudadas'
-          : 'LECTURAS NO REANUDADAS tras recuperar'
-      )
+      if (session.telemetryResumedAfterRecovery !== undefined) {
+        parts.push(
+          session.telemetryResumedAfterRecovery
+            ? 'lecturas reanudadas'
+            : 'LECTURAS NO REANUDADAS tras recuperar'
+        )
+      }
     }
 
-    if (session.telemetryReadings > 0) {
-      parts.push(`${session.telemetryReadings} lecturas`)
+    if (session.telemetryRuns > 0) {
+      parts.push(
+        session.telemetryRuns === 1
+          ? 'lecturas activadas'
+          : `lecturas activadas ${session.telemetryRuns} veces`
+      )
     }
 
     lines.push(`${index + 1}. ${parts.join(' · ')}`)

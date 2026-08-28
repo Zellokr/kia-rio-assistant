@@ -1,4 +1,3 @@
-import type { ObdSessionEvent } from '~~/core/obd/logging/ObdSessionLog'
 import {
   formatFieldTestReport,
   summariseFieldTest,
@@ -72,9 +71,10 @@ export async function sendFieldTestReport(
       continue
     }
 
-    const events = stored.events.map(
-      entry => entry.event as ObdSessionEvent
-    )
+    // No cast: `entry.event` is already the persistable subset, and
+    // widening it to `ObdSessionEvent` is what let the summary look for
+    // telemetry readings that storage never holds.
+    const events = stored.events.map(entry => entry.event)
 
     summaries.push(
       summariseSession(record.sessionId, record.startedAt, events)

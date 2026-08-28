@@ -5,7 +5,9 @@ import {
   summariseFieldTest,
   summariseSession
 } from '../../core/obd/fieldTest/summariseFieldTest'
-import type { ObdSessionEvent } from '../../core/obd/logging/ObdSessionLog'
+import type {
+  PersistableObdSessionEvent
+} from '../../core/obd/persistence/persistedEventAllowlist'
 
 /**
  * TEMPORARY — field-test evidence delivery. Delete with
@@ -17,7 +19,10 @@ import type { ObdSessionEvent } from '../../core/obd/logging/ObdSessionLog'
  */
 let sequence = 0
 
-function event(partial: Record<string, unknown>, elapsedMs = 0): ObdSessionEvent {
+function event(
+  partial: Record<string, unknown>,
+  elapsedMs = 0
+): PersistableObdSessionEvent {
   sequence += 1
 
   return {
@@ -25,7 +30,7 @@ function event(partial: Record<string, unknown>, elapsedMs = 0): ObdSessionEvent
     timestamp: new Date(1_800_000_000_000 + elapsedMs).toISOString(),
     elapsedMs,
     ...partial
-  } as ObdSessionEvent
+  } as PersistableObdSessionEvent
 }
 
 function reset() {
@@ -67,43 +72,63 @@ describe('summariseSession', () => {
    * identical to a healthy one from the badge alone, which is exactly the
    * failure the part exists to catch.
    */
+  /**
+   * Read from `telemetry-state`, not from readings.
+   *
+   * The first version looked for `decoded-value` with `source: 'telemetry'`.
+   * `isPersistableEvent` stores only the `manual` ones, so storage never
+   * holds a telemetry reading and the answer was "no" for every session ever
+   * recorded — including the 2026-08-28 run, whose own log shows telemetry
+   * restarting 2.5 s after the reconnection. The input type is now the
+   * persistable subset, which makes that a compile error.
+   *
+   * Sequences here mirror that run: telemetry started, dropped, recovered.
+   */
   it('separates a recovery that resumed readings from one that did not', () => {
     reset()
 
     const resumed = summariseSession('s3', '2026-08-28T10:10:00.000Z', [
       event({ type: 'session-state', state: 'ready' }, 3000),
-      event({ type: 'activity', activity: 'reconnect-started' }, 60_000),
-      event({ type: 'activity', activity: 'reconnect-attempt' }, 61_000),
-      event({ type: 'activity', activity: 'reconnected' }, 68_000),
-      event({
-        type: 'decoded-value',
-        source: 'telemetry',
-        command: '010C',
-        latencyMs: 40,
-        decoded: { kind: 'pid', key: 'engineRpm', pid: '010C', label: 'RPM', value: 800, unit: 'rpm' }
-      }, 70_000)
+      event({ type: 'telemetry-state', state: 'started' }, 12_400),
+      event({ type: 'activity', activity: 'reconnect-started' }, 43_400),
+      event({ type: 'activity', activity: 'reconnect-attempt' }, 43_900),
+      event({ type: 'activity', activity: 'reconnected' }, 47_900),
+      event({ type: 'telemetry-state', state: 'started' }, 50_400)
     ])
 
     expect(resumed.dropsDetected).toBe(1)
     expect(resumed.recoveries).toBe(1)
-    expect(resumed.recoveryMs).toEqual([8000])
+    expect(resumed.recoveryMs).toEqual([4500])
     expect(resumed.telemetryResumedAfterRecovery).toBe(true)
+    expect(resumed.telemetryRuns).toBe(2)
 
     reset()
 
     const dead = summariseSession('s4', '2026-08-28T10:20:00.000Z', [
-      event({
-        type: 'decoded-value',
-        source: 'telemetry',
-        command: '010C',
-        latencyMs: 40,
-        decoded: { kind: 'pid', key: 'engineRpm', pid: '010C', label: 'RPM', value: 800, unit: 'rpm' }
-      }, 10_000),
+      event({ type: 'telemetry-state', state: 'started' }, 10_000),
       event({ type: 'activity', activity: 'reconnect-started' }, 60_000),
       event({ type: 'activity', activity: 'reconnected' }, 66_000)
     ])
 
     expect(dead.telemetryResumedAfterRecovery).toBe(false)
+  })
+
+  /**
+   * A recovery with telemetry never running has nothing to resume. Saying
+   * "LECTURAS NO REANUDADAS" there would report a defect where there was
+   * only a question that does not apply.
+   */
+  it('asks nothing about resuming when telemetry was never running', () => {
+    reset()
+
+    const summary = summariseSession('s6', '2026-08-28T10:40:00.000Z', [
+      event({ type: 'session-state', state: 'ready' }, 3000),
+      event({ type: 'activity', activity: 'reconnect-started' }, 60_000),
+      event({ type: 'activity', activity: 'reconnected' }, 64_000)
+    ])
+
+    expect(summary.recoveries).toBe(1)
+    expect(summary.telemetryResumedAfterRecovery).toBeUndefined()
   })
 
   /**
@@ -152,7 +177,7 @@ describe('summariseFieldTest', () => {
         recoveries: 0,
         recoveryMs: [],
         telemetryResumedAfterRecovery: undefined,
-        telemetryReadings: 0
+        telemetryRuns: 0
       })
     )
 
@@ -177,7 +202,7 @@ describe('summariseFieldTest with unrecorded sessions', () => {
       recoveries: 0,
       recoveryMs: [],
       telemetryResumedAfterRecovery: undefined,
-      telemetryReadings: 0
+      telemetryRuns: 0
     }
   }
 
@@ -233,7 +258,7 @@ describe('formatFieldTestReport', () => {
       recoveries: drops,
       recoveryMs: drops > 0 ? [8000] : [],
       telemetryResumedAfterRecovery: drops > 0 ? true : undefined,
-      telemetryReadings: 12
+      telemetryRuns: 1
     }])
   }
 
