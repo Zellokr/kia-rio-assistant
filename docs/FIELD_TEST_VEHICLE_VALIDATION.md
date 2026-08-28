@@ -77,12 +77,12 @@ Unchanged from every physical procedure in this project.
 > been run on the vehicle**. The procedure below is kept as written so the
 > gap stays legible.
 
-**What was unknown.** Reconnection has never run against this car. No drop,
-so no recovery, has ever been observed on the vehicle: it is proven only
-against `ReplayObdTransport` and fake timers. Persistence has never run in
-the Android WebView, only against `fake-indexeddb` in Node. The sole
-vehicle evidence to date is one 91-event session on 2026-08-24, during
-which nothing disconnected.
+**What had been unknown before this run.** Reconnection had never run against
+this car. No drop, and therefore no recovery, had ever been observed on the
+vehicle: it was proven only against `ReplayObdTransport` and fake timers.
+Persistence had never run in the Android WebView, only against
+`fake-indexeddb` in Node. The sole vehicle evidence before 2026-08-28 was one
+91-event session on 2026-08-24, during which nothing disconnected.
 
 **What closes it.** Ten consecutive connections, plus one session
 containing at least one drop and its recovery. That session was specified
@@ -305,11 +305,12 @@ Bring back:
 
 Then, and only then:
 
-- Record each part as an ADR — **pass or fail** — and change its status
-  here and in `DTC_PHYSICAL_VALIDATION.md` from OPEN to the ADR reference.
-- A check is closed by evidence, never by a decision to stop worrying
-  about it. That distinction is what ADR-003 got wrong for Fase 1, and why
-  Part A is still open with two phases built on top of it.
+- Record any future rerun as an ADR — **pass or fail** — and change the
+  relevant status here and in `DTC_PHYSICAL_VALIDATION.md` only when new raw
+  evidence supports it.
+- A check is closed by evidence, never by a decision to stop worrying about it.
+  ADR-004 records the current Part A state: A1 met its criterion, and A2 closed
+  by owner waiver with one specific post-fix Bluetooth-toggle gap still visible.
 
 ## Stop conditions
 

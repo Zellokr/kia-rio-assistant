@@ -45,13 +45,15 @@ amendment to [docs/decisions/ADR-002-obd-transport.md](docs/decisions/ADR-002-ob
 [docs/STEP_18_PHYSICAL_TEST.md](docs/STEP_18_PHYSICAL_TEST.md) is the obsolete
 checklist for that removed path, kept only as history.
 
-What the Bluetooth LE path actually proved: on 2026-08-24 the Kia Rio answered
-over it while parked and idling, returning live RPM and coolant temperature, in a
-single 91-event session during which nothing disconnected. That is evidence for
-the **initial connection path only**. Reconnection and IndexedDB persistence
-shipped in Fase 1 and have **never run against the vehicle** — see
-[docs/decisions/ADR-003-fase-1-closure-waiver.md](docs/decisions/ADR-003-fase-1-closure-waiver.md).
-See also [docs/ANDROID_BLE_CONTRACT.md](docs/ANDROID_BLE_CONTRACT.md).
+What the Bluetooth LE path has physically proved: on 2026-08-24 the Kia Rio
+answered over it while parked and idling, returning live RPM and coolant
+temperature. On 2026-08-28, the vehicle field test added eleven consecutive
+ready connections, real Android WebView IndexedDB persistence, two detected
+drops, and one observed recovery. A2 is still closed by owner waiver rather than
+by full criterion: the post-fix Bluetooth-toggle recovery path has not been
+rerun on the vehicle. See
+[docs/decisions/ADR-004-part-a-closure.md](docs/decisions/ADR-004-part-a-closure.md)
+and [docs/ANDROID_BLE_CONTRACT.md](docs/ANDROID_BLE_CONTRACT.md).
 
 The lab is read-only. Only a closed allowlist of commands may reach a physical
 transport; Mode 04 and every other ECU-writing operation is blocked in
