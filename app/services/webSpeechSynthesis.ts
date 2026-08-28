@@ -2,7 +2,10 @@ import {
   detectSpeechCapability,
   type SpeechCapabilityHost
 } from '~~/core/speech/detectSpeechCapability'
-import type { SpeechSynthesisPort } from '~~/core/speech/SpeechAnnouncer'
+import type {
+  SpeakHooks,
+  SpeechSynthesisPort
+} from '~~/core/speech/SpeechAnnouncer'
 
 /**
  * Adapter from the Web Speech API to `SpeechSynthesisPort`.
@@ -19,6 +22,7 @@ import type { SpeechSynthesisPort } from '~~/core/speech/SpeechAnnouncer'
 export interface UtteranceLike {
   text: string
   lang: string
+  onstart: (() => void) | null
   onend: (() => void) | null
   onerror: ((event: { error?: string }) => void) | null
 }
@@ -37,11 +41,14 @@ export interface WebSpeechOptions {
    * How long to wait for the engine to report completion.
    *
    * Android WebViews are known to drop `onend`, which would otherwise leave
-   * the toggle spinning forever with no way back. Timing out REJECTS rather
-   * than resolving: an engine that never reports completion has not proven
-   * anything, and ADR-012's whole point is not to claim a working engine
-   * without evidence. Generous by default so a slow-but-working engine is
-   * not slandered.
+   * this promise pending forever.
+   *
+   * What the timeout means depends on whether audio was ever heard. Before
+   * `onstart` it REJECTS: an engine that never made a sound has proven
+   * nothing, and ADR-012's whole point is not to claim a working engine
+   * without evidence. After `onstart` it RESOLVES, because the proof already
+   * happened and a missing end event must not retract it. Generous by default
+   * so a slow-but-working engine is not slandered.
    */
   timeoutMs?: number
 }
@@ -73,7 +80,7 @@ export function createWebSpeechSynthesis(
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS
 
   return {
-    speak(text: string): Promise<void> {
+    speak(text: string, hooks?: SpeakHooks): Promise<void> {
       const synthesis = host.speechSynthesis
       const Utterance = host.SpeechSynthesisUtterance
 
@@ -89,19 +96,40 @@ export function createWebSpeechSynthesis(
 
         utterance.lang = 'es-ES'
 
+        let started = false
+
         const timer = setTimeout(() => {
-          settle(() => reject(new Error(
-            'El motor de voz no informó de que terminara de hablar. Se da por no funcional.'
-          )))
+          settle(() => {
+            if (started) {
+              resolve()
+
+              return
+            }
+
+            reject(new Error(
+              'El motor de voz no emitió ningún sonido. Se da por no funcional.'
+            ))
+          })
         }, timeoutMs)
 
         function settle(finish: () => void): void {
           clearTimeout(timer)
 
+          utterance.onstart = null
           utterance.onend = null
           utterance.onerror = null
 
           finish()
+        }
+
+        /**
+         * The proof, and the moment the UI is allowed to change. Reported
+         * before the phrase finishes on purpose.
+         */
+        utterance.onstart = () => {
+          started = true
+
+          hooks?.onStart?.()
         }
 
         utterance.onend = () => settle(resolve)

@@ -23,6 +23,7 @@ function workingHost(): WebSpeechHost & { spoken: string[] } {
     SpeechSynthesisUtterance: class {
       text: string
       lang = ''
+      onstart: (() => void) | null = null
       onend: (() => void) | null = null
       onerror: ((event: { error?: string }) => void) | null = null
 
@@ -73,7 +74,23 @@ describe('createWebSpeechSynthesis', () => {
       .rejects.toThrow(/synthesis-failed/)
   })
 
-  it('rejects rather than hanging when the engine never reports completion', async () => {
+  it('reports the start of audio, which is the proof the engine works', async () => {
+    const host = workingHost()
+    const onStart = vi.fn()
+
+    host.speechSynthesis!.speak = (utterance: UtteranceLike) => {
+      queueMicrotask(() => {
+        utterance.onstart?.()
+        utterance.onend?.()
+      })
+    }
+
+    await createWebSpeechSynthesis(host).speak('hola', { onStart })
+
+    expect(onStart).toHaveBeenCalledTimes(1)
+  })
+
+  it('rejects on timeout when no audio was ever heard', async () => {
     vi.useFakeTimers()
 
     const host = workingHost()
@@ -83,7 +100,31 @@ describe('createWebSpeechSynthesis', () => {
     const pending = createWebSpeechSynthesis(host, { timeoutMs: 5000 })
       .speak('hola')
 
-    const assertion = expect(pending).rejects.toThrow(/no informó/)
+    const assertion = expect(pending).rejects.toThrow(/no emitió/)
+
+    await vi.advanceTimersByTimeAsync(5000)
+    await assertion
+
+    vi.useRealTimers()
+  })
+
+  /**
+   * Android WebViews drop `onend`. Once audio has been heard the engine has
+   * proven itself, so a missing end event must not retract that.
+   */
+  it('resolves on timeout when audio started but never ended', async () => {
+    vi.useFakeTimers()
+
+    const host = workingHost()
+
+    host.speechSynthesis!.speak = (utterance: UtteranceLike) => {
+      utterance.onstart?.()
+    }
+
+    const pending = createWebSpeechSynthesis(host, { timeoutMs: 5000 })
+      .speak('hola')
+
+    const assertion = expect(pending).resolves.toBeUndefined()
 
     await vi.advanceTimersByTimeAsync(5000)
     await assertion

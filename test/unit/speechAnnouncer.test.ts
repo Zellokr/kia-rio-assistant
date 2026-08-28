@@ -9,10 +9,35 @@ function port(
   overrides: Partial<SpeechSynthesisPort> = {}
 ): SpeechSynthesisPort {
   return {
-    speak: vi.fn(async () => {}),
+    speak: vi.fn(async (_text, hooks) => {
+      hooks?.onStart?.()
+    }),
     cancel: vi.fn(),
     ...overrides
   }
+}
+
+/**
+ * A port whose utterance starts, then never finishes — a real WebView case.
+ *
+ * `onStart` fires on a later tick because it is an engine event, never a
+ * synchronous return. A fake that called it inline would hide the very gap
+ * the `starting` state exists to fill.
+ */
+function neverEndingPort(): SpeechSynthesisPort {
+  return {
+    speak: vi.fn((_text, hooks) => {
+      queueMicrotask(() => hooks?.onStart?.())
+
+      return new Promise<void>(() => {})
+    }),
+    cancel: vi.fn()
+  }
+}
+
+/** Lets queued engine events run. */
+function flush(): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, 0))
 }
 
 describe('SpeechAnnouncer', () => {
@@ -21,6 +46,51 @@ describe('SpeechAnnouncer', () => {
   })
 
   describe('enabling', () => {
+    it('reports starting before any audio exists, so the button can answer at once', () => {
+      const announcer = new SpeechAnnouncer(neverEndingPort())
+
+      void announcer.enable()
+
+      expect(announcer.state).toBe('starting')
+    })
+
+    it('turns on the moment audio begins, not when the phrase ends', async () => {
+      const states: string[] = []
+
+      const announcer = new SpeechAnnouncer(
+        neverEndingPort(),
+        () => states.push(announcer.state)
+      )
+
+      void announcer.enable()
+
+      await flush()
+
+      expect(states).toEqual(['starting', 'on'])
+    })
+
+    it('notifies every state change instead of only the final one', async () => {
+      const onChange = vi.fn()
+
+      await new SpeechAnnouncer(port(), onChange).enable()
+
+      expect(onChange.mock.calls.length).toBeGreaterThanOrEqual(2)
+    })
+
+    it('stays on when the engine never reports the end of a started utterance', async () => {
+      const announcer = new SpeechAnnouncer(port({
+        speak: vi.fn(async (_text, hooks) => {
+          hooks?.onStart?.()
+
+          throw new Error('el motor no informó del final')
+        })
+      }))
+
+      await announcer.enable()
+
+      expect(announcer.state).toBe('on')
+    })
+
     it('proves the engine by actually speaking, not by asking', async () => {
       const speak = vi.fn(async () => {})
 

@@ -32,16 +32,25 @@ function resolveAnnouncer(): SpeechAnnouncer | null {
     return null
   }
 
-  announcer = new SpeechAnnouncer(
-    createWebSpeechSynthesis(window as never)
+  /**
+   * Subscribed rather than polled after the await.
+   *
+   * Syncing once the promise settled meant the button did not move until the
+   * engine finished the whole confirmation phrase — seconds of a dead control
+   * while the phone was audibly talking. Every transition now lands the
+   * moment the announcer makes it, including `starting`.
+   */
+  const instance: SpeechAnnouncer = new SpeechAnnouncer(
+    createWebSpeechSynthesis(window as never),
+    () => {
+      state.value = instance.state
+      unavailableReason.value = instance.unavailableReason
+    }
   )
 
-  return announcer
-}
+  announcer = instance
 
-function sync(instance: SpeechAnnouncer): void {
-  state.value = instance.state
-  unavailableReason.value = instance.unavailableReason
+  return announcer
 }
 
 export interface SpeechAnnouncerHandle {
@@ -64,8 +73,6 @@ export function useSpeechAnnouncer(): SpeechAnnouncerHandle {
       }
 
       await instance.toggle()
-
-      sync(instance)
     },
 
     /**
@@ -80,8 +87,6 @@ export function useSpeechAnnouncer(): SpeechAnnouncerHandle {
       }
 
       await instance.announce(text)
-
-      sync(instance)
     }
   }
 }

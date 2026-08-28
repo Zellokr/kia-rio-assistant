@@ -44,6 +44,13 @@ async function flush(): Promise<void> {
   await new Promise(resolve => setTimeout(resolve, 0))
 }
 
+/** An engine that accepts the utterance but never makes a sound. */
+function installSilentEngine(): void {
+  installWorkingEngine()
+
+  Object.assign(window.speechSynthesis as object, { speak: () => {} })
+}
+
 function removeEngine(): void {
   Reflect.deleteProperty(window, 'speechSynthesis')
   Reflect.deleteProperty(window, 'SpeechSynthesisUtterance')
@@ -98,6 +105,56 @@ describe('SpeechToggleButton', () => {
 
     expect(wrapper.get('button').attributes('aria-pressed'))
       .toBe('false')
+  })
+
+  /**
+   * The regression this state exists for: the button used to sit unchanged
+   * until the engine finished the whole confirmation phrase, so pressing it
+   * looked like nothing had happened for seconds while the phone was audibly
+   * talking.
+   */
+  describe('the gap between the press and the first sound', () => {
+    it('answers the press immediately instead of looking dead', async () => {
+      installSilentEngine()
+
+      const wrapper = mount(SpeechToggleButton)
+
+      await wrapper.get('button').trigger('click')
+      await flush()
+
+      expect(wrapper.get('button').attributes('aria-label'))
+        .toBe('Activando la voz…')
+    })
+
+    it('stays pressable so a stuck engine can be abandoned', async () => {
+      installSilentEngine()
+
+      const wrapper = mount(SpeechToggleButton)
+
+      await wrapper.get('button').trigger('click')
+      await flush()
+
+      expect(wrapper.get('button').attributes('disabled'))
+        .toBeUndefined()
+
+      await wrapper.get('button').trigger('click')
+      await flush()
+
+      expect(wrapper.get('button').attributes('aria-label'))
+        .toBe('Activar la voz')
+    })
+
+    it('does not pulse yet, because nothing is proven', async () => {
+      installSilentEngine()
+
+      const wrapper = mount(SpeechToggleButton)
+
+      await wrapper.get('button').trigger('click')
+      await flush()
+
+      expect(wrapper.find('[data-testid="speech-pulse"]').exists())
+        .toBe(false)
+    })
   })
 
   it('wears a voice icon, not a media-player one, while speaking', async () => {

@@ -31,6 +31,20 @@ const toast = useToast()
  * is trying to shut the app up at 90 km/h.
  */
 const presentation = computed(() => {
+  /**
+   * The engine has been asked to speak and has not made a sound yet. Showing
+   * the off icon here made the press look ignored for as long as the engine
+   * took to start, so this says "working, nothing proven" instead — and the
+   * button stays enabled, because a stuck engine has to be abandonable.
+   */
+  if (state.value === 'starting') {
+    return {
+      icon: 'i-lucide-loader-circle',
+      color: 'neutral' as const,
+      label: 'Activando la voz…'
+    }
+  }
+
   if (state.value === 'on') {
     return {
       icon: 'i-lucide-audio-lines',
@@ -117,7 +131,11 @@ async function onToggle(): Promise<void> {
       variant="solid"
       size="xl"
       class="relative size-14 items-center justify-center rounded-full shadow-lg focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-      :ui="{ leadingIcon: 'size-6' }"
+      :ui="{
+        leadingIcon: state === 'starting'
+          ? 'size-6 animate-spin motion-reduce:animate-none'
+          : 'size-6'
+      }"
       @click="onToggle"
     />
   </div>
