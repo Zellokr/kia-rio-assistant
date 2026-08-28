@@ -1,4 +1,4 @@
-// @vitest-environment happy-dom
+// @vitest-environment nuxt
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 
@@ -8,7 +8,7 @@ import ConnectionView from '~/components/ConnectionView.vue'
 import LogView from '~/components/LogView.vue'
 import { InMemoryObdPersistenceAdapter } from '~~/core/obd/persistence/InMemoryObdPersistenceAdapter'
 import type { ObdPersistence } from '~~/data/repositories/createObdPersistence'
-import { provideNuxtInjections } from '../setup/nuxtMacros'
+import { provideObdPersistence } from './support/obdPersistenceInjection'
 
 /**
  * These tests replace three assertions that matched the page's own source
@@ -87,7 +87,7 @@ describe('lab page persistence', () => {
   it('persists a session as soon as the driver picks the adapter', async () => {
     const persistence = new InMemoryObdPersistenceAdapter()
 
-    provideNuxtInjections({ $obdPersistence: persistence })
+    provideObdPersistence(useNuxtApp(), persistence)
 
     await selectAdapter(mountLabPage())
 
@@ -107,7 +107,7 @@ describe('lab page persistence', () => {
    * would export.
    */
   it('reports a rejected write in the session log', async () => {
-    provideNuxtInjections({ $obdPersistence: rejectingPersistence() })
+    provideObdPersistence(useNuxtApp(), rejectingPersistence())
 
     const wrapper = mountLabPage()
 
@@ -133,7 +133,7 @@ describe('lab page persistence', () => {
    * reporting the adapter's error, not a TypeError from its own wiring.
    */
   it('runs without any persistence at all', async () => {
-    provideNuxtInjections({})
+    provideObdPersistence(useNuxtApp(), undefined)
 
     const wrapper = mountLabPage()
 

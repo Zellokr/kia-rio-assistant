@@ -1,4 +1,4 @@
-// @vitest-environment happy-dom
+// @vitest-environment nuxt
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -8,7 +8,6 @@ import { mount } from '@vue/test-utils'
 
 import LabPage from '~/pages/lab/index.vue'
 import ConnectionView from '~/components/ConnectionView.vue'
-import { recordedPageMeta } from '../setup/nuxtMacros'
 
 /**
  * Resolved from this file rather than the process cwd, and without the
@@ -40,12 +39,17 @@ describe('Android entry route', () => {
    * route table is built at build time and is out of a unit test's reach,
    * so what this pins is that the page still asks for the root.
    */
-  it('claims the root as its alias', () => {
-    mount(LabPage, { global: { stubs } })
+  /**
+   * Asked of the router rather than of the macro's argument. The comment
+   * above used to say the route table is built at build time and is out of
+   * a unit test's reach; under the real Nuxt environment it is not, so this
+   * pins where `/` actually lands instead of what the page asked for.
+   */
+  it('serves the laboratory at the root', () => {
+    const resolved = useRouter().resolve('/')
 
-    expect(recordedPageMeta()).toContainEqual(
-      expect.objectContaining({ alias: ['/'] })
-    )
+    expect(resolved.matched.length).toBeGreaterThan(0)
+    expect(resolved.matched[0]?.path).toBe('/')
   })
 
   it('renders the laboratory rather than a starter template', () => {

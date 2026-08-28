@@ -1,47 +1,34 @@
 import { fileURLToPath } from 'node:url'
 
-import vue from '@vitejs/plugin-vue'
-import { defineConfig, type Plugin } from 'vitest/config'
+import { defineVitestConfig } from '@nuxt/test-utils/config'
 
 /**
- * Nuxt replaces `import.meta.client` at build time. Vite's `define` does not
- * substitute arbitrary `import.meta` members, so without this the flag reads
- * `undefined`, every mounted page takes its server branch, and the
- * persistence wiring is skipped — the opposite of what runs on the device,
- * and a way for a test to pass while asserting nothing.
- */
-function nuxtClientFlag(): Plugin {
-  return {
-    name: 'test-nuxt-client-flag',
-    enforce: 'pre',
-    transform(code, id) {
-      if (!code.includes('import.meta.client') || id.includes('node_modules')) {
-        return null
-      }
-
-      return { code: code.replaceAll('import.meta.client', 'true'), map: null }
-    }
-  }
-}
-
-/**
- * Minimal by design.
+ * Nuxt's own test environment, opted into per file.
  *
- * It exists for exactly three reasons: Vue single-file components need a
- * transform before they can be mounted, component sources use Nuxt's
- * `~` / `~~` aliases, which Nuxt resolves at build time and Vitest does
- * not, and pages call Nuxt macros that the build compiles away. Everything
- * else — include patterns, the default node environment — is left at
- * Vitest's defaults so the existing suite runs unchanged. The DOM
- * environment is opted into per file with a
- * `// @vitest-environment happy-dom` docblock, not globally.
+ * This used to be bare `@vitejs/plugin-vue` plus a hand-written shim that
+ * stood in for `definePageMeta`, `useState`, `useNuxtApp` and `clearError`
+ * on `globalThis`. Stand-ins cannot fail when they drift from the framework,
+ * and this pair did drift: the shim never resolved auto-imported components,
+ * so `LogView` mounted as nothing and a test asserted its absence as correct
+ * while the real page rendered it on the wrong screen.
+ *
+ * Two things are required for `environment: 'nuxt'` to boot, and missing
+ * either one produces the same unhelpful crash inside `setupNuxt`
+ * (`Cannot read properties of undefined (reading 'sync')`):
+ *
+ *  1. `@nuxt/test-utils/module` must be listed in `nuxt.config.ts`.
+ *  2. Nothing may assign `useNuxtApp` on `globalThis`, which is what the old
+ *     shim did — it shadowed the real one and left `_route` undefined.
+ *
+ * The default stays `node`. Most of this suite tests `core/`, which never
+ * imports Vue; standing up Nuxt for those would cost seconds per file and
+ * buy nothing. Files ask for what they need with a `// @vitest-environment`
+ * docblock — `nuxt` for anything touching pages, layouts or Nuxt composables,
+ * `happy-dom` for components that only need a DOM.
  */
-export default defineConfig({
-  plugins: [nuxtClientFlag(), vue()],
+export default defineVitestConfig({
   test: {
-    setupFiles: [
-      fileURLToPath(new URL('./test/setup/nuxtMacros.ts', import.meta.url))
-    ]
+    environment: 'node'
   },
   resolve: {
     alias: {

@@ -1,4 +1,4 @@
-// @vitest-environment happy-dom
+// @vitest-environment nuxt
 import { describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 
@@ -7,7 +7,7 @@ import ConnectionView from '~/components/ConnectionView.vue'
 import BottomTabBar from '~/components/BottomTabBar.vue'
 import LogView from '~/components/LogView.vue'
 import { InMemoryObdPersistenceAdapter } from '~~/core/obd/persistence/InMemoryObdPersistenceAdapter'
-import { provideNuxtInjections } from '../setup/nuxtMacros'
+import { provideObdPersistence } from './support/obdPersistenceInjection'
 import { labTransportFactoryKey } from '~/utils/labTransportFactory'
 import { ReplayObdTransport } from '~~/core/obd/transport/ReplayObdTransport'
 import type { ObdTransport } from '~~/core/obd/transport/ObdTransport'
@@ -123,7 +123,7 @@ describe('lab page session', () => {
   it('persists Mode 03 observations on the v2 boundary', async () => {
     const persistence = new InMemoryObdPersistenceAdapter()
 
-    provideNuxtInjections({ $obdPersistence: persistence })
+    provideObdPersistence(useNuxtApp(), persistence)
 
     const transport = new ReplayObdTransport(createSession([
       ...readySessionEvents(),

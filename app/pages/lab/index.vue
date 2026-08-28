@@ -259,7 +259,7 @@ async function copyLog(): Promise<void> {
         </template>
 
         <LogView
-          v-else
+          v-if="activeView === 'log'"
           :events="sessionEvents"
           :dropped-events="droppedEvents"
           :truncated="logTruncated"

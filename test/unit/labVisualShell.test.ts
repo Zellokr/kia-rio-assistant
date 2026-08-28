@@ -1,4 +1,4 @@
-// @vitest-environment happy-dom
+// @vitest-environment nuxt
 import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -391,11 +391,20 @@ describe('the lab page renders', () => {
       .toContain('pb-[calc(7rem+env(safe-area-inset-bottom))]')
   })
 
+  /**
+   * The stray panel this names was real. `<LogView v-else>` bound to the
+   * `<template v-if="activeView === 'data'">` above it rather than to the
+   * ConnectionView/DataView chain, so the log rendered underneath the
+   * connection view in the shipped application. It was invisible here
+   * because the old test environment never resolved the auto-imported
+   * SessionLogPanel, and this assertion pinned the broken state as correct.
+   */
   it('offers both navigations without a stray log panel', () => {
     const wrapper = mountPage()
 
     expect(wrapper.findComponent(NavRail).exists()).toBe(true)
     expect(wrapper.findComponent(BottomTabBar).exists()).toBe(true)
+    expect(wrapper.findComponent(LogView).exists()).toBe(false)
     expect(wrapper.findComponent(SessionLogPanel).exists()).toBe(false)
   })
 
@@ -409,6 +418,9 @@ describe('the lab page renders', () => {
 
     await wrapper.findComponent(BottomTabBar).vm.$emit('select', 'log')
     expect(wrapper.findComponent(LogView).exists()).toBe(true)
-    expect(wrapper.findComponent(SessionLogPanel).exists()).toBe(false)
+    // LogView's whole template is SessionLogPanel, so on this destination it
+    // must be present. The old assertion said absent, which only held while
+    // the component failed to resolve.
+    expect(wrapper.findComponent(SessionLogPanel).exists()).toBe(true)
   })
 })

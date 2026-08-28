@@ -1,9 +1,22 @@
-// @vitest-environment happy-dom
-import { describe, expect, it } from 'vitest'
+// @vitest-environment nuxt
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { mockNuxtImport } from '@nuxt/test-utils/runtime'
 
 import ErrorPage from '~/error.vue'
-import { recordedClearErrorCalls } from '../setup/nuxtMacros'
+
+/**
+ * `clearError` dismisses the error state and navigates. Mocked through Nuxt's
+ * own import machinery, so what is replaced is the real binding the page
+ * resolves rather than a global this test happened to set first.
+ */
+const { clearErrorMock } = vi.hoisted(() => ({ clearErrorMock: vi.fn() }))
+
+mockNuxtImport('clearError', () => clearErrorMock)
+
+beforeEach(() => {
+  clearErrorMock.mockClear()
+})
 
 /**
  * `nuxt generate` emits `404.html` as the SPA fallback shell — the same 2.5 kB
@@ -77,6 +90,6 @@ describe('the error page', () => {
 
     await wrapper.find('button').trigger('click')
 
-    expect(recordedClearErrorCalls()).toEqual([{ redirect: '/lab' }])
+    expect(clearErrorMock).toHaveBeenCalledWith({ redirect: '/lab' })
   })
 })

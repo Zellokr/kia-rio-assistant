@@ -1,3 +1,4 @@
+// @vitest-environment nuxt
 import { describe, expect, it, vi } from 'vitest'
 import { effectScope } from 'vue'
 
@@ -7,7 +8,7 @@ import {
 } from '~~/core/obd/persistence/InMemoryObdPersistenceAdapter'
 import { ReplayObdTransport } from '~~/core/obd/transport/ReplayObdTransport'
 import type { ObdTransport } from '~~/core/obd/transport/ObdTransport'
-import { provideNuxtInjections } from '../setup/nuxtMacros'
+import { provideObdPersistence } from './support/obdPersistenceInjection'
 import { createSession, responseEvents } from '../fixtures/obdReplaySessions'
 
 /**
@@ -114,7 +115,7 @@ describe('useObdLabSession', () => {
   it('persists Mode 03 observations on the v2 boundary', async () => {
     const persistence = new InMemoryObdPersistenceAdapter()
 
-    provideNuxtInjections({ $obdPersistence: persistence })
+    provideObdPersistence(useNuxtApp(), persistence)
 
     const transport = new ReplayObdTransport(createSession([
       ...readySessionEvents(),
