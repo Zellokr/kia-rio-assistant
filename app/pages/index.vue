@@ -4,6 +4,7 @@ import { ref, watch } from 'vue'
 import {
   kiaRioWarningLightsCatalog
 } from '~~/catalog/kia-rio/warning-lights'
+import { useDiagnosticAnnouncements } from '~/composables/useDiagnosticAnnouncements'
 import { useObdLabSession } from '~/composables/useObdLabSession'
 import { useSessionStateBeacon } from '~/composables/useSessionStateBeacon'
 import { labViews } from '~/utils/labNav'
@@ -52,6 +53,13 @@ const {
   runQueueTest,
   readDiagnosticTroubleCodes
 } = session
+
+/**
+ * Speaks the assessment when it changes, if the driver has turned the voice
+ * on. The toggle lives in the layout and defaults to off, so this is silent
+ * until it is asked for.
+ */
+useDiagnosticAnnouncements(diagnostics.assessment)
 
 /**
  * Publishes the session state for the header, which renders outside this
