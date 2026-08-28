@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import ConnectionStatusBadge from '~/components/ConnectionStatusBadge.vue'
+import SpeechToggleButton from '~/components/SpeechToggleButton.vue'
 
 /**
  * The application chrome: header, safe-area padding and the main region every
@@ -10,6 +11,10 @@ import ConnectionStatusBadge from '~/components/ConnectionStatusBadge.vue'
  * document, a layout is the frame a page is placed in — and keeping them in
  * one file meant there was no frame to reuse. `error.vue` needs exactly this
  * frame, and could not have it.
+ *
+ * The speech toggle lives here rather than in a page for the same reason the
+ * header does: RF-031 requires silencing the assistant to be possible at all
+ * times, and a control that only exists on one view is not always reachable.
  */
 </script>
 
@@ -51,5 +56,7 @@ import ConnectionStatusBadge from '~/components/ConnectionStatusBadge.vue'
     <UMain>
       <slot />
     </UMain>
+
+    <SpeechToggleButton />
   </div>
 </template>
