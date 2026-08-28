@@ -10,34 +10,11 @@ import {
 import {
   resolveSupportedPids
 } from '~~/core/obd/capability/resolveSupportedPids'
-import {
-  DTC_MODES,
-  decodeDtcResponse
-} from '~~/core/obd/decoder/decodeDtcResponse'
-import {
-  decodeMode01Response
-} from '~~/core/obd/decoder/decodeMode01Response'
-import {
-  decodeSupportedPids
-} from '~~/core/obd/decoder/decodeSupportedPids'
-import type { DtcObservation } from '~~/core/obd/dtc/DtcCode'
+import { DTC_MODES } from '~~/core/obd/decoder/decodeDtcResponse'
 import { ObdSessionLog } from '~~/core/obd/logging/ObdSessionLog'
-import type {
-  ObdActivityEvent,
-  ObdErrorPhase
-} from '~~/core/obd/logging/ObdSessionLog'
-import {
-  BufferedObdSessionRecorder
-} from '~~/core/obd/persistence/BufferedObdSessionRecorder'
-import {
-  PHYSICAL_ALLOWED_COMMANDS
-} from '~~/core/obd/policy/PhysicalObdCommandPolicy'
 import { ObdPollScheduler } from '~~/core/obd/polling/ObdPollScheduler'
 import {
   ElmCommandExecutor
-} from '~~/core/obd/protocol/ElmCommandExecutor'
-import type {
-  ElmCommandResult
 } from '~~/core/obd/protocol/ElmCommandExecutor'
 import { initializeElm327 } from '~~/core/obd/protocol/Elm327Initializer'
 import {
@@ -47,22 +24,17 @@ import type {
   ObdSessionState
 } from '~~/core/obd/session/ObdSessionStateMachine'
 import {
-  createSupportedTelemetryPollTasks
-} from '~~/core/obd/telemetry/createSupportedTelemetryPollTasks'
-import { ObdTelemetryStore } from '~~/core/obd/telemetry/ObdTelemetryStore'
-import {
-  isObdTransportUnavailable,
-  isPhysicalTransportKind
+  isObdTransportUnavailable
 } from '~~/core/obd/transport/ObdTransport'
 import type {
   ObdTransport,
   ObdTransportMetadata,
   ObdTransportState
 } from '~~/core/obd/transport/ObdTransport'
-import type { ObdPersistence } from '~~/data/repositories/createObdPersistence'
 import { useObdReconnection } from '~/composables/useObdReconnection'
-import { useObdSessionLog } from '~/composables/useObdSessionLog'
-import { useObdTelemetry } from '~/composables/useObdTelemetry'
+import { useObdManualCommands } from '~/composables/useObdManualCommands'
+import { useObdSessionRecording } from '~/composables/useObdSessionRecording'
+import { useObdTelemetryPolling } from '~/composables/useObdTelemetryPolling'
 import { useVehicleDiagnostics } from '~/composables/useVehicleDiagnostics'
 import type { DtcModeKey } from '~/composables/useVehicleDiagnostics'
 import {
@@ -75,52 +47,6 @@ import type { ObdTransportChoice } from '~/utils/obdTransportChoice'
 // A dropped adapter makes every poll reject; halt telemetry after this many
 // consecutive failures instead of flooding the log until the user reacts.
 const MAX_CONSECUTIVE_POLL_ERRORS = 5
-
-/**
- * `0198` is the adapter's own status word rather than a vehicle read, so it
- * answers immediately or not at all; the rest are vehicle round trips.
- */
-const ADAPTER_STATUS_COMMAND = '0198'
-const ADAPTER_STATUS_TIMEOUT_MS = 1000
-const DEFAULT_COMMAND_TIMEOUT_MS = 3000
-
-const SIMULATED_COMMANDS = [
-  'ATZ',
-  'ATE0',
-  'ATL0',
-  'ATS0',
-  'ATH0',
-  'ATSP0',
-  '0100',
-  '010C',
-  '0105',
-  '0120',
-  '0199',
-  '0198',
-  '03TEST',
-  '03',
-  '0104',
-  '010D',
-  '0111'
-]
-
-const PHYSICAL_COMMANDS: string[] = [...PHYSICAL_ALLOWED_COMMANDS]
-
-/** The Mode 01 commands that answer with a supported-PID bitmask. */
-const SUPPORTED_PID_COMMANDS = [
-  '0100',
-  '0120',
-  '0140',
-  '0160',
-  '0180',
-  '01A0',
-  '01C0'
-]
-
-/** The manual commands whose answer carries stored trouble codes. */
-const STORED_DTC_COMMANDS = ['03', '03TEST']
-
-const QUEUE_TEST_COMMANDS = ['010C', '0105', '03']
 
 /**
  * Everything the lab page needs to drive one OBD-II session.
@@ -173,46 +99,49 @@ export function useObdLabSession(options: ObdLabSessionOptions = {}) {
   )
 
   const supportedPids = ref<string[]>([])
-  const telemetryRunning = ref(false)
   const sessionState = ref<ObdSessionState>(session.state)
   const transportState = ref<ObdTransportState>(transport.value.state)
   const transportChoice = ref<ObdTransportChoice>('android-ble')
   const transportError = ref('')
-  const selectedCommand = ref('ATZ')
-
-  const telemetryDomainStore = new ObdTelemetryStore()
 
   let selectedTransport: ObdTransportMetadata = {
     kind: transport.value.kind
   }
 
-  const persistence = import.meta.client
-    ? (useNuxtApp() as { $obdPersistence?: ObdPersistence }).$obdPersistence
-    : undefined
-
-  let recorder: BufferedObdSessionRecorder | undefined
-  let reconnectCount = 0
-
   const {
+    persistence,
     events: sessionEvents,
     droppedEvents,
     truncated: logTruncated,
     clearDisplay: clearLog,
     downloadJson: downloadSessionLog,
-    copyJson: copySessionLog
-  } = useObdSessionLog(sessionLog)
+    copyJson: copySessionLog,
+    toError,
+    recordError,
+    recordActivity,
+    recordPersistenceError,
+    persistObservations
+  } = useObdSessionRecording(sessionLog)
 
   const {
     metrics: telemetry,
-    setSnapshot: setTelemetrySnapshot,
-    clear: clearReactiveTelemetry
-  } = useObdTelemetry()
-
-  const commands = computed(() => (
-    isPhysicalTransportKind(transportChoice.value)
-      ? PHYSICAL_COMMANDS
-      : SIMULATED_COMMANDS
-  ))
+    running: telemetryRunning,
+    decodePid,
+    attachObservers: attachTelemetryObservers,
+    detachObservers: detachTelemetryObservers,
+    start: startTelemetry,
+    stop: stopTelemetry,
+    markStopped: markTelemetryStopped,
+    clear: clearTelemetryState
+  } = useObdTelemetryPolling({
+    sessionLog,
+    recordError,
+    getPollScheduler: () => pollScheduler.value,
+    getTransportKind: () => transport.value.kind,
+    getSupportedPids: () => supportedPids.value,
+    getSessionState: () => sessionState.value,
+    onLinkSuspect: reason => reconnection.notifyLinkSuspect(reason)
+  })
 
   const sessionBusy = computed(() => {
     return [
@@ -232,130 +161,6 @@ export function useObdLabSession(options: ObdLabSessionOptions = {}) {
    */
   function syncTransportState(): void {
     transportState.value = transport.value.state
-  }
-
-  function syncTelemetryState(): void {
-    setTelemetrySnapshot(telemetryDomainStore.getSnapshot())
-  }
-
-  function clearTelemetryState(): void {
-    telemetryDomainStore.clear()
-    clearReactiveTelemetry()
-  }
-
-  function toError(error: unknown): Error {
-    return error instanceof Error
-      ? error
-      : new Error(String(error))
-  }
-
-  function recordError(
-    error: unknown,
-    phase: ObdErrorPhase,
-    command?: string
-  ): void {
-    const normalizedError = toError(error)
-
-    sessionLog.record({
-      type: 'error',
-      command,
-      error: {
-        name: normalizedError.name,
-        message: normalizedError.message,
-        phase
-      }
-    })
-  }
-
-  /**
-   * Persistence is a recording of the session, never a participant in it: a
-   * failed write must not interrupt a driver mid-read, so this swallows the
-   * rejection.
-   *
-   * It still goes into the session log. The exported log is the evidence
-   * artefact this project argues from, and a failed write that only ever
-   * reached `console.warn` left a hole in that artefact which nobody
-   * reading it afterwards could see — including the reader deciding whether
-   * a missing observation means the vehicle stayed quiet or the write
-   * failed.
-   */
-  function recordPersistenceError(error: unknown): void {
-    recordError(error, 'persistence')
-  }
-
-  function persist(operation: Promise<void>): void {
-    void operation.catch(recordPersistenceError)
-  }
-
-  function persistedSession() {
-    const exported = sessionLog.getExport()
-
-    return {
-      schemaVersion: 1 as const,
-      sessionId: exported.sessionId,
-      startedAt: exported.startedAt,
-      endedAt: exported.endedAt,
-      transport: exported.transport,
-      reconnectCount,
-      truncated: false
-    }
-  }
-
-  const unsubscribeSessionLog = sessionLog.subscribe((change) => {
-    if (!persistence) return
-
-    if (change.type === 'started') {
-      recorder?.finish()
-      reconnectCount = 0
-      recorder = new BufferedObdSessionRecorder(
-        change.session.sessionId,
-        persistence,
-        { onError: recordPersistenceError }
-      )
-      persist(persistence.startSession(persistedSession()))
-    } else if (change.type === 'event-recorded') {
-      recorder?.record(change.event)
-
-      if (
-        change.event.type === 'activity'
-        && change.event.activity === 'reconnected'
-      ) {
-        reconnectCount++
-        persist(persistence.updateSession(persistedSession()))
-      }
-    } else if (change.type === 'finished') {
-      recorder?.finish()
-      persist(persistence.updateSession(persistedSession()))
-    }
-  })
-
-  /**
-   * Persists trouble codes the vehicle reported once.
-   *
-   * Shared by the driver-facing read and the manual `03` command so the two
-   * paths cannot drift into writing different rows for the same observation.
-   */
-  function persistObservations(
-    observations: readonly DtcObservation[]
-  ): void {
-    if (!persistence || observations.length === 0) {
-      return
-    }
-
-    const sessionId = sessionLog.getExport().sessionId
-    const writtenAt = Date.now()
-
-    persist(persistence.recordObservations(
-      observations.map((observation, index) => ({
-        schemaVersion: 2 as const,
-        id: `${sessionId}:${observation.code}:${writtenAt}:${index}`,
-        sessionId,
-        code: observation.code,
-        type: observation.type,
-        state: observation.state,
-        observedAt: observation.observedAt
-      }))
-    ))
   }
 
   /**
@@ -415,18 +220,8 @@ export function useObdLabSession(options: ObdLabSessionOptions = {}) {
     persistObservations(observations)
   }
 
-  let unsubscribePollResult = () => {}
-  let unsubscribePollError = () => {}
-  let unsubscribePollHalt = () => {}
   let unsubscribeTransportState = () => {}
 
-  /**
-   * Reacts to an unexpected transport drop (e.g. a lost Bluetooth link) while
-   * the session sits connected. Our own disconnect() has already left 'ready'
-   * before it stops the transport, and connect()/select() failures are handled
-   * by their awaited catch, so gating on 'ready' targets only the uncovered
-   * case: the link dies while idle-connected or mid-telemetry.
-   */
   function handleTransportStateChange(state: ObdTransportState): void {
     syncTransportState()
 
@@ -445,52 +240,31 @@ export function useObdLabSession(options: ObdLabSessionOptions = {}) {
     reconnection.notifyLinkSuspect('transport-state')
   }
 
-  function attachPollObservers(): void {
-    unsubscribePollResult = pollScheduler.value.onResult(({ result }) => {
-      decodeAndRecordPid(result, 'telemetry')
-    })
-
-    unsubscribePollError = pollScheduler.value.onError(({ task, error }) => {
-      recordError(error, 'poll', task.command)
-    })
-
-    unsubscribePollHalt = pollScheduler.value.onHalt(({ task }) => {
-      // The scheduler already stopped itself; reflect the lost link in the UI
-      // and seal the telemetry run so it does not look like it is still
-      // polling.
-      telemetryRunning.value = false
-
-      recordError(
-        new Error('Telemetry stopped after repeated poll failures'),
-        'poll',
-        task.command
-      )
-
-      sessionLog.record({
-        type: 'telemetry-state',
-        state: 'stopped'
-      })
-
-      reconnection.notifyLinkSuspect('poll-halt')
-    })
+  function attachObservers(): void {
+    attachTelemetryObservers()
 
     unsubscribeTransportState = transport.value.subscribeState(
       handleTransportStateChange
     )
   }
 
-  function detachPollObservers(): void {
-    unsubscribePollResult()
-    unsubscribePollError()
-    unsubscribePollHalt()
+  function detachObservers(): void {
+    detachTelemetryObservers()
     unsubscribeTransportState()
   }
 
-  attachPollObservers()
+  /**
+   * Registered before `reconnection` exists. That is safe and load-bearing:
+   * the halt handler only reaches it when a poll run fails, which cannot
+   * happen before telemetry has been started, long after the controller is
+   * built. Moving this below the controller would leave the first transport
+   * unobserved.
+   */
+  attachObservers()
 
   function replaceTransport(next: ObdTransport): void {
     pollScheduler.value.stop()
-    detachPollObservers()
+    detachObservers()
     executor.value.dispose()
 
     transport.value = next
@@ -503,7 +277,7 @@ export function useObdLabSession(options: ObdLabSessionOptions = {}) {
       { maxConsecutiveErrors: MAX_CONSECUTIVE_POLL_ERRORS }
     )
 
-    attachPollObservers()
+    attachObservers()
     syncTransportState()
   }
 
@@ -542,10 +316,6 @@ export function useObdLabSession(options: ObdLabSessionOptions = {}) {
     })
   }
 
-  function recordActivity(activity: ObdActivityEvent['activity']): void {
-    sessionLog.record({ type: 'activity', activity })
-  }
-
   // The composable never receives replaceTransport: it has no way to swap the
   // live transport, so "reconnection never replaces the transport" holds by
   // construction rather than by assertion. transport/executor/pollScheduler
@@ -561,9 +331,7 @@ export function useObdLabSession(options: ObdLabSessionOptions = {}) {
     getExecutor: () => executor.value,
     getPollScheduler: () => pollScheduler.value,
     getSupportedPids: () => supportedPids.value,
-    onTelemetryStopped: () => {
-      telemetryRunning.value = false
-    },
+    onTelemetryStopped: markTelemetryStopped,
     onTransportConnected: (metadata) => {
       selectedTransport = metadata
       syncTransportState()
@@ -574,131 +342,20 @@ export function useObdLabSession(options: ObdLabSessionOptions = {}) {
     }
   })
 
-  function decodeAndRecordPid(
-    result: ElmCommandResult,
-    source: 'manual' | 'telemetry'
-  ): void {
-    try {
-      const decoded = decodeMode01Response(result.normalizedText)
-
-      if (!decoded) {
-        return
-      }
-
-      telemetryDomainStore.update(decoded, result)
-
-      syncTelemetryState()
-
-      sessionLog.record({
-        type: 'decoded-value',
-        source,
-        command: result.command,
-        latencyMs: result.latencyMs,
-        decoded: {
-          kind: 'pid',
-          ...decoded
-        }
-      })
-    } catch (error) {
-      recordError(error, 'decode', result.command)
-    }
-  }
-
-  async function runQueueTest(): Promise<void> {
-    sessionLog.record({
-      type: 'activity',
-      activity: 'queue-test-started'
-    })
-
-    const promises = QUEUE_TEST_COMMANDS.map(
-      command => executor.value.execute(command)
-    )
-
-    try {
-      const results = await Promise.all(promises)
-
-      for (const result of results) {
-        try {
-          const decoded = decodeMode01Response(result.normalizedText)
-
-          if (decoded) {
-            sessionLog.record({
-              type: 'decoded-value',
-              source: 'manual',
-              command: result.command,
-              latencyMs: result.latencyMs,
-              decoded: {
-                kind: 'pid',
-                ...decoded
-              }
-            })
-          }
-        } catch (error) {
-          recordError(error, 'decode', result.command)
-        }
-      }
-
-      sessionLog.record({
-        type: 'activity',
-        activity: 'queue-test-completed'
-      })
-    } catch {
-      // Protocol errors are already recorded by the executor.
-    }
-  }
-
-  function startTelemetry(): void {
-    if (sessionState.value !== 'ready') {
-      recordError(new Error('Session is not ready'), 'poll')
-
-      return
-    }
-
-    if (telemetryRunning.value) {
-      return
-    }
-
-    pollScheduler.value.clearTasks()
-
-    const tasks = createSupportedTelemetryPollTasks(
-      supportedPids.value,
-      { physicalOnly: isPhysicalTransportKind(transport.value.kind) }
-    )
-
-    for (const task of tasks) {
-      pollScheduler.value.addTask(task)
-    }
-
-    if (tasks.length === 0) {
-      recordError(new Error('No supported telemetry PIDs'), 'poll')
-
-      return
-    }
-
-    pollScheduler.value.start()
-
-    telemetryRunning.value = true
-
-    sessionLog.record({
-      type: 'telemetry-state',
-      state: 'started'
-    })
-  }
-
-  function stopTelemetry(): void {
-    if (!telemetryRunning.value) {
-      return
-    }
-
-    pollScheduler.value.stop()
-
-    telemetryRunning.value = false
-
-    sessionLog.record({
-      type: 'telemetry-state',
-      state: 'stopped'
-    })
-  }
+  const {
+    selectedCommand,
+    commands,
+    sendCommand,
+    runQueueTest
+  } = useObdManualCommands({
+    sessionLog,
+    transportChoice,
+    getExecutor: () => executor.value,
+    getTransportKind: () => transport.value.kind,
+    recordError,
+    persistObservations,
+    decodePid
+  })
 
   async function selectDevice(): Promise<void> {
     transportError.value = ''
@@ -852,96 +509,11 @@ export function useObdLabSession(options: ObdLabSessionOptions = {}) {
     }
   }
 
-  function recordManualDtcResponse(result: ElmCommandResult): void {
-    try {
-      const dtcResult = decodeDtcResponse(
-        result.normalizedText,
-        DTC_MODES.stored
-      )
-      const observedAt = new Date().toISOString()
-      const observations = dtcResult.codes.map(code => ({
-        ...code,
-        state: dtcResult.state,
-        observedAt
-      }))
-
-      sessionLog.record({
-        type: 'decoded-value',
-        source: 'manual',
-        command: result.command,
-        latencyMs: result.latencyMs,
-        decoded: {
-          kind: 'dtc',
-          observations
-        }
-      })
-
-      persistObservations(observations)
-    } catch (error) {
-      recordError(error, 'decode', result.command)
-    }
-  }
-
-  function recordManualSupportedPids(result: ElmCommandResult): void {
-    try {
-      const supported = decodeSupportedPids(result.normalizedText)
-
-      sessionLog.record({
-        type: 'capability-discovery',
-        command: result.command,
-        pids: supported.pids,
-        rangeStart: supported.rangeStart,
-        rangeEnd: supported.rangeEnd,
-        hasNextRange: supported.hasNextRange
-      })
-    } catch (error) {
-      recordError(error, 'decode', result.command)
-    }
-  }
-
-  async function sendCommand(): Promise<void> {
-    const command = selectedCommand.value
-
-    if (
-      isPhysicalTransportKind(transport.value.kind)
-      && !PHYSICAL_COMMANDS.includes(command)
-    ) {
-      recordError(
-        new Error('Command is not allowed on the physical transport'),
-        'transport-write',
-        command
-      )
-
-      return
-    }
-
-    try {
-      const timeoutMs = command === ADAPTER_STATUS_COMMAND
-        ? ADAPTER_STATUS_TIMEOUT_MS
-        : DEFAULT_COMMAND_TIMEOUT_MS
-
-      const result = await executor.value.execute(command, timeoutMs)
-
-      decodeAndRecordPid(result, 'manual')
-
-      if (STORED_DTC_COMMANDS.includes(result.command)) {
-        recordManualDtcResponse(result)
-      }
-
-      if (SUPPORTED_PID_COMMANDS.includes(result.command)) {
-        recordManualSupportedPids(result)
-      }
-    } catch {
-      // Protocol errors are already recorded by the executor.
-    }
-  }
-
   onScopeDispose(() => {
     reconnection.dispose()
     pollScheduler.value.stop()
 
-    detachPollObservers()
-    unsubscribeSessionLog()
+    detachObservers()
 
     executor.value.dispose()
 
