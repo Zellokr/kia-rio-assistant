@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 
 import {
   kiaRioWarningLightsCatalog
 } from '~~/catalog/kia-rio/warning-lights'
 import { useObdLabSession } from '~/composables/useObdLabSession'
+import { useSessionStateBeacon } from '~/composables/useSessionStateBeacon'
 import { labViews } from '~/utils/labNav'
 import type { LabViewId } from '~/utils/labNav'
 import BottomTabBar from '~/components/BottomTabBar.vue'
@@ -51,6 +52,16 @@ const {
   runQueueTest,
   readDiagnosticTroubleCodes
 } = session
+
+/**
+ * Publishes the session state for the header, which renders outside this
+ * page and so cannot reach the composable that owns it.
+ */
+const sessionStateBeacon = useSessionStateBeacon()
+
+watch(sessionState, (state) => {
+  sessionStateBeacon.value = state
+}, { immediate: true })
 
 const activeView = ref<LabViewId>('connection')
 

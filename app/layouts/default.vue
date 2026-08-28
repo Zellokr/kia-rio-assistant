@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import ConnectionStatusBadge from '~/components/ConnectionStatusBadge.vue'
+
 /**
  * The application chrome: header, safe-area padding and the main region every
  * route renders into.
@@ -38,13 +40,7 @@
       </template>
 
       <template #right>
-        <UBadge
-          color="success"
-          variant="subtle"
-          class="hidden sm:inline-flex"
-        >
-          Solo lectura
-        </UBadge>
+        <ConnectionStatusBadge />
         <UColorModeButton
           size="lg"
           aria-label="Cambiar tema de color"
