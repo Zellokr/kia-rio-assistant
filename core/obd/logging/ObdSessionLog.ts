@@ -226,6 +226,10 @@ export class ObdSessionLog {
 
   private events: ObdSessionEvent[] = []
 
+  private nextEventIndex = 0
+
+  private retainedEventCount = 0
+
   private sessionId = ''
 
   private startedAtMs = 0
@@ -300,12 +304,15 @@ export class ObdSessionLog {
       elapsedMs: Math.max(0, now - this.startedAtMs)
     } as ObdSessionEvent
 
-    this.events.push(event)
-
-    if (this.events.length > this.maxEvents) {
-      this.events.shift()
+    if (this.retainedEventCount < this.maxEvents) {
+      this.events[this.nextEventIndex] = event
+      this.retainedEventCount++
+    } else {
+      this.events[this.nextEventIndex] = event
       this.droppedEvents++
     }
+
+    this.nextEventIndex = (this.nextEventIndex + 1) % this.maxEvents
 
     const copy = cloneEvent(event)
 
@@ -342,7 +349,7 @@ export class ObdSessionLog {
         droppedEvents: this.droppedEvents,
         complete: this.droppedEvents === 0
       },
-      events: this.events.map(cloneEvent)
+      events: this.getChronologicalEvents().map(cloneEvent)
     }
   }
 
@@ -354,8 +361,21 @@ export class ObdSessionLog {
     this.startedAtMs = this.now()
     this.endedAt = null
     this.events = []
+    this.nextEventIndex = 0
+    this.retainedEventCount = 0
     this.droppedEvents = 0
     this.sequence = 0
+  }
+
+  private getChronologicalEvents(): ObdSessionEvent[] {
+    if (this.retainedEventCount < this.maxEvents) {
+      return this.events.slice(0, this.retainedEventCount)
+    }
+
+    return [
+      ...this.events.slice(this.nextEventIndex),
+      ...this.events.slice(0, this.nextEventIndex)
+    ]
   }
 
   private notify(change: ObdSessionLogChange): void {

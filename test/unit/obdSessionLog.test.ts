@@ -116,6 +116,48 @@ describe('ObdSessionLog', () => {
     })
   })
 
+  it('keeps chronological export order and retention metadata after multiple wraparounds', () => {
+    const log = new ObdSessionLog({
+      transport: { kind: 'mock' },
+      maxEvents: 3,
+      now: createClock(0, 1, 2, 3, 4, 5, 6, 7, 8),
+      idFactory: () => 'wrapped-session'
+    })
+
+    for (const activity of [
+      'adapter-selected',
+      'connected',
+      'initialization-started',
+      'initialization-completed',
+      'discovery-started',
+      'discovery-completed',
+      'queue-test-started',
+      'queue-test-completed'
+    ] as const) {
+      log.record({
+        type: 'activity',
+        activity
+      })
+    }
+
+    const exported = log.getExport()
+
+    expect(exported.events.map(event => event.sequence)).toEqual([6, 7, 8])
+    expect(exported.events.map(event => event.elapsedMs)).toEqual([6, 7, 8])
+    expect(exported.events.map(event => (
+      event.type === 'activity' ? event.activity : undefined
+    ))).toEqual([
+      'discovery-completed',
+      'queue-test-started',
+      'queue-test-completed'
+    ])
+    expect(exported.retention).toEqual({
+      maxEvents: 3,
+      droppedEvents: 5,
+      complete: false
+    })
+  })
+
   it('finishes a session and starts a fresh one', () => {
     const log = new ObdSessionLog({
       transport: { kind: 'mock' },
