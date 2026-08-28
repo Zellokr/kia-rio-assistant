@@ -1,7 +1,14 @@
 <script setup lang="ts">
-import { capacitorAndroidBle } from '~/services/capacitorAndroidBle'
+import { inject } from 'vue'
+
 import { VEEPEAK_BLE_PROFILE } from '~/services/veepeakBleProfile'
 import { useElmPipeProbe } from '~/composables/useElmPipeProbe'
+import {
+  androidBleBridgeKey,
+  defaultAndroidBleBridge
+} from '~/utils/bleServiceKeys'
+
+const bridge = inject(androidBleBridgeKey, defaultAndroidBleBridge)
 
 const {
   busy,
@@ -10,9 +17,9 @@ const {
   statusMessage,
   errorMessage,
   run
-} = useElmPipeProbe(capacitorAndroidBle, VEEPEAK_BLE_PROFILE)
+} = useElmPipeProbe(bridge, VEEPEAK_BLE_PROFILE)
 
-const supported = capacitorAndroidBle.isSupported()
+const supported = bridge.isSupported()
 </script>
 
 <template>

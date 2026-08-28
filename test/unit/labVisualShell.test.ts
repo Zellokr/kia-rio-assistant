@@ -334,6 +334,11 @@ describe('lab destinations', () => {
  * output into `describe('the lab page renders')` below, and what needed a
  * session in `ready` into `labPageSession`, which injects a transport
  * through `labTransportFactoryKey` and drives the real handshake.
+ *
+ * `GattInspectorPanel` left the list for the same reason. It was here
+ * because it named its Capacitor service directly and could only ever
+ * render its unavailable branch; the bridge is injected now, so
+ * `bleInspectionPanels` mounts it and reads the workflow off the screen.
  */
 describe('what cannot be mounted', () => {
   it('brands the document as this project, not the starter template', () => {
@@ -370,22 +375,6 @@ describe('what cannot be mounted', () => {
 
     expect(source).toContain('--color-terminal:')
     expect(source).toContain('--color-terminal-foreground:')
-  })
-
-  /**
-   * GATT discovery imports its Capacitor service at module scope, and
-   * that service reports unsupported outside the Android shell — so a
-   * mounted panel renders the "open this from the app" branch and never
-   * the numbered workflow this asserts.
-   */
-  it('presents GATT discovery as a numbered, read-only workflow', () => {
-    const source = readProjectFile('app/components/GattInspectorPanel.vue')
-
-    expect(source).toContain('Inventario Bluetooth')
-    expect(source).toContain('1. Buscar adaptador')
-    expect(source).toContain('2. Elegir dispositivo')
-    expect(source).toContain('3. Descubrir servicios')
-    expect(source).toContain('No lee ni escribe datos del vehículo')
   })
 })
 

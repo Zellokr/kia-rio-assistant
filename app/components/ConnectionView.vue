@@ -2,6 +2,8 @@
 import type { ObdSessionState } from '~~/core/obd/session/ObdSessionStateMachine'
 import type { ObdTransportState } from '~~/core/obd/transport/ObdTransport'
 import type { ObdTransportChoice } from '~/utils/obdTransportChoice'
+import ElmPipeProbePanel from '~/components/ElmPipeProbePanel.vue'
+import GattInspectorPanel from '~/components/GattInspectorPanel.vue'
 
 export type ConnectionBadgeColor
   = | 'neutral'

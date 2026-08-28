@@ -1,7 +1,13 @@
 <script setup lang="ts">
+import { inject } from 'vue'
+
+import { useGattInspector } from '~/composables/useGattInspector'
 import {
-  capacitorGattInspector
-} from '~/services/capacitorGattInspector'
+  defaultGattInspectorBridge,
+  gattInspectorBridgeKey
+} from '~/utils/bleServiceKeys'
+
+const bridge = inject(gattInspectorBridgeKey, defaultGattInspectorBridge)
 
 const {
   supported,
@@ -15,7 +21,7 @@ const {
   scan,
   inspect,
   disconnect
-} = useGattInspector(capacitorGattInspector)
+} = useGattInspector(bridge)
 
 async function copyInventory(): Promise<void> {
   if (!inventory.value) return
