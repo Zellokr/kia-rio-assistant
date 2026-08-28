@@ -127,7 +127,9 @@ already arrived. The status line under the buttons says what happened.
 6. Remove `telegramEnabled` from `useObdSessionLog`, `sendFieldReport` from
    `useObdSessionRecording`, both from `useObdLabSession`, the `telegram`
    prop and emit from `LogView` and `SessionLogPanel`, and
-   `sendLogToTelegram` from `app/pages/index.vue`.
+   `sendLogToTelegram` from `app/pages/index.vue`. That leaves **Copiar
+   registro** as the only way to get a session off the phone, which is why
+   this should not be removed until the field test is finished.
 7. Delete this file.
 
 Every one of those carries a `TEMPORARY` comment pointing back here, so

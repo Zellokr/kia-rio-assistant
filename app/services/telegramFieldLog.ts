@@ -36,8 +36,8 @@ import type {
  * ## Removing it
  *
  * Delete this file, its test, the `telegram` block in `nuxt.config.ts`, and
- * the `sendToTelegram` wiring in `useObdSessionLog`. Nothing else refers to
- * it. `test/unit/telegramFieldLog.test.ts` asserts the production bundle
+ * the `telegramEnabled` flag in `useObdSessionLog` together with
+ * `sendFieldReport` in `useObdSessionRecording`. Nothing else refers to it. `test/unit/telegramFieldLog.test.ts` asserts the production bundle
  * stays clean while it is here.
  */
 

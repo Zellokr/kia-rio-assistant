@@ -6,7 +6,6 @@ import {
 
 import type {
   ObdSessionEvent,
-  ObdSessionExport,
   ObdSessionLog
 } from '~~/core/obd/logging/ObdSessionLog'
 
@@ -72,14 +71,6 @@ function formatEvent(event: ObdSessionEvent): string {
   }
 }
 
-function createFilename(session: ObdSessionExport): string {
-  const timestamp = session.startedAt
-    .replaceAll(':', '-')
-    .replaceAll('.', '-')
-
-  return `obd-session-${timestamp}.json`
-}
-
 export function useObdSessionLog(log: ObdSessionLog) {
   const initial = log.getExport()
   const events = ref<ObdSessionEvent[]>(initial.events)
@@ -137,37 +128,19 @@ export function useObdSessionLog(log: ObdSessionLog) {
       = events.value.at(-1)?.sequence ?? 0
   }
 
-  function downloadJson(): void {
-    if (typeof document === 'undefined') {
-      return
-    }
-
-    const session = log.getExport()
-    const blob = new Blob(
-      [JSON.stringify(session, null, 2)],
-      { type: 'application/json' }
-    )
-    const url = URL.createObjectURL(blob)
-    const anchor = document.createElement('a')
-
-    anchor.href = url
-    anchor.download = createFilename(session)
-    anchor.click()
-
-    // Revoke on the next macrotask, not synchronously: a large session export
-    // may still be streaming to disk when click() returns, and revoking the
-    // object URL immediately can truncate or cancel the download.
-    setTimeout(() => URL.revokeObjectURL(url), 0)
-  }
-
   /**
-   * Copies the same export to the clipboard, returning whether it worked.
+   * Copies the session export to the clipboard, reporting whether it worked.
    *
-   * The Android WebView ignores `<a download>` on a blob: URL, so downloadJson
-   * silently does nothing on the phone — which is exactly where a physical
-   * session is recorded. This is the path that gets the evidence out of the
-   * car, so it must report failure rather than fail silently the way the
-   * download does.
+   * This is the path that gets evidence off the phone, and the phone is
+   * where every physical session is recorded. There used to be a download
+   * button beside it, built on `<a download>` over a `blob:` URL — which the
+   * Android WebView ignores. It was removed on 2026-08-28: a control that
+   * looks like it works and silently does nothing is the same class of
+   * defect as a frozen reading that looks live.
+   *
+   * So this reports failure rather than swallowing it. A driver who is told
+   * the copy failed can try again; one who is told nothing walks away
+   * believing the evidence was saved.
    */
   async function copyJson(): Promise<boolean> {
     const clipboard = globalThis.navigator?.clipboard
@@ -199,38 +172,15 @@ export function useObdSessionLog(log: ObdSessionLog) {
    * build that does not contain them, and this composable keeps working
    * without a Nuxt app instance — which is what lets it be tested directly.
    *
-   * `scripts/assert-no-field-test-secrets.mjs` checks that against the
+   * Only the flag lives here; the sending itself is `sendFieldReport` in
+   * `useObdSessionRecording`, which needs the persistence this composable
+   * does not have.
+   *
+   * `scripts/assert-no-field-test-secrets.mjs` checks the fold against the
    * emitted bytes. It caught the first version of this, where the guard was
    * a runtime boolean: the chunk shipped anyway, merely unreachable.
    */
   const telegramEnabled = __FIELD_TEST_TELEGRAM__
-
-  const telegramConfig = __FIELD_TEST_TELEGRAM__
-    ? useRuntimeConfig().public.telegram as {
-      enabled: boolean
-      botToken: string
-      chatId: string
-    } | undefined
-    : undefined
-
-  async function sendToTelegram(): Promise<string> {
-    if (!__FIELD_TEST_TELEGRAM__ || !telegramConfig?.enabled) {
-      return 'Esta compilación no lleva envío a Telegram.'
-    }
-
-    const { sendSessionToTelegram } = await import(
-      '~/services/telegramFieldLog'
-    )
-
-    const result = await sendSessionToTelegram(log.getExport(), {
-      botToken: telegramConfig.botToken,
-      chatId: telegramConfig.chatId
-    })
-
-    return result.ok
-      ? 'Registro enviado a Telegram'
-      : result.reason
-  }
 
   return {
     events,
@@ -239,9 +189,7 @@ export function useObdSessionLog(log: ObdSessionLog) {
     droppedEvents,
     truncated,
     clearDisplay,
-    downloadJson,
     copyJson,
-    telegramEnabled,
-    sendToTelegram
+    telegramEnabled
   }
 }

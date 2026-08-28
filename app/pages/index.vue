@@ -42,7 +42,6 @@ const {
   droppedEvents,
   logTruncated,
   clearLog,
-  downloadSessionLog,
   copySessionLog,
   telegramEnabled,
   sendFieldReport,
@@ -186,7 +185,6 @@ async function sendLogToTelegram(): Promise<void> {
           :truncated="logTruncated"
           :copy-status="logCopyStatus"
           :telegram-enabled="telegramEnabled"
-          @export="downloadSessionLog"
           @copy="copyLog"
           @clear="clearLog"
           @telegram="sendLogToTelegram"

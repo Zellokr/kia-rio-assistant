@@ -45,7 +45,6 @@ export function useObdSessionRecording(sessionLog: ObdSessionLog) {
     droppedEvents,
     truncated,
     clearDisplay,
-    downloadJson,
     copyJson,
     telegramEnabled
   } = useObdSessionLog(sessionLog)
@@ -258,7 +257,6 @@ export function useObdSessionRecording(sessionLog: ObdSessionLog) {
     droppedEvents,
     truncated,
     clearDisplay,
-    downloadJson,
     copyJson,
 
     /** TEMPORARY — field-test evidence delivery. See `telegramFieldLog.ts`. */

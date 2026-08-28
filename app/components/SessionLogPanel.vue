@@ -22,7 +22,6 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  export: []
   copy: []
   clear: []
   telegram: []
@@ -123,16 +122,6 @@ const hiddenByLimit = computed(() => {
         >
           {{ props.copyStatus }}
         </p>
-        <UButton
-          color="primary"
-          variant="soft"
-          size="lg"
-          icon="i-lucide-download"
-          class="min-h-12 justify-center"
-          @click="emit('export')"
-        >
-          Exportar
-        </UButton>
         <UButton
           color="neutral"
           variant="ghost"

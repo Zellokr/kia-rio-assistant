@@ -379,6 +379,12 @@ describe('lab destinations', () => {
     expect(wrapper.findComponent(SessionLogPanel).exists()).toBe(true)
   })
 
+  /**
+   * The `export` action this used to forward is gone. It was built on
+   * `<a download>` over a `blob:` URL, which the Android WebView ignores —
+   * so on the only platform this ships to, the button looked like it worked
+   * and silently did nothing.
+   */
   it('forwards a log action from the panel to its parent', async () => {
     const wrapper = mount(LogView, {
       props: {
@@ -389,10 +395,23 @@ describe('lab destinations', () => {
       global: { stubs, components: { SessionLogPanel } }
     })
 
-    wrapper.findComponent(SessionLogPanel).vm.$emit('export')
+    wrapper.findComponent(SessionLogPanel).vm.$emit('copy')
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.emitted('export')).toHaveLength(1)
+    expect(wrapper.emitted('copy')).toHaveLength(1)
+  })
+
+  it('offers no download, which cannot work in the Android WebView', () => {
+    const wrapper = mount(LogView, {
+      props: {
+        events: [],
+        droppedEvents: 0,
+        truncated: false
+      },
+      global: { stubs, components: { SessionLogPanel } }
+    })
+
+    expect(wrapper.text()).not.toContain('Exportar')
   })
 
   /**

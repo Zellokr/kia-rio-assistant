@@ -13,7 +13,6 @@ defineProps<{
 }>()
 
 const emit = defineEmits<{
-  export: []
   copy: []
   clear: []
   telegram: []
@@ -27,7 +26,6 @@ const emit = defineEmits<{
     :truncated="truncated"
     :copy-status="copyStatus"
     :telegram-enabled="telegramEnabled"
-    @export="emit('export')"
     @copy="emit('copy')"
     @clear="emit('clear')"
     @telegram="emit('telegram')"
