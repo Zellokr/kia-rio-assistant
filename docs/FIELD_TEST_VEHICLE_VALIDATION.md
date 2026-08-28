@@ -19,13 +19,15 @@ driver's hands.
 
 ## Before you leave the house
 
-1. Build and install the current `master` on the phone:
-   `pnpm android:build:debug`, then install the APK.
-2. Charge the phone. Part A runs 30+ minutes with the screen on.
-3. Have a notebook or a second device. **Do not rely on memory for
-   observations** — you will be reading a small screen next to a running
-   engine.
-4. Create a folder to drop exported JSON into, one file per step.
+1. Build and install the **field-test** APK — the only build that carries
+   the report sender. See `docs/FIELD_TEST_TELEGRAM.md`; an ordinary build
+   has no way to get evidence off the phone, because the Android WebView
+   ignores `<a download>` on a `blob:` URL.
+2. Charge the phone. Part A runs 20–25 minutes with the screen on.
+3. **No notebook.** The app records every observation the procedure used to
+   ask for, and sends them as a report. Transcribing timings off a small
+   screen next to a running engine was the least reliable instrument in
+   this test and the one nobody could check afterwards.
 
 ## Safety
 
@@ -35,8 +37,9 @@ Unchanged from every physical procedure in this project.
   adaptation are forbidden. `PhysicalObdCommandPolicy` enforces this
   below the UI, and no step below asks you to bypass it.
 - Vehicle **stationary**, parking brake on, gearbox in neutral or park.
-- Part A runs the engine for 30 minutes. **Outdoors or in a ventilated
-  space.** Carbon monoxide is the real hazard here, not the software.
+- Part A runs the engine for about ten minutes. **Outdoors or in a
+  ventilated space.** Carbon monoxide is the real hazard here, not the
+  software.
 - Never operate the phone while driving. No step in this document
   requires the car to move.
 - If anything smells, smokes, overheats or sounds wrong, stop the engine
@@ -58,8 +61,10 @@ the Android WebView, only against `fake-indexeddb` in Node. The sole
 vehicle evidence to date is one 91-event session on 2026-08-24, during
 which nothing disconnected.
 
-**What closes it.** Ten consecutive connections, plus one 30-minute
-session containing at least one drop and its recovery.
+**What closes it.** Ten consecutive connections, plus one session
+containing at least one drop and its recovery. That session was specified
+as thirty minutes and was shortened to ten with two drops on 2026-08-28;
+the reasoning, and what the shortening gives up, are in A2 below.
 
 ### A1 — Ten consecutive connections
 
@@ -71,43 +76,65 @@ With the ignition on and the engine off:
 4. **Desconectar**.
 5. Repeat 2–4 **ten times without closing the app**.
 
-Record for each of the ten: did it reach ready, how long it took roughly,
-and anything that needed a retry. **A retry is a result, not a mistake to
-hide** — write it down.
+Nothing to record by hand. Each attempt opens a session that is written to
+IndexedDB as it happens, and the report reads all ten back — whether each
+reached ready, how long it took, and what errored on the way. **A retry is
+a result, not a mistake to hide**, and it lands in the report either way.
 
-Then go to **Registro** → **Exportar** and save the JSON as `A1.json`.
+Send nothing yet: the report goes once, at the end of A2, and covers every
+session recorded since.
 
 > Ten in a row matters more than ten total. A stack that leaks a
 > subscription or a stale executor usually survives the first two
 > connections and fails around the fifth.
 
-### A2 — Thirty-minute session with a real drop
+### A2 — Ten-minute session with two real drops
 
 Start the engine. Ventilated space.
 
+> **Shortened from thirty minutes on 2026-08-28, deliberately.** The
+> arithmetic said the length was buying almost nothing. Five PIDs at
+> 1000/1000/1500/2000/3000 ms is about 3.5 polls per second and roughly 19
+> events per second, so thirty minutes reaches around 34,500 events against
+> a 50,000 ring buffer — neither length exercises truncation. Reconnection
+> backs off over 21s under a 30s deadline, so a drop and its recovery fit
+> inside a minute.
+>
+> The time is spent on a second drop instead. **Two recoveries from two
+> different causes prove more about reconnection than thirty quiet minutes
+> and one.**
+>
+> What this no longer tests is the long soak: slow BLE-stack degradation,
+> memory growth, Doze, thermal effects. That is a real gap, and it is
+> accepted knowingly rather than overlooked. If a session ever fails in a
+> way that smells like duration, the thirty-minute run is the next thing to
+> try.
+
 1. Connect as in A1 and reach ready.
 2. Go to **Datos** and press **Ver lecturas**. Leave it running.
-3. Let it run undisturbed for about ten minutes. Note whether values keep
-   updating or quietly freeze.
-4. **Induce a drop.** Use one of these, in order of preference:
-   - **Unplug the adapter from the OBD port for ~5 seconds, then plug it
-     back in.** Cleanest and most controlled. Safe: the port is powered,
-     unplugging a reader writes nothing.
-   - Walk ~20 m away from the car with the phone until the link drops,
-     then walk back.
-   - Turn the phone screen off, wait two minutes, turn it back on.
-5. **Watch what the app does.** This is the actual test. Record:
-   - Did the badge change away from ready, or did it lie and stay ready?
-   - Did it attempt to reconnect on its own?
-   - Did it recover, and roughly how long did that take?
-   - After recovery, did telemetry resume, or did it stay dead while the
-     badge claimed ready?
-6. Continue the session to **30 minutes total**.
-7. Press **Pausar lecturas**, disconnect, and export the log as `A2.json`.
+3. About three minutes in, **induce the first drop**: unplug the adapter
+   from the OBD port for ~5 seconds, then plug it back in. Cleanest and
+   most controlled, and safe — the port is powered, and unplugging a reader
+   writes nothing.
+4. Watch it recover, and confirm the readings come back and stay live for a
+   couple of minutes.
+5. Around minute eight, **induce a second drop by a different cause**:
+   walk ~20 m away from the car with the phone until the link drops and
+   come back, or turn the phone screen off for two minutes and turn it back
+   on. Using the same cause twice tests one path twice.
+6. Press **Pausar lecturas**, disconnect, and press **Registro → Enviar
+   informe**.
 
-**A2 passes only if the drop was detected and the recovery observed.** A
-30-minute session where nothing dropped is not a pass — it is an
-unfinished test, and you should induce a drop before stopping.
+**A2 is closed only if both drops were detected and both recoveries
+observed.** A session where nothing dropped is not a pass — it is an
+unfinished test, and you should induce a drop before stopping. The report
+says so on its own when no drop is on record.
+
+**Nothing here needs writing down.** The report computes what the old
+version asked a human to observe — whether the state stopped claiming
+ready, whether it retried on its own, how long recovery took, and whether
+telemetry resumed afterwards or stayed dead behind a ready badge. See
+`docs/FIELD_TEST_TELEGRAM.md`.
 
 ---
 
@@ -208,9 +235,11 @@ here is a small, deliberate change — not a rewrite.
 
 Bring back:
 
-- `A1.json`, `A2.json`, `B.json`, and `D.json` if Part D ran.
-- Your written observations for A1 and A2, including retries and timings.
-- The cluster and manual photographs for Part C.
+- The field report and the session JSON files, already in Telegram — the
+  app sent them. Retries, timings, drops and recoveries are in the report;
+  nothing was transcribed by hand, so nothing depends on memory.
+- `B.json` if Part B ran, and `D.json` if Part D ran.
+- The cluster photographs for Part C.
 
 Then, and only then:
 
