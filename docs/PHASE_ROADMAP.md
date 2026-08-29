@@ -176,8 +176,10 @@ The next work item is therefore a native Capacitor bridge for **synthesis
 only**. Checks 6 and 7, added and run the same day, settled the other half:
 the two sides of the Web Speech API disagree on this device. Synthesis is
 absent; recognition's constructor is present, unprefixed, and a real
-`start()` returned a transcript. **Push-to-talk needs no bridge** — it can be
-built on the Web Speech recognizer, and the only open question there is
-whether it still works with no Internet (check 8).
+`start()` returned a transcript — offline as well as online (check 8).
+**Push-to-talk needs no bridge and no network.** It can be built on the Web
+Speech recognizer today. The one design constraint carried forward is that
+the offline recognition pack belongs to this phone, not to Android, so the
+voice path must degrade to the text command bar on a device that lacks it.
 
 The wake-word viability gate (ADR-011) is unscheduled and blocks nothing.

@@ -6,7 +6,7 @@ disagree on this device, and that is the headline.**
 | | Result | Consequence |
 |---|---|---|
 | **Synthesis (TTS)** | `window.speechSynthesis` **does not exist** (check 1) | Needs a native Capacitor bridge. Fase 2's `TTS local` exit criterion is **NOT met**. |
-| **Recognition (STT)** | Constructor present, and a real `start()` **worked** — transcript returned (checks 6 and 7) | **No bridge needed.** Push-to-talk can be built on the Web Speech recognizer. |
+| **Recognition (STT)** | Constructor present, a real `start()` **worked**, and it works **offline** too (checks 6, 7 and 8) | **No bridge needed, no network needed.** Push-to-talk can be built on the Web Speech recognizer. |
 
 Nobody predicted the split. The expectation going in was that both would be
 missing together, because they are one API; measuring cost ten seconds each
@@ -213,6 +213,18 @@ push-to-talk design rather than being discovered by a driver in a tunnel.
 2. Hold the probe and speak.
 3. Record the transcript, or the code.
 
+**Ran 2026-08-29: PASS.** The transcript came back `definitivo` with no
+network at all, so this device carries an offline Spanish recognition pack.
+Push-to-talk therefore works in a tunnel, in a car park, and with the phone's
+data switched off.
+
+**One caveat that belongs in the design, not in a bug report.** That pack is
+a property of *this* phone, not of Android. Another device without it returns
+`network`, and the app must degrade rather than look broken: the voice path
+has to keep the text command bar reachable and say plainly that recognition
+needs a connection on that device. RF-030's own acceptance already points the
+same way — *"la función principal no depende del reconocimiento de voz"*.
+
 ## What is NOT covered here
 
 - **Push-to-talk as a feature.** Check 7 starts the recognizer and shows
@@ -235,5 +247,5 @@ push-to-talk design rather than being discovered by a driver in a tunnel.
 | 5 — icons render | 2026-08-29 | **PASS** | Every glyph draws: the five bottom-bar icons, the crossed-out speaker on the voice toggle and the speech bubble on the command bar. The unprefixed `mask-image` concern does not bite on this WebView. |
 | 6 — recognition present | 2026-08-29 | **Síntesis (TTS): ausente. Reconocimiento (STT): alcanzable (estándar).** Voces instaladas: 0. | The two engines diverge, which no one predicted: synthesis is missing and recognition's constructor is present, unprefixed. Not a pass — see below. |
 | 7 — recognizer starts | 2026-08-29 | **PASS** | Held the probe and said *"esto es una prueba"*. The transcript came back marked `definitivo`, with no error code. The Web Speech recognizer works in this WebView and **STT needs no native bridge**. |
-| 8 — recognizer without Internet | — | NOT RUN | Android speech usually reaches a network service unless an offline language pack is installed. Check 7 ran online, so this is untested. See below. |
+| 8 — recognizer without Internet | 2026-08-29 | **PASS** | With data and Wi-Fi off (owner-reported), the probe returned *"hola esto es otra prueba hablando sin conexión"* marked `definitivo`. This phone has an offline Spanish recognition pack. |
 
