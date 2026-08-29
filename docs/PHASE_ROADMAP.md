@@ -41,7 +41,7 @@ states separately and which does not always restate the exit criterion.
 |---|---|---|---|---|---|
 | Fase 0 | Transport viability | Minimal test page. Connect, send `ATZ` and `0100`, receive a valid response, record traces and repeat the operation. | Recorded demonstration and `ATZ`/`0100`/`010C` log, **or** a documented decision to change transport. | MUST | **Closed.** Closed through the second branch: the transport decision is documented in `docs/decisions/ADR-002-obd-transport.md`, which took the §3.1 decision gate's native-container path. |
 | Fase 1 | Local OBD reader | ELM initialization, protocol detection, supported PIDs, telemetry, DTC, errors and reconnection. | Stable local OBD dashboard, tested parser, read-only DTC. | MUST | **Closed on vehicle evidence with one narrow waiver.** ADR-003 closed it on 2026-08-25 with no vehicle validation at all; ADR-004 superseded that on 2026-08-28 with the real field-test run. See the Sprint 0 table below. |
-| Fase 2 | Local diagnostics and warning lights | Severity rules, DTC catalogue, guided warning-light identification, **local TTS** and session logging. | Local evaluation and warning-light catalogue operational without Internet. | MUST | **Coded, not verified.** Local TTS (RF-031) was missing entirely and now ships: a layout-wide toggle, spoken assessments, and a mute. It has **never run on the phone**, so whether the platform engine is reachable from this WebView is still open — [`SPEECH_DEVICE_VALIDATION.md`](SPEECH_DEVICE_VALIDATION.md) check 1 is the gate, and it needs no car. The Rio warning-light catalogue also ships with an unverified-provenance header, see `WARNING_LIGHT_CATALOG_VERIFICATION.md`. |
+| Fase 2 | Local diagnostics and warning lights | Severity rules, DTC catalogue, guided warning-light identification, **local TTS** and session logging. | Local evaluation and warning-light catalogue operational without Internet. | MUST | **Open, and its TTS criterion is now proven unmet.** Local TTS (RF-031) ships — a layout-wide toggle, spoken assessments and a mute — and on 2026-08-29 all of it was shown to be inert on the phone: [`SPEECH_DEVICE_VALIDATION.md`](SPEECH_DEVICE_VALIDATION.md) check 1 failed because `window.speechSynthesis` does not exist in this Capacitor WebView. Closing Fase 2 needs a native bridge to the platform engine (ADR-012's option 2), not more web code. The Rio warning-light catalogue also ships with an unverified-provenance header, see `WARNING_LIGHT_CATALOG_VERIFICATION.md`. |
 | Fase 3 | **Voice and AI** | Push-to-talk, transcription, structured responses, swappable AI provider, output validation and temporary local fallback. | Voice/text query with fallback and a structured response. | MUST | **Open since 2026-08-28** — ADR-010. Activation is push-to-talk (RF-030); the "hey kirio" wake word is out of scope and gated separately by ADR-011. |
 | Fase 4 | **Convex and maintenance** | Mandatory synchronization, history, maintenance records, reminders, queue recovery and basic export. | Synchronization and maintenance without compromising local operation. | MUST | Not started. |
 | Fase 5 | Extensions | Camera, native app, advanced modules, multiple vehicles and historical metrics. | (not listed in §15.3) | **COULD** | Not started. |
@@ -92,10 +92,14 @@ best-evidenced part of the stack.
 Checking §3.1 properly also surfaced a second thing: Fase 3's *actual*
 previous phase is Fase 2, and Fase 2's exit criterion includes local TTS
 (RF-031, MUST), which had never been built. That one is **not** waived. It was
-built as Fase 3's first work item and now ships — but by ADR-012's own
-standard, shipped code that has never run on the device proves nothing.
-Fase 2 closes when [`SPEECH_DEVICE_VALIDATION.md`](SPEECH_DEVICE_VALIDATION.md)
-check 1 passes on the phone, not before.
+built as Fase 3's first work item and ships — and by ADR-012's own standard,
+shipped code that has never run on the device proved nothing. On 2026-08-29 it
+ran, and it failed: `window.speechSynthesis` does not exist in this Capacitor
+WebView, so every line of that TTS is inert on the phone.
+
+So Fase 2 remains open on this criterion, and the gate is no longer a check —
+it is a bridge. `SpeechAnnouncer` takes an injected `SpeechSynthesisPort`, so
+what has to change is the adapter behind it, not the feature.
 
 ## Sprint 0 (Anexo B)
 
@@ -158,15 +162,22 @@ whether it means the spec's or the repository's.
 ## Next step
 
 Fase 3 is open. Its first work item — local TTS (RF-031), which also closes
-Fase 2's outstanding exit criterion — is **coded and awaiting one check on the
-phone**.
+Fase 2's outstanding exit criterion — is coded, and **the check it was waiting
+for has now run and failed**.
 
 Speech uses the device's own engines, not a bundled model
-([ADR-012](decisions/ADR-012-on-device-speech.md)). The TTS half is written and
-shipped; whether those engines are reachable from inside the Capacitor WebView
-is **still unverified**. [`SPEECH_DEVICE_VALIDATION.md`](SPEECH_DEVICE_VALIDATION.md)
-holds that check. It needs a phone, not a car, and it takes ten seconds — and
-until it runs, no further speech work should be built on the assumption that
-the API is there.
+([ADR-012](decisions/ADR-012-on-device-speech.md)). Those engines are **not**
+reachable from the Web Speech APIs inside this Capacitor WebView: check 1 of
+[`SPEECH_DEVICE_VALIDATION.md`](SPEECH_DEVICE_VALIDATION.md) failed on
+2026-08-29 with `window.speechSynthesis` undefined. ADR-012 anticipated this
+exact outcome as its option 2, so it is a decision taken, not a surprise.
+
+The next work item is therefore a native Capacitor bridge for **synthesis
+only**. Checks 6 and 7, added and run the same day, settled the other half:
+the two sides of the Web Speech API disagree on this device. Synthesis is
+absent; recognition's constructor is present, unprefixed, and a real
+`start()` returned a transcript. **Push-to-talk needs no bridge** — it can be
+built on the Web Speech recognizer, and the only open question there is
+whether it still works with no Internet (check 8).
 
 The wake-word viability gate (ADR-011) is unscheduled and blocks nothing.

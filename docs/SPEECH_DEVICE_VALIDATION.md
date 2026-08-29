@@ -1,15 +1,22 @@
 # Speech device validation
 
-**Status: NOT RUN.** Nothing below has been executed on the phone. The TTS
-code is written, unit-tested and shipped; whether the platform engine is
-reachable from inside the Capacitor WebView is still an open question.
+**Status: measured on 2026-08-29. The two halves of the Web Speech API
+disagree on this device, and that is the headline.**
 
-[ADR-012](decisions/ADR-012-on-device-speech.md) puts speech on the device's
-own engines and states plainly that it does **not** assume those engines are
-reachable from the Web Speech APIs in this shell. This document is where that
-assumption gets tested. Until check 1 runs, the honest status of Fase 2's
-`TTS local` exit criterion is *coded, unverified* — see
-[`PHASE_ROADMAP.md`](PHASE_ROADMAP.md).
+| | Result | Consequence |
+|---|---|---|
+| **Synthesis (TTS)** | `window.speechSynthesis` **does not exist** (check 1) | Needs a native Capacitor bridge. Fase 2's `TTS local` exit criterion is **NOT met**. |
+| **Recognition (STT)** | Constructor present, and a real `start()` **worked** — transcript returned (checks 6 and 7) | **No bridge needed.** Push-to-talk can be built on the Web Speech recognizer. |
+
+Nobody predicted the split. The expectation going in was that both would be
+missing together, because they are one API; measuring cost ten seconds each
+time and overturned that twice.
+
+The TTS result is [ADR-012](decisions/ADR-012-on-device-speech.md)'s option 2
+becoming the actual path, not a defect: that ADR put speech on the device's
+own engines and stated plainly that it did **not** assume those engines were
+reachable from the Web Speech APIs in this shell. For synthesis they are not.
+For recognition they are. See [`PHASE_ROADMAP.md`](PHASE_ROADMAP.md).
 
 > **Why this file exists.** `WebSerialRfcommTransport` was written and
 > unit-tested against a browser API that does not exist inside the Android
@@ -19,7 +26,7 @@ assumption gets tested. Until check 1 runs, the honest status of Fase 2's
 > runs against an injected fake host. **The phone is the only thing that can
 > answer check 1.**
 
-No car is needed for checks 1–3. Only check 4 wants the vehicle.
+Only check 4 wants the vehicle. Every other check runs on the phone alone.
 
 ## Quick path
 
@@ -105,13 +112,112 @@ later from memory.
 
 If the circles are blank, the icons are not the bug — the mask is.
 
+## Check 6 — Is the recognition engine there either?
+
+Added on 2026-08-29, after check 1 failed. Android's WebView omitting
+synthesis makes recognition's absence very likely — they are the same Web
+Speech API — but likely is not measured, and this project does not record
+inferences as results. Push-to-talk is the next thing to be designed, so the
+inference has to become a reading first.
+
+Open **Registro**. At the top is *Motor de voz del dispositivo*, which runs
+`detectSpeechCapability` against the live `window` and prints both engines.
+Record the two status lines verbatim:
+
+- **Reconocimiento (STT): ausente** — recognition needs a native Capacitor
+  bridge too, and the push-to-talk button must be built on that bridge rather
+  than on `SpeechRecognition`.
+- **Reconocimiento (STT): alcanzable** — the constructor exists. This is
+  *not* a pass: only a real `start()` distinguishes a working recognizer from
+  one that throws or is denied on first use. It means the bridge question is
+  open for STT, not that STT works.
+
+**Read on 2026-08-29: `alcanzable (estándar)`, with synthesis absent.** The
+two halves of the same Web Speech API do not agree on this device, and the
+expectation going in — that recognition would be missing alongside synthesis
+— was wrong. That is the entire justification for this check existing: the
+inference was reasonable, cheap to test, and false.
+
+What it does **not** license is building push-to-talk on `SpeechRecognition`
+and calling it done. A present constructor is compatible with a recognizer
+that throws on `start()`, is denied the microphone, or reaches no service.
+The next measurement is a real `start()`, and it needs `RECORD_AUDIO` in the
+manifest — deliberately absent until now, so adding it is a decision to take
+openly, not a line to slip in.
+
+The panel says on screen that it proves nothing, and that line is permanent
+rather than conditional on the result. *Volver a comprobar* re-runs the probe:
+`getVoices()` can return an empty list before the engine finishes loading, so
+a voice count of zero is worth one retry before it is written down.
+
+
+## Check 7 — Does the recognizer actually start?
+
+Added on 2026-08-29, after check 6 read `alcanzable (estándar)`. A present
+constructor is compatible with a recognizer that throws, is denied the
+microphone, or has no service behind it. This is the `start()` that tells
+them apart, and it is the last thing standing between the project and a
+push-to-talk design.
+
+**This check needs a microphone permission that did not exist before.**
+`RECORD_AUDIO` and `MODIFY_AUDIO_SETTINGS` are now in the manifest. Capacitor
+asks for both together: `BridgeWebChromeClient.onPermissionRequest` launches
+a runtime request for the pair whenever web content asks for an
+`AUDIO_CAPTURE` resource. No audio is recorded, stored or sent anywhere — the
+probe shows the transcript on screen and discards it (RNF-007).
+
+Open **Registro**. Under the capability panel is *Sonda de push-to-talk*.
+
+1. **Hold** the button and say something short — *"lee los códigos"*.
+2. Android may ask for the microphone the first time. Accept it; that dialog
+   is why the start deadline is 15 s and not 3.
+3. **Release.**
+
+Record which of these happened:
+
+| What you see | What it means | Status |
+|---|---|---|
+| *Escuchando*, then your words appear, `definitivo` | The Web Speech recognizer works in this WebView. Push-to-talk needs **no** native bridge. | PASS |
+| `not-allowed` | The system denied the microphone. A permission problem, not an engine one — check Android settings and retry before recording it. | RETRY, then FAIL |
+| `service-not-allowed` | The device offers no recognition service to this WebView. **This is the outcome that forces a native bridge for STT too.** | FAIL |
+| `no-speech` | The microphone opened and heard nothing. The engine WORKS — this is a PASS for reachability. Retry while actually speaking. | PASS (engine), retry for a transcript |
+| `network` | The recognizer needed the internet and had none. Not a microphone failure; retry online. | RETRY |
+| *El reconocedor no llegó a abrir el micrófono* | 15 s passed with no audio start. Nothing was proven; treat as a hang, not a denial. | FAIL |
+
+The code shown in monospace is the finding. The Spanish line under it is a
+gloss for whoever is holding the phone — **report the code**, not the gloss.
+
+**What a PASS here still does not prove.** That recognition works, not that
+push-to-talk is done. The probe runs no commands: it displays the transcript
+and throws it away. Wiring it to §11's vocabulary is a separate change with
+its own acceptance, and RF-030's real criterion — *"la función principal no
+depende del reconocimiento de voz"* — is met by the text command bar, not by
+this.
+
+## Check 8 — Does recognition still work with no Internet?
+
+Open, and worth running before push-to-talk is designed around the recognizer.
+
+Check 7 passed **online**. Android's speech recognition commonly reaches a
+network service unless the device has an offline language pack for Spanish
+installed, and the Web Speech API reports that failure as `network`. This
+project cares because §9.5 defines a degraded mode for exactly this: no
+Internet, local rules and catalogue still answering.
+
+Voice is not on RNF-004's list of what must survive offline, so a `network`
+result here is **not** a defect. It is a scope fact that belongs in the
+push-to-talk design rather than being discovered by a driver in a tunnel.
+
+1. Turn off mobile data and Wi-Fi. Re-enable Bluetooth if you also want the
+   adapter; airplane mode switches it off.
+2. Hold the probe and speak.
+3. Record the transcript, or the code.
+
 ## What is NOT covered here
 
-- **STT / speech recognition.** Not built. `detectSpeechCapability` reports
-  whether a `SpeechRecognition` constructor exists, but nothing surfaces that
-  yet and a constructor proves nothing on its own — only a real `start()`
-  does. The `RECORD_AUDIO` permission is deliberately still absent from the
-  manifest.
+- **Push-to-talk as a feature.** Check 7 starts the recognizer and shows
+  what it heard; it runs no commands and stores nothing. Connecting a
+  transcript to §11's vocabulary is a separate change.
 - **The wake word.** Out of scope by
   [ADR-011](decisions/ADR-011-wake-word-viability-gate.md); it has its own
   gate.
@@ -122,8 +228,12 @@ If the circles are blank, the icons are not the bug — the mask is.
 
 | Check | Date | Outcome | Notes |
 |---|---|---|---|
-| 1 — engine reachable | — | NOT RUN | |
-| 2 — Spanish voice | — | NOT RUN | |
-| 3 — silencing | — | NOT RUN | |
-| 4 — assessment in the car | — | NOT RUN | Opportunistic; needs a stored fault |
-| 5 — icons render | — | NOT RUN | Blank circles would point at `mask-image`, not the icons |
+| 1 — engine reachable | 2026-08-29 | **FAIL** | The button turned red. Reason reported by the owner: *"No se pudo activar la voz. speechSynthesis no existe en este webview. El TTS necesitará un puente nativo de capacitor"*. That is the toast title from `SpeechToggleButton.vue` plus the canonical note in `detectSpeechCapability.ts`, so the path is traced: `window.speechSynthesis` was undefined. |
+| 2 — Spanish voice | 2026-08-29 | NOT APPLICABLE | Nothing spoke, so there was no accent to judge. Reopens if a native bridge lands. |
+| 3 — silencing | 2026-08-29 | NOT APPLICABLE | Nothing to silence. Reopens with the bridge. |
+| 4 — assessment in the car | — | NOT RUN | Opportunistic; needs a stored fault, and now also needs the bridge |
+| 5 — icons render | 2026-08-29 | **PASS** | Every glyph draws: the five bottom-bar icons, the crossed-out speaker on the voice toggle and the speech bubble on the command bar. The unprefixed `mask-image` concern does not bite on this WebView. |
+| 6 — recognition present | 2026-08-29 | **Síntesis (TTS): ausente. Reconocimiento (STT): alcanzable (estándar).** Voces instaladas: 0. | The two engines diverge, which no one predicted: synthesis is missing and recognition's constructor is present, unprefixed. Not a pass — see below. |
+| 7 — recognizer starts | 2026-08-29 | **PASS** | Held the probe and said *"esto es una prueba"*. The transcript came back marked `definitivo`, with no error code. The Web Speech recognizer works in this WebView and **STT needs no native bridge**. |
+| 8 — recognizer without Internet | — | NOT RUN | Android speech usually reaches a network service unless an offline language pack is installed. Check 7 ran online, so this is untested. See below. |
+
