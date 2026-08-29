@@ -183,6 +183,28 @@ const readLines = computed<ReadLine[]>(() =>
         </ul>
       </section>
 
+      <!--
+        Restored with §8.2's `recommendedChecks`. The field was missing from
+        the assessment entirely, so the catalogue's suggested checks were
+        collected and then dropped on the floor.
+      -->
+      <section
+        v-if="props.assessment.recommendedChecks.length > 0"
+        class="flex flex-col gap-2"
+      >
+        <h3 class="text-sm font-semibold text-highlighted">
+          Qué conviene revisar
+        </h3>
+        <ul class="list-disc pl-5 text-sm leading-6 text-muted">
+          <li
+            v-for="check in props.assessment.recommendedChecks"
+            :key="check"
+          >
+            {{ check }}
+          </li>
+        </ul>
+      </section>
+
       <section class="flex flex-col gap-2">
         <h3 class="text-sm font-semibold text-highlighted">
           En qué se basa
@@ -190,9 +212,9 @@ const readLines = computed<ReadLine[]>(() =>
         <ul class="list-disc pl-5 text-sm leading-6 text-muted">
           <li
             v-for="item in props.assessment.evidence"
-            :key="`${item.source}:${item.summary}`"
+            :key="`${item.type}:${item.description}`"
           >
-            {{ item.summary }}
+            {{ item.description }}
           </li>
         </ul>
       </section>

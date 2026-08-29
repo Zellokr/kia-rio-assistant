@@ -108,7 +108,7 @@ function codesRead(
 }
 
 describe('assessDiagnostics', () => {
-  it('returns exactly the six mandatory spec §8.2 fields', () => {
+  it('returns exactly the eight mandatory spec §8.2 fields', () => {
     const assessment = assessDiagnostics(
       {
         reads: [codesRead(['P0420'])],
@@ -119,10 +119,12 @@ describe('assessDiagnostics', () => {
 
     expect(Object.keys(assessment).sort()).toEqual([
       'confidence',
+      'dtcs',
       'evidence',
       'immediateAction',
       'limitations',
       'possibleCauses',
+      'recommendedChecks',
       'severity'
     ])
     expect(assessment.immediateAction.length).toBeGreaterThan(0)
@@ -258,7 +260,7 @@ describe('assessDiagnostics', () => {
 
   describe('evidence', () => {
     /** Spec §10.4 ordering: OBD data, then local rules, then driver input. */
-    it('orders sources per §10.4 and never invents a manual source', () => {
+    it('orders evidence per §10.4 and never invents manual evidence', () => {
       const assessment = assessDiagnostics(
         {
           reads: [codesRead(['P0300'])],
@@ -269,14 +271,14 @@ describe('assessDiagnostics', () => {
       )
 
       expect(
-        assessment.evidence.map(item => item.source)
+        assessment.evidence.map(item => item.type)
       ).toEqual([
-        'obd-data',
-        'local-rules',
-        'driver-input'
+        'dtc',
+        'dtc',
+        'driver'
       ])
       expect(
-        assessment.evidence.some(item => item.source === 'manual')
+        assessment.evidence.some(item => item.type === 'manual')
       ).toBe(false)
     })
 
@@ -297,8 +299,76 @@ describe('assessDiagnostics', () => {
 
       expect(assessment.evidence).toHaveLength(1)
       expect(assessment.evidence[0]).toMatchObject({
-        source: 'obd-data'
+        type: 'dtc'
       })
+    })
+  })
+
+  describe('dtcs', () => {
+    it('carries the codes the assessment was built from', () => {
+      const assessment = assessDiagnostics(
+        {
+          reads: [codesRead(['P0420', 'P0300'])],
+          adapterConnected: true
+        },
+        catalog
+      )
+
+      expect(assessment.dtcs).toEqual(['P0420', 'P0300'])
+    })
+
+    it('does not repeat a code read twice', () => {
+      const assessment = assessDiagnostics(
+        {
+          reads: [codesRead(['P0420']), codesRead(['P0420'])],
+          adapterConnected: true
+        },
+        catalog
+      )
+
+      expect(assessment.dtcs).toEqual(['P0420'])
+    })
+
+    it('is empty when nothing was read', () => {
+      const assessment = assessDiagnostics(
+        { reads: [], adapterConnected: false },
+        catalog
+      )
+
+      expect(assessment.dtcs).toEqual([])
+    })
+  })
+
+  describe('recommendedChecks', () => {
+    it('carries what the catalogue suggests looking at', () => {
+      const assessment = assessDiagnostics(
+        {
+          reads: [codesRead(['P0420'])],
+          adapterConnected: true
+        },
+        catalog
+      )
+
+      expect(assessment.recommendedChecks.length).toBeGreaterThan(0)
+    })
+
+    /**
+     * An uncovered code contributes no checks rather than a guess. The
+     * conservative `immediateAction` already covers the driver when the
+     * catalogue has nothing to say.
+     */
+    it('stays empty for a code the catalogue does not cover', () => {
+      const assessment = assessDiagnostics(
+        {
+          reads: [codesRead(['P0001'])],
+          adapterConnected: true
+        },
+        catalog
+      )
+
+      expect(assessment.recommendedChecks).toEqual([])
+
+      expect(assessment.immediateAction.length).toBeGreaterThan(0)
     })
   })
 

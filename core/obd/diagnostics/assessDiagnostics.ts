@@ -12,21 +12,29 @@ import type { DtcCode } from '../dtc/DtcCode'
 import type { DtcReadOutcome } from '../usecases/readDiagnosticCodes'
 
 /**
- * Where a piece of evidence came from, in the priority order of spec §10.4:
- * OBD data first, then local rules, then the workshop manual, then what the
- * driver reported. `manual` is declared but never produced in Fase 2 — this
- * project ships no manual data.
+ * Where a piece of evidence came from. Spec §8.2's own five values.
+ *
+ * A catalogue lookup is reported as `dtc`, the same as the read it describes,
+ * and that is deliberate: §8.2 has no value for a local rule, and giving one
+ * its own value is what previously let a catalogued read corroborate itself
+ * into `high` confidence. Sharing the value makes the set dedupe, so the
+ * safeguard is now structural instead of a list that has to be maintained.
+ *
+ * `pid`, `light` and `manual` are declared and never produced yet: this
+ * project ships no manual data, and the assessment is built from DTC reads
+ * rather than live PIDs or tell-tales.
  */
-export type DiagnosticEvidenceSource
-  = | 'obd-data'
-    | 'local-rules'
+export type DiagnosticEvidenceType
+  = | 'pid'
+    | 'dtc'
+    | 'driver'
+    | 'light'
     | 'manual'
-    | 'driver-input'
 
 export interface DiagnosticEvidence {
-  readonly source: DiagnosticEvidenceSource
+  readonly type: DiagnosticEvidenceType
   /** Spanish, user-facing. */
-  readonly summary: string
+  readonly description: string
 }
 
 export interface DiagnosticContext {
@@ -36,16 +44,28 @@ export interface DiagnosticContext {
 }
 
 /**
- * Spec §8.2, exactly. Six fields, no more: Fase 3 sends this structure to
- * the AI, so adding a field here forks a contract another phase depends on.
- * Anything else worth saying travels inside `evidence` or `limitations`.
+ * Spec §8.2, all eight fields.
+ *
+ * This used to carry six and claim in a comment that it matched §8.2
+ * "exactly". It did not: `dtcs` and `recommendedChecks` were missing, and
+ * `evidence` used different field names and a different value set. The
+ * comment's own warning was right — RF-032 sends this structure to the AI, so
+ * a fork here forks a contract another phase depends on — it just pointed the
+ * wrong way. Fase 3 is that phase, and it would have sent an assessment
+ * without the codes that caused it.
+ *
+ * Anything worth saying that §8.2 has no field for travels inside `evidence`
+ * or `limitations`. Do not add a ninth field.
  */
 export interface DiagnosticAssessment {
   readonly severity: DiagnosticSeverity
   readonly confidence: DiagnosticConfidence
+  /** The codes this assessment was built from, in the order encountered. */
+  readonly dtcs: readonly string[]
   readonly evidence: readonly DiagnosticEvidence[]
   readonly possibleCauses: readonly string[]
   readonly immediateAction: string
+  readonly recommendedChecks: readonly string[]
   readonly limitations: readonly string[]
 }
 
@@ -81,24 +101,12 @@ const STATE_LABELS = {
   permanent: 'permanentes'
 } as const
 
-const EVIDENCE_SOURCE_ORDER: readonly DiagnosticEvidenceSource[] = [
-  'obd-data',
-  'local-rules',
+const EVIDENCE_TYPE_ORDER: readonly DiagnosticEvidenceType[] = [
+  'pid',
+  'dtc',
   'manual',
-  'driver-input'
-]
-
-/**
- * Sources that can corroborate ONE ANOTHER. `local-rules` is excluded on
- * purpose: a catalogue entry is this project's interpretation of the very
- * code the OBD read produced, not a second, independent observation of the
- * fault. Counting it would let every catalogued single read call itself
- * `high` confidence on the strength of its own lookup.
- */
-const CORROBORATING_SOURCES: readonly DiagnosticEvidenceSource[] = [
-  'obd-data',
-  'manual',
-  'driver-input'
+  'light',
+  'driver'
 ]
 
 interface ContributingCode {
@@ -135,9 +143,11 @@ export function assessDiagnostics(
   return {
     severity,
     confidence: resolveConfidence(context, contributing),
+    dtcs: collectDtcs(contributing),
     evidence: buildEvidence(context, contributing),
     possibleCauses: collectCauses(contributing),
     immediateAction: resolveImmediateAction(contributing, severity),
+    recommendedChecks: collectRecommendedChecks(contributing),
     limitations: collectLimitations(context, contributing)
   }
 }
@@ -202,6 +212,42 @@ function resolveImmediateAction(
     ?? CONSERVATIVE_ACTIONS[severity]
 }
 
+/** The codes behind the assessment, deduplicated, in the order encountered. */
+function collectDtcs(
+  contributing: readonly ContributingCode[]
+): readonly string[] {
+  const codes: string[] = []
+
+  for (const item of contributing) {
+    if (!codes.includes(item.code.code)) {
+      codes.push(item.code.code)
+    }
+  }
+
+  return codes
+}
+
+/**
+ * What the catalogue suggests looking at. An uncovered code contributes
+ * nothing here rather than a guess — the conservative `immediateAction`
+ * already covers the driver when the catalogue is silent.
+ */
+function collectRecommendedChecks(
+  contributing: readonly ContributingCode[]
+): readonly string[] {
+  const checks: string[] = []
+
+  for (const item of contributing) {
+    for (const check of entryOf(item)?.recommendedChecks ?? []) {
+      if (!checks.includes(check)) {
+        checks.push(check)
+      }
+    }
+  }
+
+  return checks
+}
+
 function collectCauses(
   contributing: readonly ContributingCode[]
 ): readonly string[] {
@@ -241,8 +287,7 @@ function resolveConfidence(
 
   const corroborating = new Set(
     buildEvidence(context, contributing)
-      .map(item => item.source)
-      .filter(source => CORROBORATING_SOURCES.includes(source))
+      .map(item => item.type)
   )
 
   return corroborating.size >= 2
@@ -258,8 +303,8 @@ function buildEvidence(
 
   for (const read of context.reads) {
     evidence.push({
-      source: 'obd-data',
-      summary: describeRead(read)
+      type: 'dtc',
+      description: describeRead(read)
     })
   }
 
@@ -268,24 +313,24 @@ function buildEvidence(
 
     if (entry) {
       evidence.push({
-        source: 'local-rules',
-        summary: `${entry.code}: ${entry.title}`
+        type: 'dtc',
+        description: `${entry.code}: ${entry.title}`
       })
     }
   }
 
   for (const symptom of context.driverReportedSymptoms ?? []) {
     evidence.push({
-      source: 'driver-input',
-      summary: symptom
+      type: 'driver',
+      description: symptom
     })
   }
 
   // `manual` never appears: Fase 2 has no manual data to cite.
   return [...evidence].sort(
     (left, right) =>
-      EVIDENCE_SOURCE_ORDER.indexOf(left.source)
-      - EVIDENCE_SOURCE_ORDER.indexOf(right.source)
+      EVIDENCE_TYPE_ORDER.indexOf(left.type)
+      - EVIDENCE_TYPE_ORDER.indexOf(right.type)
   )
 }
 

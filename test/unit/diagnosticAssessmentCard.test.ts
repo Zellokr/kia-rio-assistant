@@ -28,14 +28,15 @@ const stubs = {
 const ASSESSMENT: DiagnosticAssessment = {
   severity: 'critical',
   confidence: 'medium',
+  dtcs: ['P0300'],
   evidence: [
     {
-      source: 'obd-data',
-      summary: 'Lectura de códigos almacenados: 1 código(s)'
+      type: 'dtc',
+      description: 'Lectura de códigos almacenados: 1 código(s)'
     },
     {
-      source: 'local-rules',
-      summary: 'P0300: Fallo de encendido detectado en varios cilindros'
+      type: 'dtc',
+      description: 'P0300: Fallo de encendido detectado en varios cilindros'
     }
   ],
   possibleCauses: [
@@ -43,6 +44,7 @@ const ASSESSMENT: DiagnosticAssessment = {
     'Bobina de encendido defectuosa'
   ],
   immediateAction: 'Detén el vehículo en un lugar seguro.',
+  recommendedChecks: ['Revisa el estado de las bujías'],
   limitations: ['No se ha confirmado la causa mediante OBD-II']
 }
 
@@ -63,7 +65,7 @@ function render(props: Record<string, unknown>) {
 }
 
 describe('DiagnosticAssessmentCard', () => {
-  it('renders all six mandatory spec §8.2 fields', () => {
+  it('renders all eight mandatory spec §8.2 fields', () => {
     const text = render({
       assessment: ASSESSMENT,
       reads: [storedRead(['P0300'])]
@@ -76,6 +78,21 @@ describe('DiagnosticAssessmentCard', () => {
     expect(text).toContain('Detén el vehículo en un lugar seguro.')
     expect(text).toContain('No se ha confirmado la causa mediante OBD-II')
     expect(text).toContain('Lectura de códigos almacenados')
+    expect(text).toContain('Revisa el estado de las bujías')
+  })
+
+  /**
+   * `recommendedChecks` was missing from the assessment entirely, so the
+   * catalogue collected these and then dropped them. An empty list must not
+   * leave an empty heading behind.
+   */
+  it('hides the checks section when the catalogue suggests none', () => {
+    const text = render({
+      assessment: { ...ASSESSMENT, recommendedChecks: [] },
+      reads: [storedRead(['P0300'])]
+    }).text()
+
+    expect(text).not.toContain('Qué conviene revisar')
   })
 
   it('lists the codes that were actually read', () => {
