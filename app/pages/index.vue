@@ -9,6 +9,8 @@ import { useObdLabSession } from '~/composables/useObdLabSession'
 import { useSessionStateBeacon } from '~/composables/useSessionStateBeacon'
 import { labViews } from '~/utils/labNav'
 import type { LabViewId } from '~/utils/labNav'
+import type { QuickCommandIntent } from '~~/core/assistant/parseQuickCommand'
+import AssistantCommandBar from '~/components/AssistantCommandBar.vue'
 import BottomTabBar from '~/components/BottomTabBar.vue'
 import ConnectionView from '~/components/ConnectionView.vue'
 import DataView from '~/components/DataView.vue'
@@ -75,6 +77,38 @@ const activeView = ref<LabViewId>('connection')
 
 function setActiveView(view: LabViewId): void {
   activeView.value = view
+}
+
+/**
+ * Carries out a quick command from the assistant bar (§11).
+ *
+ * Every branch lands the driver on the screen that answers the question,
+ * because the spoken or typed reply is a summary and the detail lives in the
+ * view. `save-note` cannot arrive: the bar refuses it, since notes are a
+ * Fase 4 maintenance record this app cannot write.
+ */
+function runAssistantCommand(intent: QuickCommandIntent): void {
+  switch (intent) {
+    case 'status':
+      activeView.value = 'connection'
+      break
+
+    case 'read-dtc':
+      activeView.value = 'diagnostics'
+      void readDiagnosticTroubleCodes('stored')
+      break
+
+    case 'temperature':
+      activeView.value = 'data'
+      break
+
+    case 'warning-light':
+      activeView.value = 'warnings'
+      break
+
+    case 'save-note':
+      break
+  }
 }
 
 const logCopyStatus = ref('')
@@ -186,6 +220,8 @@ async function sendLogToTelegram(): Promise<void> {
         />
       </UContainer>
     </div>
+
+    <AssistantCommandBar @command="runAssistantCommand" />
 
     <BottomTabBar
       :views="labViews"
