@@ -52,6 +52,24 @@
         android:usesPermissionFlags="neverForLocation" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 
+    <!--
+        Push-to-talk probe (RF-030). Deliberately absent until 2026-08-29:
+        check 6 found the SpeechRecognition constructor present in this
+        WebView while speechSynthesis was absent, and a constructor proves
+        nothing — only a real start() does, and that needs the microphone.
+
+        MODIFY_AUDIO_SETTINGS is here because Capacitor asks for it: the
+        WebView grants a JS microphone request through
+        BridgeWebChromeClient.onPermissionRequest, which launches BOTH
+        permissions for an AUDIO_CAPTURE resource. Declaring only
+        RECORD_AUDIO would make that runtime request fail.
+
+        No audio is recorded, stored or sent anywhere (RNF-007). The probe
+        displays the transcript and discards it.
+    -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+
     <uses-feature
         android:name="android.hardware.bluetooth_le"
         android:required="false" />

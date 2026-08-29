@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useSpeechCapability } from '~/composables/useSpeechCapability'
+import { useSpeechListener } from '~/composables/useSpeechListener'
 import type {
   ObdSessionEvent
 } from '~~/core/obd/logging/ObdSessionLog'
@@ -25,6 +26,20 @@ const emit = defineEmits<{
  * evidence, which is what this destination already holds.
  */
 const { report: speechReport, probe: probeSpeech } = useSpeechCapability()
+
+/**
+ * The push-to-talk probe sits under the capability panel because it answers
+ * the question that panel raises: the recognizer's constructor is present in
+ * this WebView, and only a real `start()` says whether it works.
+ */
+const {
+  state: listenerState,
+  transcript,
+  transcriptIsFinal,
+  reason: listenerReason,
+  press,
+  release
+} = useSpeechListener()
 </script>
 
 <template>
@@ -32,6 +47,15 @@ const { report: speechReport, probe: probeSpeech } = useSpeechCapability()
     <SpeechCapabilityPanel
       :report="speechReport"
       @refresh="probeSpeech"
+    />
+
+    <PushToTalkProbe
+      :state="listenerState"
+      :transcript="transcript"
+      :transcript-is-final="transcriptIsFinal"
+      :reason="listenerReason"
+      @press="press"
+      @release="release"
     />
 
     <SessionLogPanel
