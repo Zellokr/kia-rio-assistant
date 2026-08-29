@@ -88,6 +88,23 @@ action, then silence:
   confidence assessment is announced without that hedge, it is a defect.
 - An informational assessment must say nothing at all.
 
+## Check 5 — Do the button icons render in the WebView?
+
+Not a speech question, but it is answered by the same session and it costs
+one glance.
+
+The floating buttons must show a glyph, not an empty circle: a crossed-out
+speaker on the voice toggle, a speech bubble on the command bar above it.
+
+**Why it is worth a check.** Nuxt Icon paints glyphs with an unprefixed
+`mask-image`, and the built CSS contains no `-webkit-mask` declaration at all.
+Desktop Chrome renders this correctly — verified. Whether every Android
+WebView version does is **unverified**, and a blank circle would look like a
+missing icon rather than a CSS support gap, which is a bad thing to debug
+later from memory.
+
+If the circles are blank, the icons are not the bug — the mask is.
+
 ## What is NOT covered here
 
 - **STT / speech recognition.** Not built. `detectSpeechCapability` reports
@@ -109,3 +126,4 @@ action, then silence:
 | 2 — Spanish voice | — | NOT RUN | |
 | 3 — silencing | — | NOT RUN | |
 | 4 — assessment in the car | — | NOT RUN | Opportunistic; needs a stored fault |
+| 5 — icons render | — | NOT RUN | Blank circles would point at `mask-image`, not the icons |
