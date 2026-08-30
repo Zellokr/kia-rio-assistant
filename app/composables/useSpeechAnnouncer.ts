@@ -4,7 +4,7 @@ import {
   SpeechAnnouncer,
   type AnnouncerState
 } from '~~/core/speech/SpeechAnnouncer'
-import { createWebSpeechSynthesis } from '~/services/webSpeechSynthesis'
+import { createSpeechSynthesisPort } from '~/services/speechSynthesisPort'
 
 /**
  * One announcer for the whole app.
@@ -41,7 +41,7 @@ function resolveAnnouncer(): SpeechAnnouncer | null {
    * moment the announcer makes it, including `starting`.
    */
   const instance: SpeechAnnouncer = new SpeechAnnouncer(
-    createWebSpeechSynthesis(window as never),
+    createSpeechSynthesisPort(window as never),
     () => {
       state.value = instance.state
       unavailableReason.value = instance.unavailableReason

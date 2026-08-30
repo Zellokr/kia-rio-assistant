@@ -16,7 +16,7 @@ function workingHost(): WebSpeechHost & { spoken: string[] } {
       getVoices: () => [{ lang: 'es-ES' }],
       speak: (utterance: UtteranceLike) => {
         spoken.push(utterance.text)
-        queueMicrotask(() => utterance.onend?.())
+        queueMicrotask(() => utterance.onstart?.())
       },
       cancel: vi.fn()
     },
@@ -49,7 +49,7 @@ describe('createWebSpeechSynthesis', () => {
 
     host.speechSynthesis!.speak = (utterance: UtteranceLike) => {
       lang = utterance.lang
-      queueMicrotask(() => utterance.onend?.())
+      queueMicrotask(() => utterance.onstart?.())
     }
 
     await createWebSpeechSynthesis(host).speak('hola')
@@ -112,24 +112,15 @@ describe('createWebSpeechSynthesis', () => {
    * Android WebViews drop `onend`. Once audio has been heard the engine has
    * proven itself, so a missing end event must not retract that.
    */
-  it('resolves on timeout when audio started but never ended', async () => {
-    vi.useFakeTimers()
-
+  it('resolves immediately when audio starts even if it never ends', async () => {
     const host = workingHost()
 
     host.speechSynthesis!.speak = (utterance: UtteranceLike) => {
       utterance.onstart?.()
     }
 
-    const pending = createWebSpeechSynthesis(host, { timeoutMs: 5000 })
-      .speak('hola')
-
-    const assertion = expect(pending).resolves.toBeUndefined()
-
-    await vi.advanceTimersByTimeAsync(5000)
-    await assertion
-
-    vi.useRealTimers()
+    await expect(createWebSpeechSynthesis(host, { timeoutMs: 5000 }).speak('hola'))
+      .resolves.toBeUndefined()
   })
 
   it('reports zero voices as the cause rather than a bare failure', async () => {

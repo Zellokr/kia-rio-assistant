@@ -10,19 +10,20 @@ import {
 import SpeechToggleButton from '../../app/components/SpeechToggleButton.vue'
 import { __resetSpeechAnnouncer } from '../../app/composables/useSpeechAnnouncer'
 
-/** Installs a speech engine on `window` that completes every utterance. */
+/** Installs a speech engine on `window` that starts every utterance. */
 function installWorkingEngine(): void {
   Object.assign(window, {
     speechSynthesis: {
       getVoices: () => [{ lang: 'es-ES' }],
-      speak: (utterance: { onend: (() => void) | null }) => {
-        queueMicrotask(() => utterance.onend?.())
+      speak: (utterance: { onstart: (() => void) | null }) => {
+        queueMicrotask(() => utterance.onstart?.())
       },
       cancel: () => {}
     },
     SpeechSynthesisUtterance: class {
       text: string
       lang = ''
+      onstart: (() => void) | null = null
       onend: (() => void) | null = null
       onerror: (() => void) | null = null
 

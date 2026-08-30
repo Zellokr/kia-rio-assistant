@@ -5,6 +5,7 @@ import { mount } from '@vue/test-utils'
 import LabPage from '~/pages/index.vue'
 import ConnectionView from '~/components/ConnectionView.vue'
 import BottomTabBar from '~/components/BottomTabBar.vue'
+import AssistantCommandBar from '~/components/AssistantCommandBar.vue'
 
 /**
  * The lab page is the integration point: it owns transport selection, the
@@ -99,5 +100,26 @@ describe('lab page', () => {
     expect(wrapper.findComponent(ConnectionView).exists()).toBe(true)
     expect(wrapper.findComponent(ConnectionView).props('transportError'))
       .not.toBe('')
+  })
+
+  it('clears a local assistant answer when a deterministic command runs', async () => {
+    const wrapper = mountLabPage()
+    const commandBar = wrapper.findComponent(AssistantCommandBar)
+
+    await commandBar.vm.$emit('query', {
+      text: 'que significa esto',
+      source: 'text'
+    })
+    await new Promise(resolve => setTimeout(resolve, 0))
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.text()).toContain('Respuesta del asistente')
+    expect(wrapper.text()).toContain('Fallback local')
+
+    await commandBar.vm.$emit('command', 'temperature')
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.text()).not.toContain('Respuesta del asistente')
+    expect(wrapper.text()).toContain('Lecturas en directo')
   })
 })

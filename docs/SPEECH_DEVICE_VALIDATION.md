@@ -5,8 +5,8 @@ disagree on this device, and that is the headline.**
 
 | | Result | Consequence |
 |---|---|---|
-| **Synthesis (TTS)** | `window.speechSynthesis` **does not exist** (check 1) | Needs a native Capacitor bridge. Fase 2's `TTS local` exit criterion is **NOT met**. |
-| **Recognition (STT)** | Constructor present, a real `start()` **worked**, and it works **offline** too (checks 6, 7 and 8) | **No bridge needed, no network needed.** Push-to-talk can be built on the Web Speech recognizer. |
+| **Synthesis (TTS)** | `window.speechSynthesis` **does not exist**, but the native Capacitor Android `TextToSpeech` bridge **works on the phone** (checks 1, 2 and 3) | Fase 2's `TTS local` exit criterion is met through the native bridge. Web Speech remains only the browser fallback. |
+| **Recognition (STT)** | Constructor present, a real `start()` **worked**, works **offline**, and drove quick commands through `parseQuickCommand` on device (checks 6, 7, 8 and 9) | **No bridge needed, no network needed.** Push-to-talk is wired through the Web Speech recognizer while the text command bar remains the fallback. |
 
 Nobody predicted the split. The expectation going in was that both would be
 missing together, because they are one API; measuring cost ten seconds each
@@ -44,7 +44,7 @@ there is nothing to read off a debug panel:
 
 | What happens | What it means | Status to record |
 |---|---|---|
-| It spins briefly, then shows a **waveform with a pulsing halo**, and you hear **"Voz activada"** | The Web Speech API is reachable and works in this WebView. No native bridge needed for TTS. | PASS |
+| It spins briefly, then shows a **waveform with a pulsing halo**, and you hear **"Voz activada"** | The selected speech engine works. In the Android app this now means the native `TextToSpeech` bridge reached audio start; in a browser it means Web Speech worked. | PASS |
 | It turns **red** with a crossed-out speaker, and a toast names a reason | Reachable or absent, but not usable. **The reason is the finding** — copy it verbatim. | FAIL, with reason |
 | It **spins and never settles** | The engine accepted the utterance and never made a sound. It gives up after 8 s and turns red. | FAIL |
 | Nothing happens at all | Not a speech result — the button did not receive the tap. Report as a UI defect, not a speech one. | INVALID |
@@ -227,25 +227,29 @@ same way — *"la función principal no depende del reconocimiento de voz"*.
 
 ## What is NOT covered here
 
-- **Push-to-talk as a feature.** Check 7 starts the recognizer and shows
-  what it heard; it runs no commands and stores nothing. Connecting a
-  transcript to §11's vocabulary is a separate change.
-- **The wake word.** Out of scope by
+- **A wake word.** Out of scope by
   [ADR-011](decisions/ADR-011-wake-word-viability-gate.md); it has its own
   gate.
 - **§11's detailed-while-parked speech.** Needs the driving mode, which does
   not exist.
+- **Spoken rerun of the later assistant fallback panel.** Check 9 validated
+  quick-command routing and negative cases on the installed APK. The later
+  local structured-answer fallback has now been rerun on the phone for typed
+  unknown text by ADB automation, and the tap-to-toggle dictation control was
+  owner-confirmed on the Pixel 9a with the spoken command *"temperatura"*.
+  A fresh spoken unknown transcript still should not execute an OBD command.
 
 ## Results
 
 | Check | Date | Outcome | Notes |
 |---|---|---|---|
-| 1 — engine reachable | 2026-08-29 | **FAIL** | The button turned red. Reason reported by the owner: *"No se pudo activar la voz. speechSynthesis no existe en este webview. El TTS necesitará un puente nativo de capacitor"*. That is the toast title from `SpeechToggleButton.vue` plus the canonical note in `detectSpeechCapability.ts`, so the path is traced: `window.speechSynthesis` was undefined. |
-| 2 — Spanish voice | 2026-08-29 | NOT APPLICABLE | Nothing spoke, so there was no accent to judge. Reopens if a native bridge lands. |
-| 3 — silencing | 2026-08-29 | NOT APPLICABLE | Nothing to silence. Reopens with the bridge. |
-| 4 — assessment in the car | — | NOT RUN | Opportunistic; needs a stored fault, and now also needs the bridge |
+| 1 — engine reachable | 2026-08-29 | **PASS via native bridge** | Owner-reported APK validation: the native Android `TextToSpeech` bridge works perfectly on the phone. Historical finding preserved: the Web Speech path failed because `window.speechSynthesis` was undefined in this Capacitor WebView. |
+| 2 — Spanish voice | 2026-08-29 | **PASS via native bridge** | Owner-reported together with check 1: *"Voz activada"* is spoken by the device TTS path. |
+| 3 — silencing | 2026-08-29 | **PASS via native bridge** | Owner-reported together with check 1: the voice control works as expected, including cancelling/silencing. |
+| 4 — assessment in the car | — | NOT RUN | Opportunistic; needs a stored fault. The native bridge is no longer the blocker. |
 | 5 — icons render | 2026-08-29 | **PASS** | Every glyph draws: the five bottom-bar icons, the crossed-out speaker on the voice toggle and the speech bubble on the command bar. The unprefixed `mask-image` concern does not bite on this WebView. |
 | 6 — recognition present | 2026-08-29 | **Síntesis (TTS): ausente. Reconocimiento (STT): alcanzable (estándar).** Voces instaladas: 0. | The two engines diverge, which no one predicted: synthesis is missing and recognition's constructor is present, unprefixed. Not a pass — see below. |
 | 7 — recognizer starts | 2026-08-29 | **PASS** | Held the probe and said *"esto es una prueba"*. The transcript came back marked `definitivo`, with no error code. The Web Speech recognizer works in this WebView and **STT needs no native bridge**. |
 | 8 — recognizer without Internet | 2026-08-29 | **PASS** | With data and Wi-Fi off (owner-reported), the probe returned *"hola esto es otra prueba hablando sin conexión"* marked `definitivo`. This phone has an offline Spanish recognition pack. |
+| 9 — speech transcript executes quick commands | 2026-08-29; Pixel 9a reruns 2026-08-30 | **PASS** | USB/ADB-assisted device validation on the installed APK. Holding **Dictar comando** and speaking quick-command phrases drove the same `parseQuickCommand` path as text: *"temperatura"* moved to the data view, *"estado"* moved to the connection view, *"testigo"* moved to warning lights, and *"códigos"* moved to diagnostics/DTC. Negative cases also held: *"nota"* showed *"Guardar notas todavía no está disponible"*, and *"radio"* did not execute a command. After the later local assistant fallback wiring, ADB automation on a Pixel 9a confirmed typed *"que significa esto"* opens the structured local answer panel with `Fallback local` and `sin proveedor de IA configurado`, and a subsequent deterministic *"Temperatura"* command clears that stale answer while navigating to live data. The original press-and-hold dictation UX ended too quickly on the Pixel 9a, so it was changed to tap-to-start/tap-to-stop; the owner then confirmed spoken *"temperatura"* works. A fresh spoken-unknown fallback path was not rerun. The text command bar remains the non-voice fallback. |
 

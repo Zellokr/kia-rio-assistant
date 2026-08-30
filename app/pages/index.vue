@@ -9,8 +9,27 @@ import { useObdLabSession } from '~/composables/useObdLabSession'
 import { useSessionStateBeacon } from '~/composables/useSessionStateBeacon'
 import { labViews } from '~/utils/labNav'
 import type { LabViewId } from '~/utils/labNav'
+import {
+  buildAssistantRequest
+} from '~~/core/assistant/buildAssistantRequest'
+import type {
+  AssistantTurn
+} from '~~/core/assistant/buildAssistantRequest'
+import {
+  resolveAssistantAnswer
+} from '~~/core/assistant/resolveAssistantAnswer'
+import type {
+  AssistantAnswer
+} from '~~/core/assistant/resolveAssistantAnswer'
 import type { QuickCommandIntent } from '~~/core/assistant/parseQuickCommand'
+import type {
+  ObdTelemetryMetric
+} from '~~/core/obd/telemetry/ObdTelemetryStore'
+import AssistantAnswerPanel from '~/components/AssistantAnswerPanel.vue'
 import AssistantCommandBar from '~/components/AssistantCommandBar.vue'
+import type {
+  AssistantCommandQuery
+} from '~/components/AssistantCommandBar.vue'
 import BottomTabBar from '~/components/BottomTabBar.vue'
 import ConnectionView from '~/components/ConnectionView.vue'
 import DataView from '~/components/DataView.vue'
@@ -74,9 +93,80 @@ watch(sessionState, (state) => {
 }, { immediate: true })
 
 const activeView = ref<LabViewId>('connection')
+const assistantAnswer = ref<AssistantAnswer | null>(null)
+const assistantPending = ref(false)
+const assistantHistory = ref<AssistantTurn[]>([])
+let assistantRequestSequence = 0
 
 function setActiveView(view: LabViewId): void {
   activeView.value = view
+}
+
+function clearAssistantAnswer(): void {
+  assistantRequestSequence++
+  assistantPending.value = false
+  assistantAnswer.value = null
+}
+
+function definedTelemetryMetrics(): ObdTelemetryMetric[] {
+  return [
+    telemetry.value.engineRpm,
+    telemetry.value.vehicleSpeed,
+    telemetry.value.coolantTemperature,
+    telemetry.value.engineLoad,
+    telemetry.value.throttlePosition
+  ].filter((metric): metric is ObdTelemetryMetric => metric !== undefined)
+}
+
+async function answerAssistantQuery(
+  query: AssistantCommandQuery
+): Promise<void> {
+  const request = buildAssistantRequest({
+    query: { text: query.text, intent: null },
+    assessment: diagnostics.assessment.value,
+    telemetry: definedTelemetryMetrics(),
+    history: assistantHistory.value,
+    nowMs: Date.now()
+  })
+
+  if (!request) {
+    return
+  }
+
+  const sequence = ++assistantRequestSequence
+  assistantPending.value = true
+
+  try {
+    const answer = await resolveAssistantAnswer({ request })
+
+    if (sequence !== assistantRequestSequence) {
+      return
+    }
+
+    assistantAnswer.value = answer
+    assistantHistory.value = [
+      ...assistantHistory.value,
+      { role: 'user', text: request.query.text },
+      { role: 'assistant', text: answer.text }
+    ]
+  } catch (error) {
+    if (sequence !== assistantRequestSequence) {
+      return
+    }
+
+    assistantAnswer.value = {
+      text: 'No pude preparar la respuesta local. Inténtalo de nuevo con una pregunta más concreta.',
+      source: 'local-template',
+      reasons: [{
+        kind: 'provider-failed',
+        message: error instanceof Error ? error.message : 'error desconocido'
+      }]
+    }
+  } finally {
+    if (sequence === assistantRequestSequence) {
+      assistantPending.value = false
+    }
+  }
 }
 
 /**
@@ -88,6 +178,8 @@ function setActiveView(view: LabViewId): void {
  * Fase 4 maintenance record this app cannot write.
  */
 function runAssistantCommand(intent: QuickCommandIntent): void {
+  clearAssistantAnswer()
+
   switch (intent) {
     case 'status':
       activeView.value = 'connection'
@@ -159,6 +251,11 @@ async function sendLogToTelegram(): Promise<void> {
           </p>
         </div>
 
+        <AssistantAnswerPanel
+          :answer="assistantAnswer"
+          :pending="assistantPending"
+        />
+
         <ConnectionView
           v-if="activeView === 'connection'"
           v-model:transport-choice="transportChoice"
@@ -221,7 +318,10 @@ async function sendLogToTelegram(): Promise<void> {
       </UContainer>
     </div>
 
-    <AssistantCommandBar @command="runAssistantCommand" />
+    <AssistantCommandBar
+      @command="runAssistantCommand"
+      @query="answerAssistantQuery"
+    />
 
     <BottomTabBar
       :views="labViews"

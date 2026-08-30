@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 
+import { useSpeechListener } from '~/composables/useSpeechListener'
 import {
   parseQuickCommand,
   type QuickCommandIntent
@@ -24,14 +25,23 @@ import {
  * never has to hunt for a destination behind a scroll gesture.
  */
 
+export interface AssistantCommandQuery {
+  readonly text: string
+  readonly source: 'text' | 'speech'
+}
+
 const emit = defineEmits<{
   command: [QuickCommandIntent]
+  query: [AssistantCommandQuery]
 }>()
 
 const open = ref(false)
 const typed = ref('')
 const feedback = ref('')
 const field = ref<{ input?: HTMLInputElement } | null>(null)
+const lastSpeechFinal = ref('')
+
+const speech = useSpeechListener()
 
 /** Spanish, user-facing. §11 names these five, in this order. */
 const QUICK_COMMANDS: ReadonlyArray<{
@@ -71,11 +81,21 @@ async function toggleOpen(): Promise<void> {
 }
 
 /**
- * Runs one command. Only a recognised, supported intent reaches the parent;
- * everything else is answered here, because the reason belongs next to the
- * field that produced it.
+ * Runs one command. Recognised, supported intents stay deterministic and reach
+ * the parent as commands; open questions reach the assistant query path.
  */
 function run(text: string): void {
+  runRecognisedInput(text, 'text')
+}
+
+function runSpeech(text: string): void {
+  runRecognisedInput(text, 'speech')
+}
+
+function runRecognisedInput(
+  text: string,
+  source: 'text' | 'speech'
+): void {
   const trimmed = text.trim()
 
   if (!trimmed) {
@@ -85,8 +105,14 @@ function run(text: string): void {
   const match = parseQuickCommand(trimmed)
 
   if (!match) {
-    feedback.value
-      = 'No he entendido eso. Prueba con Estado, DTC, Temperatura o Testigo.'
+    emit('query', { text: trimmed, source })
+
+    if (source === 'text') {
+      typed.value = ''
+    }
+
+    feedback.value = ''
+    open.value = false
 
     return
   }
@@ -100,10 +126,43 @@ function run(text: string): void {
 
   emit('command', match.intent)
 
-  typed.value = ''
+  if (source === 'text') {
+    typed.value = ''
+  }
+
   feedback.value = ''
   open.value = false
 }
+
+function toggleSpeech(): void {
+  if (speech.state.value === 'starting' || speech.state.value === 'listening') {
+    speech.release()
+
+    return
+  }
+
+  lastSpeechFinal.value = ''
+  feedback.value = ''
+  speech.press()
+}
+
+watch(
+  [speech.transcript, speech.transcriptIsFinal],
+  ([transcript, isFinal]) => {
+    const finalTranscript = transcript.trim()
+
+    if (!isFinal || !finalTranscript) {
+      return
+    }
+
+    if (finalTranscript === lastSpeechFinal.value) {
+      return
+    }
+
+    lastSpeechFinal.value = finalTranscript
+    runSpeech(finalTranscript)
+  }
+)
 </script>
 
 <template>
@@ -130,7 +189,7 @@ function run(text: string): void {
         <UInput
           ref="field"
           v-model="typed"
-          placeholder="Estado, DTC, Temperatura…"
+          placeholder="Estado, DTC, Temperatura o pregunta…"
           aria-label="Escribe un comando"
           autocomplete="off"
           class="min-w-0 flex-1"
@@ -161,6 +220,53 @@ function run(text: string): void {
         >
           {{ command.label }}
         </UButton>
+      </div>
+
+      <div class="mt-3 rounded-xl border border-default p-2">
+        <UButton
+          type="button"
+          data-testid="assistant-speech"
+          :icon="speech.state.value === 'listening'
+            ? 'i-lucide-mic'
+            : 'i-lucide-mic-2'"
+          :aria-label="speech.state.value === 'starting' || speech.state.value === 'listening'
+            ? 'Detener el dictado del comando'
+            : 'Toca para dictar un comando'"
+          :title="speech.state.value === 'starting' || speech.state.value === 'listening'
+            ? 'Detener el dictado del comando'
+            : 'Toca para dictar un comando'"
+          color="neutral"
+          variant="soft"
+          size="sm"
+          @click="toggleSpeech"
+        >
+          {{ speech.state.value === 'starting'
+            ? 'Abriendo micrófono…'
+            : speech.state.value === 'listening'
+              ? 'Escuchando…'
+              : 'Dictar comando' }}
+        </UButton>
+
+        <p class="mt-1 text-xs text-muted">
+          Entrada de voz opcional: toca para empezar y vuelve a tocar para parar.
+        </p>
+
+        <p
+          v-if="speech.transcript.value"
+          class="mt-1 text-sm text-muted"
+          aria-live="polite"
+        >
+          “{{ speech.transcript.value }}”
+          <span v-if="!speech.transcriptIsFinal.value">(provisional)</span>
+        </p>
+
+        <p
+          v-if="speech.reason.value"
+          class="mt-1 text-sm text-error"
+          role="status"
+        >
+          {{ speech.reason.value }}
+        </p>
       </div>
 
       <!--

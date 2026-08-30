@@ -55,6 +55,7 @@ export class SpeechListener {
   private reason: string | null = null
   private heard = ''
   private final = false
+  private stoppingSession: number | null = null
 
   /**
    * Counts sessions so a settled promise can tell whether it is still the
@@ -105,6 +106,8 @@ export class SpeechListener {
     this.publish()
 
     try {
+      this.stoppingSession = null
+
       await this.port.start({
         onStart: () => {
           if (this.isStale(session)) {
@@ -139,6 +142,16 @@ export class SpeechListener {
         return
       }
 
+      if (this.stoppingSession === session) {
+        this.stoppingSession = null
+        this.currentState = 'idle'
+        this.reason = null
+
+        this.publish()
+
+        return
+      }
+
       this.currentState = 'unavailable'
       this.reason = describe(error)
 
@@ -152,12 +165,13 @@ export class SpeechListener {
   }
 
   /**
-   * Release. The session is retired immediately so whatever the engine
-   * reports afterwards — a clean end or an `aborted` error — cannot move the
-   * state back.
+   * Release. Android commonly emits the final transcript after `stop()`, so a
+   * button release must not retire the session before that result can arrive.
+   * Late failures from the manual stop are still ignored as a user-requested
+   * end, not reported as recognizer unavailability.
    */
   stop(): void {
-    this.session += 1
+    this.stoppingSession = this.session
 
     this.port.stop()
 

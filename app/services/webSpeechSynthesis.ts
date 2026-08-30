@@ -38,17 +38,16 @@ export interface WebSpeechHost extends SpeechCapabilityHost {
 
 export interface WebSpeechOptions {
   /**
-   * How long to wait for the engine to report completion.
+   * How long to wait for the engine to report audio start.
    *
    * Android WebViews are known to drop `onend`, which would otherwise leave
    * this promise pending forever.
    *
-   * What the timeout means depends on whether audio was ever heard. Before
-   * `onstart` it REJECTS: an engine that never made a sound has proven
-   * nothing, and ADR-012's whole point is not to claim a working engine
-   * without evidence. After `onstart` it RESOLVES, because the proof already
-   * happened and a missing end event must not retract it. Generous by default
-   * so a slow-but-working engine is not slandered.
+   * The timeout only applies before `onstart`: an engine that never made a
+   * sound has proven nothing, and ADR-012's whole point is not to claim a
+   * working engine without evidence. Once `onstart` fires, this adapter resolves
+   * immediately because the proof already happened. Generous by default so a
+   * slow-but-working engine is not slandered.
    */
   timeoutMs?: number
 }
@@ -96,20 +95,10 @@ export function createWebSpeechSynthesis(
 
         utterance.lang = 'es-ES'
 
-        let started = false
-
         const timer = setTimeout(() => {
-          settle(() => {
-            if (started) {
-              resolve()
-
-              return
-            }
-
-            reject(new Error(
-              'El motor de voz no emitió ningún sonido. Se da por no funcional.'
-            ))
-          })
+          settle(() => reject(new Error(
+            'El motor de voz no emitió ningún sonido. Se da por no funcional.'
+          )))
         }, timeoutMs)
 
         function settle(finish: () => void): void {
@@ -123,16 +112,15 @@ export function createWebSpeechSynthesis(
         }
 
         /**
-         * The proof, and the moment the UI is allowed to change. Reported
-         * before the phrase finishes on purpose.
+         * The proof, and the moment the promise resolves. Reported before the
+         * phrase finishes on purpose.
          */
-        utterance.onstart = () => {
-          started = true
-
+        utterance.onstart = () => settle(() => {
           hooks?.onStart?.()
-        }
+          resolve()
+        })
 
-        utterance.onend = () => settle(resolve)
+        utterance.onend = () => undefined
 
         utterance.onerror = event => settle(() => reject(
           new Error(failureMessage(host, event?.error))

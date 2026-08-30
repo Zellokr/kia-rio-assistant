@@ -216,6 +216,23 @@ describe('SpeechListener', () => {
       await session
     })
 
+    it('keeps a final transcript that arrives after the button is released', async () => {
+      const engine = fakePort()
+      const listener = new SpeechListener(engine.port)
+
+      const session = listener.listen()
+
+      engine.audioStarts()
+      listener.stop()
+      engine.hears('temperatura', true)
+      engine.ends()
+      await session
+
+      expect(listener.transcript).toBe('temperatura')
+      expect(listener.transcriptIsFinal).toBe(true)
+      expect(listener.state).toBe('idle')
+    })
+
     /**
      * The release of the button and the engine's own end event race. The
      * late one must not overwrite the state the newer one already set.
