@@ -136,9 +136,10 @@ None of these block code. All three need a vehicle or an owner decision.
 2. **`docs/DTC_PHYSICAL_VALIDATION.md` check 1** — Mode 03 multi-frame
    framing needs a car with more than three stored DTCs. This project will
    not induce them; the check is opportunistic and may never run.
-3. **The temporary Telegram channel** used for physical-test reporting
-   (`docs/FIELD_TEST_TELEGRAM.md`) — keep it for future vehicle sessions or
-   remove it. Owner decision, not a technical one.
+3. **Removed field-test uploader.** The temporary Telegram reporting path was
+   removed after owner approval. Historical evidence may still note that the
+   2026-08-28 field reports lived in Telegram, but future builds must not embed
+   Telegram credentials.
 
 ## A warning about ADR numbering
 

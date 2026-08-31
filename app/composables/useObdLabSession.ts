@@ -114,8 +114,6 @@ export function useObdLabSession(options: ObdLabSessionOptions = {}) {
     truncated: logTruncated,
     clearDisplay: clearLog,
     copyJson: copySessionLog,
-    telegramEnabled,
-    sendFieldReport,
     toError,
     recordError,
     recordActivity,
@@ -522,8 +520,6 @@ export function useObdLabSession(options: ObdLabSessionOptions = {}) {
     logTruncated,
     clearLog,
     copySessionLog,
-    telegramEnabled,
-    sendFieldReport,
 
     diagnostics,
 

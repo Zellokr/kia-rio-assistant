@@ -9,12 +9,6 @@ import type {
   ObdSessionLog
 } from '~~/core/obd/logging/ObdSessionLog'
 
-/**
- * TEMPORARY — field-test evidence delivery. Defined by `vite.define` in
- * `nuxt.config.ts` and by `vitest.config.ts`; see `telegramFieldLog.ts`.
- */
-declare const __FIELD_TEST_TELEGRAM__: boolean
-
 function formatEvent(event: ObdSessionEvent): string {
   switch (event.type) {
     case 'command-queued':
@@ -160,28 +154,6 @@ export function useObdSessionLog(log: ObdSessionLog) {
     }
   }
 
-  /**
-   * TEMPORARY — field-test evidence delivery. Delete with
-   * `app/services/telegramFieldLog.ts`.
-   *
-   * Whether this build carries a Telegram sender at all.
-   *
-   * `__FIELD_TEST_TELEGRAM__` is a build-time literal, so an ordinary build
-   * folds every branch below to nothing: no `useRuntimeConfig` call, no
-   * dynamic import, no sender chunk. The credentials cannot leak from a
-   * build that does not contain them, and this composable keeps working
-   * without a Nuxt app instance — which is what lets it be tested directly.
-   *
-   * Only the flag lives here; the sending itself is `sendFieldReport` in
-   * `useObdSessionRecording`, which needs the persistence this composable
-   * does not have.
-   *
-   * `scripts/assert-no-field-test-secrets.mjs` checks the fold against the
-   * emitted bytes. It caught the first version of this, where the guard was
-   * a runtime boolean: the chunk shipped anyway, merely unreachable.
-   */
-  const telegramEnabled = __FIELD_TEST_TELEGRAM__
-
   return {
     events,
     lines,
@@ -189,7 +161,6 @@ export function useObdSessionLog(log: ObdSessionLog) {
     droppedEvents,
     truncated,
     clearDisplay,
-    copyJson,
-    telegramEnabled
+    copyJson
   }
 }

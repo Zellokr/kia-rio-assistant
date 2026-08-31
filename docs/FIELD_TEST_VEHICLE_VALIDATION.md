@@ -12,8 +12,7 @@ evidence it asks for, never by deciding it probably works.
 | C | **Closed** | Cluster photographed and compared; guided identifier owner-reported correct for ABS, seatbelt and immobilizer |
 | D | **Not executable** | The car has no stored codes to multi-frame |
 
-Evidence lives in the Telegram field-test channel: two reports and
-twenty-one session JSON files, sent by the app itself.
+Historical evidence from the 2026-08-28 run lived in the temporary Telegram field-test channel: two reports and twenty-one session JSON files, sent by the app itself. That uploader has since been removed; future field runs must use local log copy/export or a new reviewed evidence path that does not embed client-side credentials.
 
 This is one trip to the car. It closes, in order:
 
@@ -30,10 +29,7 @@ driver's hands.
 
 ## Before you leave the house
 
-1. Build and install the **field-test** APK — the only build that carries
-   the report sender. See `docs/FIELD_TEST_TELEGRAM.md`; an ordinary build
-   has no way to get evidence off the phone, because the Android WebView
-   ignores `<a download>` on a `blob:` URL.
+1. Build and install an ordinary APK. The temporary field-test report sender was removed; do not create APKs with embedded Telegram credentials. Use the local session log copy/export path for any future evidence.
 2. Charge the phone. The original Part A plan ran 20–25 minutes with the
    screen on; the executed A2 was deliberately shortened to about ten minutes.
 3. **No notebook.** The app records every observation the procedure used to
@@ -167,8 +163,7 @@ Start the engine. Ventilated space.
    > stop while the link stayed up — indistinguishable on screen from a real
    > drop, and A2 would record a recovery that never tested reconnection at
    > all. That is fabricated evidence for the one thing Part A blocks on.
-6. Press **Pausar lecturas**, disconnect, and press **Registro → Enviar
-   informe**.
+6. Press **Pausar lecturas**, disconnect, and use **Registro → Copiar registro** to export the local session log.
 
 **Original A2 evidence criterion:** both drops detected and both recoveries
 observed. The current 2026-08-28 status is different and explicit: A2 is closed
@@ -176,11 +171,7 @@ by owner waiver in `ADR-004`, with one observed recovery and one unrepeated
 post-fix Bluetooth-toggle recovery gap. A future rerun can use the original
 criterion to replace the waiver with direct evidence.
 
-**Nothing here needs writing down.** The report computes what the old
-version asked a human to observe — whether the state stopped claiming
-ready, whether it retried on its own, how long recovery took, and whether
-telemetry resumed afterwards or stayed dead behind a ready badge. See
-`docs/FIELD_TEST_TELEGRAM.md`.
+**Nothing here needs writing down by hand if the local log is exported.** The session events contain what the old version asked a human to observe — whether the state stopped claiming ready, whether it retried on its own, how long recovery took, and whether telemetry resumed afterwards or stayed dead behind a ready badge.
 
 ---
 
@@ -305,9 +296,10 @@ here is a small, deliberate change — not a rewrite.
 
 Bring back:
 
-- The field report and the session JSON files, already in Telegram — the
-  app sent them. Retries, timings, drops and recoveries are in the report;
-  nothing was transcribed by hand, so nothing depends on memory.
+- The local session JSON copied/exported from the app. For the historical
+  2026-08-28 run, the removed temporary uploader had already sent the report
+  and session JSON files to Telegram; future runs must not rely on embedded
+  Telegram credentials.
 - `B.json` if Part B ran, and `D.json` if Part D ran.
 - The cluster photographs for Part C, plus screenshots if a future run repeats
   the guided identifier. The 2026-08-28 identifier closure is owner-reported

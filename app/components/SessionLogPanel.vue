@@ -17,14 +17,11 @@ const props = defineProps<{
   droppedEvents: number
   truncated: boolean
   copyStatus?: string
-  /** TEMPORARY — field-test evidence delivery. See `telegramFieldLog.ts`. */
-  telegramEnabled?: boolean
 }>()
 
 const emit = defineEmits<{
   copy: []
   clear: []
-  telegram: []
 }>()
 
 const DISPLAY_LIMIT = 200
@@ -99,21 +96,6 @@ const hiddenByLimit = computed(() => {
           @click="emit('copy')"
         >
           Copiar registro
-        </UButton>
-        <!--
-          TEMPORARY — field-test evidence delivery. Absent unless the build
-          was made with FIELD_TEST_TELEGRAM=1; see `telegramFieldLog.ts`.
-        -->
-        <UButton
-          v-if="props.telegramEnabled"
-          color="primary"
-          variant="soft"
-          size="lg"
-          icon="i-lucide-send"
-          class="min-h-12 justify-center"
-          @click="emit('telegram')"
-        >
-          Enviar informe
         </UButton>
         <p
           v-if="props.copyStatus"
