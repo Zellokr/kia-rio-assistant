@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 import DiagnosticAssessmentCard from './DiagnosticAssessmentCard.vue'
 import type {
@@ -17,7 +17,28 @@ const props = defineProps<{
   reads: readonly DtcReadOutcome[]
 }>()
 
+type DtcReadAction = 'stored' | 'pending' | 'permanent'
+
+const activeReadAction = ref<DtcReadAction | undefined>()
 const readsDisabled = computed(() => props.busy)
+const busyLabel = computed(() => {
+  switch (activeReadAction.value) {
+    case 'stored':
+      return 'Leyendo códigos almacenados…'
+    case 'pending':
+      return 'Leyendo códigos pendientes…'
+    case 'permanent':
+      return 'Leyendo códigos permanentes…'
+    default:
+      return 'Leyendo códigos…'
+  }
+})
+
+watch(() => props.busy, (busy) => {
+  if (!busy) {
+    activeReadAction.value = undefined
+  }
+})
 
 const emit = defineEmits<{
   'back-to-connection': []
@@ -26,6 +47,22 @@ const emit = defineEmits<{
   'readPermanent': []
   'reset': []
 }>()
+
+function readCodes(action: DtcReadAction): void {
+  activeReadAction.value = action
+
+  switch (action) {
+    case 'stored':
+      emit('readStored')
+      break
+    case 'pending':
+      emit('readPending')
+      break
+    case 'permanent':
+      emit('readPermanent')
+      break
+  }
+}
 </script>
 
 <template>
@@ -95,7 +132,8 @@ const emit = defineEmits<{
             variant="solid"
             size="lg"
             :disabled="readsDisabled"
-            @click="emit('readStored')"
+            :loading="props.busy && activeReadAction === 'stored'"
+            @click="readCodes('stored')"
           >
             Códigos almacenados
           </UButton>
@@ -104,7 +142,8 @@ const emit = defineEmits<{
             variant="soft"
             size="lg"
             :disabled="readsDisabled"
-            @click="emit('readPending')"
+            :loading="props.busy && activeReadAction === 'pending'"
+            @click="readCodes('pending')"
           >
             Códigos pendientes
           </UButton>
@@ -113,7 +152,8 @@ const emit = defineEmits<{
             variant="soft"
             size="lg"
             :disabled="readsDisabled"
-            @click="emit('readPermanent')"
+            :loading="props.busy && activeReadAction === 'permanent'"
+            @click="readCodes('permanent')"
           >
             Códigos permanentes
           </UButton>
@@ -127,6 +167,15 @@ const emit = defineEmits<{
             Limpiar resultados
           </UButton>
         </div>
+
+        <p
+          v-if="props.busy"
+          class="text-sm font-medium text-primary"
+          role="status"
+          aria-live="polite"
+        >
+          {{ busyLabel }}
+        </p>
 
         <UAlert
           v-if="props.errorMessage"

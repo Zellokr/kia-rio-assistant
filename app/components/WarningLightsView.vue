@@ -166,6 +166,8 @@ watch(
               :key="evidence.key"
               :color="selectedEvidence?.key === evidence.key ? 'primary' : 'neutral'"
               :variant="selectedEvidence?.key === evidence.key ? 'soft' : 'ghost'"
+              :aria-pressed="selectedEvidence?.key === evidence.key"
+              :aria-current="selectedEvidence?.key === evidence.key ? 'true' : undefined"
               size="sm"
               @click="selectedObservationKey = evidence.key"
             >

@@ -146,6 +146,7 @@ const hiddenByLimit = computed(() => {
         :color="activeFilter === filter.value ? 'primary' : 'neutral'"
         :variant="activeFilter === filter.value ? 'soft' : 'ghost'"
         :icon="filter.icon"
+        :aria-pressed="activeFilter === filter.value"
         size="lg"
         class="min-h-12 justify-center px-2"
         @click="activeFilter = filter.value"

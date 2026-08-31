@@ -251,15 +251,20 @@ async function sendLogToTelegram(): Promise<void> {
           with a colour, an icon, a sentence and its progress. The marker
           that earns its place on every screen is the read-only one.
         -->
-        <div class="flex items-center gap-3 rounded-xl border border-success/30 bg-success/5 px-4 py-3">
+        <div class="flex items-start gap-3 rounded-xl border border-warning/40 bg-warning/10 px-4 py-3">
           <UIcon
-            name="i-lucide-shield-check"
-            class="size-5 shrink-0 text-success"
+            name="i-lucide-shield-alert"
+            class="mt-0.5 size-5 shrink-0 text-warning"
             aria-hidden="true"
           />
-          <p class="min-w-0 font-semibold text-highlighted">
-            Solo lectura
-          </p>
+          <div class="min-w-0">
+            <p class="font-semibold text-highlighted">
+              Solo lectura, vehículo estacionado
+            </p>
+            <p class="text-sm leading-6 text-muted">
+              App OBD de solo lectura: no borra códigos ni escribe en la ECU. Consulta las lecturas con el coche parado y sin usarla mientras conduces.
+            </p>
+          </div>
         </div>
 
         <AssistantAnswerPanel

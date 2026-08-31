@@ -9,6 +9,7 @@ import type {
 import type {
   ObdTelemetryMetrics
 } from '~/composables/useObdTelemetry'
+import MetricCard from './MetricCard.vue'
 import { describeMetricFreshness } from '~/utils/telemetryAge'
 import type { ObdTransportChoice } from '~/utils/obdTransportChoice'
 
@@ -37,6 +38,14 @@ onScopeDispose(() => clearInterval(clock))
 
 function freshness(metric: ObdTelemetryMetric | undefined) {
   return describeMetricFreshness(metric, nowMs.value)
+}
+
+function freshnessLabel(metric: ObdTelemetryMetric | undefined): string {
+  return metric ? freshness(metric).label : 'Sin muestra'
+}
+
+function metricStale(metric: ObdTelemetryMetric | undefined): boolean {
+  return freshness(metric).stale
 }
 
 /**
@@ -174,67 +183,25 @@ const emit = defineEmits<{
       />
 
       <div class="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
-        <UCard>
-          <div class="flex min-h-36 flex-col justify-between gap-3">
-            <div class="flex items-center justify-between">
-              <span class="text-sm font-medium text-muted">RPM</span>
-              <UIcon
-                name="i-lucide-gauge"
-                class="size-5 text-primary"
-                aria-hidden="true"
-              />
-            </div>
-            <div>
-              <span
-                class="font-mono text-4xl font-bold tabular-nums transition-colors"
-                :class="freshness(telemetry.engineRpm).stale ? 'text-muted/60' : 'text-highlighted'"
-              >
-                {{ telemetry.engineRpm ? Math.round(telemetry.engineRpm.value) : '—' }}
-              </span>
-              <span
-                v-if="telemetry.engineRpm"
-                class="ml-1 text-xs text-muted"
-              >rpm</span>
-            </div>
-            <span
-              class="text-xs"
-              :class="freshness(telemetry.engineRpm).stale ? 'font-medium text-warning' : 'text-muted'"
-            >
-              {{ telemetry.engineRpm ? freshness(telemetry.engineRpm).label : 'Sin muestra' }}
-            </span>
-          </div>
-        </UCard>
+        <MetricCard
+          label="RPM"
+          :value="telemetry.engineRpm ? String(Math.round(telemetry.engineRpm.value)) : '—'"
+          :unit="telemetry.engineRpm ? 'rpm' : undefined"
+          :freshness-label="freshnessLabel(telemetry.engineRpm)"
+          :stale="metricStale(telemetry.engineRpm)"
+          icon="i-lucide-gauge"
+          large
+        />
 
-        <UCard>
-          <div class="flex min-h-36 flex-col justify-between gap-3">
-            <div class="flex items-center justify-between">
-              <span class="text-sm font-medium text-muted">Velocidad</span>
-              <UIcon
-                name="i-lucide-navigation"
-                class="size-5 text-primary"
-                aria-hidden="true"
-              />
-            </div>
-            <div>
-              <span
-                class="font-mono text-4xl font-bold tabular-nums transition-colors"
-                :class="freshness(telemetry.vehicleSpeed).stale ? 'text-muted/60' : 'text-highlighted'"
-              >
-                {{ telemetry.vehicleSpeed ? Math.round(telemetry.vehicleSpeed.value) : '—' }}
-              </span>
-              <span
-                v-if="telemetry.vehicleSpeed"
-                class="ml-1 text-xs text-muted"
-              >km/h</span>
-            </div>
-            <span
-              class="text-xs"
-              :class="freshness(telemetry.vehicleSpeed).stale ? 'font-medium text-warning' : 'text-muted'"
-            >
-              {{ telemetry.vehicleSpeed ? freshness(telemetry.vehicleSpeed).label : 'Sin muestra' }}
-            </span>
-          </div>
-        </UCard>
+        <MetricCard
+          label="Velocidad"
+          :value="telemetry.vehicleSpeed ? String(Math.round(telemetry.vehicleSpeed.value)) : '—'"
+          :unit="telemetry.vehicleSpeed ? 'km/h' : undefined"
+          :freshness-label="freshnessLabel(telemetry.vehicleSpeed)"
+          :stale="metricStale(telemetry.vehicleSpeed)"
+          icon="i-lucide-navigation"
+          large
+        />
       </div>
 
       <details class="group rounded-xl border border-default bg-default">
@@ -252,57 +219,30 @@ const emit = defineEmits<{
           />
         </summary>
         <div class="grid gap-3 border-t border-default p-4 sm:grid-cols-3">
-          <div class="rounded-xl bg-elevated p-4">
-            <p class="text-sm text-muted">
-              Refrigerante
-            </p>
-            <p
-              class="mt-2 font-mono text-2xl font-bold tabular-nums transition-colors"
-              :class="freshness(telemetry.coolantTemperature).stale ? 'text-muted/60' : 'text-highlighted'"
-            >
-              {{ telemetry.coolantTemperature ? `${telemetry.coolantTemperature.value} °C` : '—' }}
-            </p>
-            <p
-              class="mt-1 text-xs"
-              :class="freshness(telemetry.coolantTemperature).stale ? 'font-medium text-warning' : 'text-muted'"
-            >
-              {{ telemetry.coolantTemperature ? freshness(telemetry.coolantTemperature).label : 'Sin muestra' }}
-            </p>
-          </div>
-          <div class="rounded-xl bg-elevated p-4">
-            <p class="text-sm text-muted">
-              Carga del motor
-            </p>
-            <p
-              class="mt-2 font-mono text-2xl font-bold tabular-nums transition-colors"
-              :class="freshness(telemetry.engineLoad).stale ? 'text-muted/60' : 'text-highlighted'"
-            >
-              {{ telemetry.engineLoad ? `${telemetry.engineLoad.value.toFixed(1)} %` : '—' }}
-            </p>
-            <p
-              class="mt-1 text-xs"
-              :class="freshness(telemetry.engineLoad).stale ? 'font-medium text-warning' : 'text-muted'"
-            >
-              {{ telemetry.engineLoad ? freshness(telemetry.engineLoad).label : 'Sin muestra' }}
-            </p>
-          </div>
-          <div class="rounded-xl bg-elevated p-4">
-            <p class="text-sm text-muted">
-              Acelerador
-            </p>
-            <p
-              class="mt-2 font-mono text-2xl font-bold tabular-nums transition-colors"
-              :class="freshness(telemetry.throttlePosition).stale ? 'text-muted/60' : 'text-highlighted'"
-            >
-              {{ telemetry.throttlePosition ? `${telemetry.throttlePosition.value.toFixed(1)} %` : '—' }}
-            </p>
-            <p
-              class="mt-1 text-xs"
-              :class="freshness(telemetry.throttlePosition).stale ? 'font-medium text-warning' : 'text-muted'"
-            >
-              {{ telemetry.throttlePosition ? freshness(telemetry.throttlePosition).label : 'Sin muestra' }}
-            </p>
-          </div>
+          <MetricCard
+            label="Refrigerante"
+            :value="telemetry.coolantTemperature ? String(telemetry.coolantTemperature.value) : '—'"
+            :unit="telemetry.coolantTemperature ? '°C' : undefined"
+            :freshness-label="freshnessLabel(telemetry.coolantTemperature)"
+            :stale="metricStale(telemetry.coolantTemperature)"
+            elevated
+          />
+          <MetricCard
+            label="Carga del motor"
+            :value="telemetry.engineLoad ? telemetry.engineLoad.value.toFixed(1) : '—'"
+            :unit="telemetry.engineLoad ? '%' : undefined"
+            :freshness-label="freshnessLabel(telemetry.engineLoad)"
+            :stale="metricStale(telemetry.engineLoad)"
+            elevated
+          />
+          <MetricCard
+            label="Acelerador"
+            :value="telemetry.throttlePosition ? telemetry.throttlePosition.value.toFixed(1) : '—'"
+            :unit="telemetry.throttlePosition ? '%' : undefined"
+            :freshness-label="freshnessLabel(telemetry.throttlePosition)"
+            :stale="metricStale(telemetry.throttlePosition)"
+            elevated
+          />
         </div>
       </details>
 
