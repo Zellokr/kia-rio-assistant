@@ -18,6 +18,9 @@ import type {
 import {
   resolveAssistantAnswer
 } from '~~/core/assistant/resolveAssistantAnswer'
+import {
+  createRemoteAssistantProvider
+} from '~/services/remoteAssistantProvider'
 import type {
   AssistantAnswer
 } from '~~/core/assistant/resolveAssistantAnswer'
@@ -92,6 +95,11 @@ watch(sessionState, (state) => {
   sessionStateBeacon.value = state
 }, { immediate: true })
 
+const runtimeConfig = useRuntimeConfig()
+const remoteAssistantAsk = createRemoteAssistantProvider({
+  endpointUrl: runtimeConfig.public.assistant.endpointUrl
+})
+
 const activeView = ref<LabViewId>('connection')
 const assistantAnswer = ref<AssistantAnswer | null>(null)
 const assistantPending = ref(false)
@@ -137,7 +145,10 @@ async function answerAssistantQuery(
   assistantPending.value = true
 
   try {
-    const answer = await resolveAssistantAnswer({ request })
+    const answer = await resolveAssistantAnswer({
+      request,
+      ask: remoteAssistantAsk
+    })
 
     if (sequence !== assistantRequestSequence) {
       return

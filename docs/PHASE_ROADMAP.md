@@ -42,7 +42,7 @@ states separately and which does not always restate the exit criterion.
 | Fase 0 | Transport viability | Minimal test page. Connect, send `ATZ` and `0100`, receive a valid response, record traces and repeat the operation. | Recorded demonstration and `ATZ`/`0100`/`010C` log, **or** a documented decision to change transport. | MUST | **Closed.** Closed through the second branch: the transport decision is documented in `docs/decisions/ADR-002-obd-transport.md`, which took the §3.1 decision gate's native-container path. |
 | Fase 1 | Local OBD reader | ELM initialization, protocol detection, supported PIDs, telemetry, DTC, errors and reconnection. | Stable local OBD dashboard, tested parser, read-only DTC. | MUST | **Closed on vehicle evidence with one narrow waiver.** ADR-003 closed it on 2026-08-25 with no vehicle validation at all; ADR-004 superseded that on 2026-08-28 with the real field-test run. See the Sprint 0 table below. |
 | Fase 2 | Local diagnostics and warning lights | Severity rules, DTC catalogue, guided warning-light identification, **local TTS** and session logging. | Local evaluation and warning-light catalogue operational without Internet. | MUST | **Closed on device evidence, with check 4 still opportunistic.** Local TTS (RF-031) ships — a layout-wide toggle, spoken assessments and a mute — and on 2026-08-29 the Web Speech path was shown to be inert on the phone because `window.speechSynthesis` does not exist in this Capacitor WebView. ADR-012's option 2 is now implemented through a native Capacitor bridge to Android `TextToSpeech`, and the owner reported the APK working perfectly on the phone. Check 4 in `SPEECH_DEVICE_VALIDATION.md` still needs a stored fault and is not induced by this read-only project. The Rio warning-light catalogue also ships with an unverified-provenance header, see `WARNING_LIGHT_CATALOG_VERIFICATION.md`. |
-| Fase 3 | **Voice and AI** | Push-to-talk, transcription, structured responses, swappable AI provider, output validation and temporary local fallback. | Voice/text query with fallback and a structured response. | MUST | **Open since 2026-08-28** — ADR-010. Activation is push-to-talk (RF-030); the "hey kirio" wake word is out of scope and gated separately by ADR-011. |
+| Fase 3 | **Voice and AI** | Push-to-talk, transcription, structured responses, swappable AI provider, output validation and temporary local fallback. | Voice/text query with fallback and a structured response. | MUST | **Open since 2026-08-28** — ADR-010. Activation is push-to-talk (RF-030); the "hey kirio" wake word is out of scope and gated separately by ADR-011. A safe optional remote-provider seam now exists behind `NUXT_PUBLIC_ASSISTANT_ENDPOINT_URL`; no provider, key or bundled backend ships with the static APK. Its endpoint contract is documented in `ASSISTANT_REMOTE_PROVIDER.md`. |
 | Fase 4 | **Convex and maintenance** | Mandatory synchronization, history, maintenance records, reminders, queue recovery and basic export. | Synchronization and maintenance without compromising local operation. | MUST | Not started. |
 | Fase 5 | Extensions | Camera, native app, advanced modules, multiple vehicles and historical metrics. | (not listed in §15.3) | **COULD** | Not started. |
 
@@ -189,5 +189,13 @@ and the installed APK has executed that path on the phone. The one design
 constraint carried forward is that the offline recognition pack belongs to this
 phone, not to Android, so the voice path must degrade to the text command bar on
 a device that lacks it.
+
+The assistant can optionally call a public remote endpoint configured with
+`NUXT_PUBLIC_ASSISTANT_ENDPOINT_URL`. That is only a seam: the static Android
+build still has no Nitro `/api` endpoint, no bundled AI dependency and no
+client-side model key. The endpoint contract lives in
+[`ASSISTANT_REMOTE_PROVIDER.md`](ASSISTANT_REMOTE_PROVIDER.md). When the URL is
+absent, the resolver keeps the existing no-provider local fallback, and any
+remote text remains untrusted until the same validation accepts or rejects it.
 
 The wake-word viability gate (ADR-011) is unscheduled and blocks nothing.

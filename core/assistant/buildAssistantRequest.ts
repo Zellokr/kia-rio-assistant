@@ -28,9 +28,9 @@ import type {
  *
  * This is a pure builder. It performs no request, holds no key and knows no
  * provider: RNF-006 keeps AI keys out of the client bundle, so the transport
- * belongs to a server-side seam that does not exist yet. What exists is the
+ * belongs to the optional remote-provider seam. What exists here is the
  * decision about *what may be sent*, which is the part worth fixing in tests
- * before any provider is chosen.
+ * independently of any provider choice.
  *
  * **Not sent, on purpose.** The vehicle is a constant of this project (Kia
  * Rio YB 2019 1.2 MPI); it belongs in the provider adapter's system prompt,

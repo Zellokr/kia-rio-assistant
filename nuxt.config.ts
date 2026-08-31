@@ -26,6 +26,9 @@ export default defineNuxtConfig({
         chatId: process.env.FIELD_TEST_TELEGRAM === '1'
           ? process.env.TELEGRAM_CHAT_ID ?? ''
           : ''
+      },
+      assistant: {
+        endpointUrl: process.env.NUXT_PUBLIC_ASSISTANT_ENDPOINT_URL ?? ''
       }
     }
   },
