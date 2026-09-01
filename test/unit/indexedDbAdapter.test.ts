@@ -43,11 +43,21 @@ describe('IndexedDbAdapter (against fake-indexeddb, NOT the Android WebView — 
     factory = new IDBFactory()
   })
 
-  it('creates all four object stores with the keyPaths and indexes declared in stores.ts on migration v1', async () => {
+  it('creates every object store with the keyPaths and indexes declared in stores.ts', async () => {
     const database = await openObdDatabase(factory)
 
+    // Six since DB v2 added evaluations and maintenance. The four below are
+    // v1's and their shape is asserted here; the two v2 added are asserted in
+    // `diagnosticHistoryPersistence.test.ts` alongside the upgrade path.
     expect([...database.objectStoreNames].sort()).toEqual(
-      [OBD_STORES.sessions, OBD_STORES.events, OBD_STORES.observations, OBD_STORES.pidCache].sort()
+      [
+        OBD_STORES.sessions,
+        OBD_STORES.events,
+        OBD_STORES.observations,
+        OBD_STORES.pidCache,
+        OBD_STORES.assessments,
+        OBD_STORES.maintenance
+      ].sort()
     )
 
     const transaction = database.transaction([...database.objectStoreNames])

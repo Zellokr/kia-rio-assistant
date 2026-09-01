@@ -1,7 +1,11 @@
 import type {
+  DiagnosticAssessmentRepository,
   DtcRepository,
+  MaintenanceRepository,
   ObdSessionRepository,
+  PersistedDiagnosticAssessment,
   PersistedDtcObservation,
+  PersistedMaintenanceRecord,
   PersistedObdSessionEventRecord,
   PersistedObdSessionRecord,
   PersistedSupportedPidCache,
@@ -23,10 +27,14 @@ function clone<Value>(value: Value): Value {
 export class InMemoryObdPersistenceAdapter implements
   ObdSessionRepository,
   DtcRepository,
+  DiagnosticAssessmentRepository,
+  MaintenanceRepository,
   SupportedPidCacheRepository {
   private readonly sessions = new Map<string, PersistedObdSessionRecord>()
   private readonly events = new Map<string, PersistedObdSessionEventRecord[]>()
   private readonly observations = new Map<string, PersistedDtcObservation>()
+  private readonly assessments = new Map<string, PersistedDiagnosticAssessment>()
+  private readonly maintenance = new Map<string, PersistedMaintenanceRecord>()
   private readonly caches = new Map<string, PersistedSupportedPidCache>()
 
   private consecutiveWriteFailures = 0
@@ -89,6 +97,7 @@ export class InMemoryObdPersistenceAdapter implements
     await this.persist(() => {
       this.sessions.delete(sessionId)
       this.events.delete(sessionId)
+      this.forgetAssessmentsOf(sessionId)
     })
   }
 
@@ -104,6 +113,30 @@ export class InMemoryObdPersistenceAdapter implements
 
   async deleteObservation(id: string): Promise<void> {
     await this.persist(() => this.observations.delete(id))
+  }
+
+  async recordAssessment(assessment: PersistedDiagnosticAssessment): Promise<void> {
+    await this.persist(() => this.assessments.set(assessment.id, clone(assessment)))
+  }
+
+  async listAssessments(): Promise<PersistedDiagnosticAssessment[]> {
+    return [...this.assessments.values()].map(clone)
+  }
+
+  async deleteAssessment(id: string): Promise<void> {
+    await this.persist(() => this.assessments.delete(id))
+  }
+
+  async saveMaintenanceRecord(record: PersistedMaintenanceRecord): Promise<void> {
+    await this.persist(() => this.maintenance.set(record.id, clone(record)))
+  }
+
+  async listMaintenanceRecords(): Promise<PersistedMaintenanceRecord[]> {
+    return [...this.maintenance.values()].map(clone)
+  }
+
+  async deleteMaintenanceRecord(id: string): Promise<void> {
+    await this.persist(() => this.maintenance.delete(id))
   }
 
   async read(fingerprint: string): Promise<PersistedSupportedPidCache | undefined> {
@@ -124,6 +157,18 @@ export class InMemoryObdPersistenceAdapter implements
     for (const session of expired) {
       this.sessions.delete(session.sessionId)
       this.events.delete(session.sessionId)
+      // Evaluations roll off with their session, exactly as events do. The
+      // maintenance map is untouched here on purpose: it holds what the owner
+      // typed, which no session lifecycle may discard.
+      this.forgetAssessmentsOf(session.sessionId)
+    }
+  }
+
+  private forgetAssessmentsOf(sessionId: string): void {
+    for (const [id, assessment] of this.assessments) {
+      if (assessment.sessionId === sessionId) {
+        this.assessments.delete(id)
+      }
     }
   }
 

@@ -1,3 +1,4 @@
+import type { DiagnosticAssessment } from '../diagnostics/assessDiagnostics'
 import type { DtcState, DtcType } from '../dtc/DtcCode'
 import type { PersistableObdSessionEvent } from './persistedEventAllowlist'
 import type { ObdTransportMetadata } from '../transport/ObdTransport'
@@ -49,6 +50,52 @@ export interface PersistedDtcObservation {
 
 export type PersistedDtcObservationRecord = PersistedDtcObservationV1 | PersistedDtcObservation
 
+/**
+ * A stored evaluation (RF-034: *"sesiones, DTC, evaluaciones y
+ * mantenimientos"*).
+ *
+ * The assessment is embedded whole rather than recomputed on read. The rules
+ * engine evolves, and an evaluation the driver was actually shown is a record
+ * of what this app said at that moment — re-deriving it later from stored
+ * codes would silently rewrite history every time the rules change.
+ *
+ * Bound to a session, and only to a session: an evaluation outlives neither
+ * the session it describes nor that session's eviction.
+ */
+export interface PersistedDiagnosticAssessment {
+  schemaVersion: 1
+  id: string
+  sessionId: string
+  recordedAt: string
+  assessment: DiagnosticAssessment
+}
+
+/**
+ * An owner-entered maintenance record (RF-036).
+ *
+ * Every field here is typed by a person. §3's Fase 4 wants upcoming due dates
+ * *"sin depender de la ECU"*, and this vehicle's odometer is not on the OBD
+ * PIDs this project reads, so `odometerKm` cannot come from the car.
+ *
+ * **The shape is chosen by this repository, not by the spec.** §8.1 requires
+ * `schemaVersion` on every record and RF-036 names the date and the mileage;
+ * `item` and `notes` are the minimum needed to make a row mean something, and
+ * nothing here should be read as a spec-mandated field list.
+ *
+ * Unlike sessions, these are never evicted. A capped history of what the
+ * owner did to the car would lose the oldest service exactly when a due-date
+ * calculation needs it most.
+ */
+export interface PersistedMaintenanceRecord {
+  schemaVersion: 1
+  id: string
+  /** Calendar date as the owner entered it, `YYYY-MM-DD`. */
+  performedAt: string
+  odometerKm: number
+  item: string
+  notes: string | null
+}
+
 export interface PersistedSupportedPidCache {
   schemaVersion: 1
   fingerprint: string
@@ -71,6 +118,19 @@ export interface DtcRepository {
   recordObservations(observations: PersistedDtcObservationRecord[]): Promise<void>
   listObservations(): Promise<PersistedDtcObservation[]>
   deleteObservation(id: string): Promise<void>
+}
+
+export interface DiagnosticAssessmentRepository {
+  recordAssessment(assessment: PersistedDiagnosticAssessment): Promise<void>
+  listAssessments(): Promise<PersistedDiagnosticAssessment[]>
+  deleteAssessment(id: string): Promise<void>
+}
+
+export interface MaintenanceRepository {
+  /** Writes by id, so re-saving a corrected row replaces it. */
+  saveMaintenanceRecord(record: PersistedMaintenanceRecord): Promise<void>
+  listMaintenanceRecords(): Promise<PersistedMaintenanceRecord[]>
+  deleteMaintenanceRecord(id: string): Promise<void>
 }
 
 export interface SupportedPidCacheRepository {

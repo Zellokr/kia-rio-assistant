@@ -1,9 +1,13 @@
 import type {
+  DiagnosticAssessmentRepository,
   DtcRepository,
+  MaintenanceRepository,
   ObdSessionRepository,
+  PersistedDiagnosticAssessment,
   PersistedDtcObservation,
   PersistedDtcObservationRecord,
   PersistedObdSessionEventRecord,
+  PersistedMaintenanceRecord,
   PersistedObdSessionRecord,
   PersistedSupportedPidCache,
   SupportedPidCacheRepository
@@ -31,6 +35,8 @@ function transactionDone(transaction: IDBTransaction): Promise<void> {
 export class IndexedDbAdapter implements
   ObdSessionRepository,
   DtcRepository,
+  DiagnosticAssessmentRepository,
+  MaintenanceRepository,
   SupportedPidCacheRepository {
   private readonly database: Promise<IDBDatabase>
 
@@ -46,12 +52,16 @@ export class IndexedDbAdapter implements
   async startSession(session: PersistedObdSessionRecord): Promise<void> {
     const database = await this.database
     const transaction = database.transaction(
-      [OBD_STORES.sessions, OBD_STORES.events],
+      [OBD_STORES.sessions, OBD_STORES.events, OBD_STORES.assessments],
       'readwrite'
     )
     const sessions = transaction.objectStore(OBD_STORES.sessions)
     sessions.put(session)
-    this.evictExpiredSessions(sessions, transaction.objectStore(OBD_STORES.events))
+    this.evictExpiredSessions(
+      sessions,
+      transaction.objectStore(OBD_STORES.events),
+      transaction.objectStore(OBD_STORES.assessments)
+    )
     await transactionDone(transaction)
   }
 
@@ -86,11 +96,16 @@ export class IndexedDbAdapter implements
   async deleteSession(sessionId: string): Promise<void> {
     const database = await this.database
     const transaction = database.transaction(
-      [OBD_STORES.sessions, OBD_STORES.events],
+      [OBD_STORES.sessions, OBD_STORES.events, OBD_STORES.assessments],
       'readwrite'
     )
     transaction.objectStore(OBD_STORES.sessions).delete(sessionId)
     this.deleteSessionEvents(transaction.objectStore(OBD_STORES.events), sessionId)
+    this.deleteByIndex(
+      transaction.objectStore(OBD_STORES.assessments),
+      'sessionId',
+      sessionId
+    )
     await transactionDone(transaction)
   }
 
@@ -114,6 +129,36 @@ export class IndexedDbAdapter implements
 
   async deleteObservation(id: string): Promise<void> {
     await this.writeStore(OBD_STORES.observations, store => store.delete(id))
+  }
+
+  async recordAssessment(assessment: PersistedDiagnosticAssessment): Promise<void> {
+    await this.writeStore(OBD_STORES.assessments, store => store.put(assessment))
+  }
+
+  async listAssessments(): Promise<PersistedDiagnosticAssessment[]> {
+    return this.readStore(
+      OBD_STORES.assessments,
+      store => requestResult(store.getAll())
+    )
+  }
+
+  async deleteAssessment(id: string): Promise<void> {
+    await this.writeStore(OBD_STORES.assessments, store => store.delete(id))
+  }
+
+  async saveMaintenanceRecord(record: PersistedMaintenanceRecord): Promise<void> {
+    await this.writeStore(OBD_STORES.maintenance, store => store.put(record))
+  }
+
+  async listMaintenanceRecords(): Promise<PersistedMaintenanceRecord[]> {
+    return this.readStore(
+      OBD_STORES.maintenance,
+      store => requestResult(store.getAll())
+    )
+  }
+
+  async deleteMaintenanceRecord(id: string): Promise<void> {
+    await this.writeStore(OBD_STORES.maintenance, store => store.delete(id))
   }
 
   async read(fingerprint: string): Promise<PersistedSupportedPidCache | undefined> {
@@ -145,7 +190,8 @@ export class IndexedDbAdapter implements
 
   private evictExpiredSessions(
     sessions: IDBObjectStore,
-    events: IDBObjectStore
+    events: IDBObjectStore,
+    assessments: IDBObjectStore
   ): void {
     let retained = 0
     const request = sessions.index('startedAt').openCursor(null, 'prev')
@@ -153,7 +199,12 @@ export class IndexedDbAdapter implements
       const cursor = request.result
       if (!cursor) return
       if (retained++ >= MAX_PERSISTED_SESSIONS) {
-        this.deleteSessionEvents(events, cursor.value.sessionId as string)
+        const sessionId = cursor.value.sessionId as string
+
+        this.deleteSessionEvents(events, sessionId)
+        // An evaluation of a session nobody can open any more is unreadable
+        // history, so it rolls off with the session rather than accumulating.
+        this.deleteByIndex(assessments, 'sessionId', sessionId)
         cursor.delete()
       }
       cursor.continue()
@@ -161,7 +212,15 @@ export class IndexedDbAdapter implements
   }
 
   private deleteSessionEvents(events: IDBObjectStore, sessionId: string): void {
-    const request = events.index('sessionId').openCursor(sessionId)
+    this.deleteByIndex(events, 'sessionId', sessionId)
+  }
+
+  private deleteByIndex(
+    store: IDBObjectStore,
+    index: string,
+    key: string
+  ): void {
+    const request = store.index(index).openCursor(key)
     request.onsuccess = () => {
       const cursor = request.result
       if (!cursor) return
