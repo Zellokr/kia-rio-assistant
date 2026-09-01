@@ -41,6 +41,15 @@ const {
 
 <template>
   <div class="space-y-4">
+    <!--
+      Maintenance sits in this destination rather than behind a sixth tab,
+      for the same reason the speech probe does: the bottom bar is capped at
+      five on purpose. The grouping holds up on its own, too — the other four
+      destinations are about this session with the car, and these two are
+      about what is known over time.
+    -->
+    <MaintenancePanel />
+
     <SpeechCapabilityPanel
       :report="speechReport"
       @refresh="probeSpeech"
