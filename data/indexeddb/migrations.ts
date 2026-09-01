@@ -1,13 +1,18 @@
-import { createDiagnosticHistoryStores, createObdStores } from './stores'
+import {
+  createDiagnosticHistoryStores,
+  createObdStores,
+  createSyncQueueStore
+} from './stores'
 
 export const DB_NAME = 'kia-rio-assistant'
-export const DB_VERSION = 2
+export const DB_VERSION = 3
 
 type Migration = (database: IDBDatabase, transaction: IDBTransaction) => void
 
 export const MIGRATIONS: Record<number, Migration> = {
   1: database => createObdStores(database),
-  2: database => createDiagnosticHistoryStores(database)
+  2: database => createDiagnosticHistoryStores(database),
+  3: database => createSyncQueueStore(database)
 }
 
 export function openObdDatabase(

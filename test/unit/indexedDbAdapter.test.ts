@@ -46,9 +46,10 @@ describe('IndexedDbAdapter (against fake-indexeddb, NOT the Android WebView — 
   it('creates every object store with the keyPaths and indexes declared in stores.ts', async () => {
     const database = await openObdDatabase(factory)
 
-    // Six since DB v2 added evaluations and maintenance. The four below are
-    // v1's and their shape is asserted here; the two v2 added are asserted in
-    // `diagnosticHistoryPersistence.test.ts` alongside the upgrade path.
+    // Seven: v1's four, v2's evaluations and maintenance, v3's sync queue.
+    // The four below are v1's and their shape is asserted here; v2's two are
+    // asserted in `diagnosticHistoryPersistence.test.ts` alongside the
+    // upgrade path.
     expect([...database.objectStoreNames].sort()).toEqual(
       [
         OBD_STORES.sessions,
@@ -56,7 +57,8 @@ describe('IndexedDbAdapter (against fake-indexeddb, NOT the Android WebView — 
         OBD_STORES.observations,
         OBD_STORES.pidCache,
         OBD_STORES.assessments,
-        OBD_STORES.maintenance
+        OBD_STORES.maintenance,
+        OBD_STORES.syncQueue
       ].sort()
     )
 
@@ -79,6 +81,13 @@ describe('IndexedDbAdapter (against fake-indexeddb, NOT the Android WebView — 
     const pidCache = transaction.objectStore(OBD_STORES.pidCache)
     expect(pidCache.keyPath).toBe('fingerprint')
     expect([...pidCache.indexNames]).toEqual([])
+
+    // Keyed by the idempotency key, not an insertion counter: that is what
+    // makes re-enqueuing replace instead of duplicating (§15.2).
+    const syncQueue = transaction.objectStore(OBD_STORES.syncQueue)
+    expect(syncQueue.keyPath).toBe('id')
+    expect(syncQueue.autoIncrement).toBe(false)
+    expect([...syncQueue.indexNames]).toEqual(['enqueuedAt'])
 
     database.close()
   })

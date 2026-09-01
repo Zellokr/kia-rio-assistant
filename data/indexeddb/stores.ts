@@ -4,7 +4,8 @@ export const OBD_STORES = {
   observations: 'dtcObservations',
   pidCache: 'supportedPidCache',
   assessments: 'diagnosticAssessments',
-  maintenance: 'maintenanceRecords'
+  maintenance: 'maintenanceRecords',
+  syncQueue: 'syncQueue'
 } as const
 
 export function createObdStores(database: IDBDatabase): void {
@@ -54,4 +55,22 @@ export function createDiagnosticHistoryStores(database: IDBDatabase): void {
     keyPath: 'id'
   })
   maintenance.createIndex('performedAt', 'performedAt')
+}
+
+/**
+ * DB v3: RF-035's queue.
+ *
+ * §6 makes IndexedDB the mandatory home for the sync queue, so the queue has
+ * to survive the app being closed — an app that can *"permanecer offline y
+ * sincronizar después"* cannot hold pending work in memory.
+ *
+ * Indexed by `enqueuedAt` because the remote must receive changes in the
+ * order they happened, and the store's own key is the idempotency key rather
+ * than an insertion counter.
+ */
+export function createSyncQueueStore(database: IDBDatabase): void {
+  const queue = database.createObjectStore(OBD_STORES.syncQueue, {
+    keyPath: 'id'
+  })
+  queue.createIndex('enqueuedAt', 'enqueuedAt')
 }

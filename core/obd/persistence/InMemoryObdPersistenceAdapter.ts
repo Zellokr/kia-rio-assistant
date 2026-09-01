@@ -11,6 +11,7 @@ import type {
   PersistedSupportedPidCache,
   SupportedPidCacheRepository
 } from './ports'
+import type { SyncOperation, SyncQueueRepository } from '../../sync/ports'
 import { isPersistableEvent } from './persistedEventAllowlist'
 
 export const MAX_PERSISTED_SESSIONS = 20
@@ -29,6 +30,7 @@ export class InMemoryObdPersistenceAdapter implements
   DtcRepository,
   DiagnosticAssessmentRepository,
   MaintenanceRepository,
+  SyncQueueRepository,
   SupportedPidCacheRepository {
   private readonly sessions = new Map<string, PersistedObdSessionRecord>()
   private readonly events = new Map<string, PersistedObdSessionEventRecord[]>()
@@ -36,6 +38,8 @@ export class InMemoryObdPersistenceAdapter implements
   private readonly assessments = new Map<string, PersistedDiagnosticAssessment>()
   private readonly maintenance = new Map<string, PersistedMaintenanceRecord>()
   private readonly caches = new Map<string, PersistedSupportedPidCache>()
+
+  private readonly queued = new Map<string, SyncOperation>()
 
   private consecutiveWriteFailures = 0
 
@@ -137,6 +141,31 @@ export class InMemoryObdPersistenceAdapter implements
 
   async deleteMaintenanceRecord(id: string): Promise<void> {
     await this.persist(() => this.maintenance.delete(id))
+  }
+
+  async enqueue(operation: SyncOperation): Promise<void> {
+    await this.persist(() => this.queued.set(operation.id, clone(operation)))
+  }
+
+  async listPendingOperations(): Promise<SyncOperation[]> {
+    return [...this.queued.values()]
+      .sort((left, right) => left.enqueuedAt.localeCompare(right.enqueuedAt))
+      .map(clone)
+  }
+
+  async markOperationsSynced(ids: readonly string[]): Promise<void> {
+    await this.persist(() => ids.forEach(id => this.queued.delete(id)))
+  }
+
+  async recordOperationFailure(ids: readonly string[]): Promise<void> {
+    await this.persist(() => ids.forEach((id) => {
+      const operation = this.queued.get(id)
+
+      // Ignored when absent: an earlier drain may have accepted and removed it.
+      if (!operation) return
+
+      this.queued.set(id, { ...operation, attempts: operation.attempts + 1 })
+    }))
   }
 
   async read(fingerprint: string): Promise<PersistedSupportedPidCache | undefined> {

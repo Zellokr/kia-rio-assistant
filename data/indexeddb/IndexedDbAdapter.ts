@@ -12,6 +12,10 @@ import type {
   PersistedSupportedPidCache,
   SupportedPidCacheRepository
 } from '~~/core/obd/persistence/ports'
+import type {
+  SyncOperation,
+  SyncQueueRepository
+} from '~~/core/sync/ports'
 import { isPersistedDtcObservationRecord, upgradeDtcObservation } from '../../core/obd/persistence/upgradeDtcObservation'
 import { openObdDatabase } from './migrations'
 import { OBD_STORES } from './stores'
@@ -37,6 +41,7 @@ export class IndexedDbAdapter implements
   DtcRepository,
   DiagnosticAssessmentRepository,
   MaintenanceRepository,
+  SyncQueueRepository,
   SupportedPidCacheRepository {
   private readonly database: Promise<IDBDatabase>
 
@@ -159,6 +164,49 @@ export class IndexedDbAdapter implements
 
   async deleteMaintenanceRecord(id: string): Promise<void> {
     await this.writeStore(OBD_STORES.maintenance, store => store.delete(id))
+  }
+
+  async enqueue(operation: SyncOperation): Promise<void> {
+    await this.writeStore(OBD_STORES.syncQueue, store => store.put(operation))
+  }
+
+  async listPendingOperations(): Promise<SyncOperation[]> {
+    return this.readStore(
+      OBD_STORES.syncQueue,
+      store => requestResult(
+        store.index('enqueuedAt').getAll()
+      ) as Promise<SyncOperation[]>
+    )
+  }
+
+  async markOperationsSynced(ids: readonly string[]): Promise<void> {
+    await this.writeStore(
+      OBD_STORES.syncQueue,
+      store => ids.forEach(id => store.delete(id))
+    )
+  }
+
+  async recordOperationFailure(ids: readonly string[]): Promise<void> {
+    const database = await this.database
+    const transaction = database.transaction(OBD_STORES.syncQueue, 'readwrite')
+    const store = transaction.objectStore(OBD_STORES.syncQueue)
+
+    for (const id of ids) {
+      const request = store.get(id)
+
+      request.onsuccess = () => {
+        const operation = request.result as SyncOperation | undefined
+
+        // An acknowledgement for something this queue does not hold is
+        // ignored rather than re-created: the row may have been accepted and
+        // removed by an earlier drain.
+        if (!operation) return
+
+        store.put({ ...operation, attempts: operation.attempts + 1 })
+      }
+    }
+
+    await transactionDone(transaction)
   }
 
   async read(fingerprint: string): Promise<PersistedSupportedPidCache | undefined> {
