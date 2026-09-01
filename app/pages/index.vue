@@ -10,6 +10,7 @@ import { useSessionStateBeacon } from '~/composables/useSessionStateBeacon'
 import { labViews } from '~/utils/labNav'
 import type { LabViewId } from '~/utils/labNav'
 import {
+  MAX_ASSISTANT_HISTORY_TURNS,
   buildAssistantRequest
 } from '~~/core/assistant/buildAssistantRequest'
 import type {
@@ -152,12 +153,16 @@ async function answerAssistantQuery(
       return
     }
 
-    assistantAnswer.value = answer
-    assistantHistory.value = [
-      ...assistantHistory.value,
+    const newTurns: AssistantTurn[] = [
       { role: 'user', text: request.query.text },
       { role: 'assistant', text: answer.text }
     ]
+
+    assistantAnswer.value = answer
+    assistantHistory.value = [
+      ...assistantHistory.value,
+      ...newTurns
+    ].slice(-MAX_ASSISTANT_HISTORY_TURNS)
   } catch (error) {
     if (sequence !== assistantRequestSequence) {
       return
