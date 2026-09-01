@@ -3,7 +3,8 @@ export default defineNuxtConfig({
   modules: [
     '@nuxt/eslint',
     '@nuxt/ui',
-    '@nuxt/test-utils/module'
+    '@nuxt/test-utils/module',
+    '@lupinum/better-convex-nuxt'
   ],
 
   devtools: {
@@ -29,6 +30,19 @@ export default defineNuxtConfig({
   },
 
   compatibilityDate: '2026-06-30',
+
+  /**
+   * Convex is the Fase 4 backend (spec §8.1, RF-035). Empty options are the
+   * documented Convex-only build: `convex.auth` is deliberately omitted, so
+   * no Better Auth peer is installed and no auth proxy exists.
+   *
+   * The deployment URL arrives through `NUXT_PUBLIC_CONVEX_URL`, which the
+   * module reads before falling back to `CONVEX_URL`. That URL is public by
+   * design and is the only Convex value the client may ever hold: RNF-006
+   * keeps every key server-side, and this APK is a static bundle that cannot
+   * hide one.
+   */
+  convex: {},
 
   eslint: {
     config: {

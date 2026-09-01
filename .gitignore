@@ -34,3 +34,7 @@ logs
 
 # scripts/extract-spec-pdf.py leaves these behind when imported
 __pycache__/
+
+# Convex codegen output. Regenerated from convex/schema.ts and the deployment,
+# so it is a build artifact, not source.
+convex/_generated/
