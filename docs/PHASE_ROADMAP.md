@@ -43,7 +43,7 @@ states separately and which does not always restate the exit criterion.
 | Fase 1 | Local OBD reader | ELM initialization, protocol detection, supported PIDs, telemetry, DTC, errors and reconnection. | Stable local OBD dashboard, tested parser, read-only DTC. | MUST | **Closed on vehicle evidence with one narrow waiver.** ADR-003 closed it on 2026-08-25 with no vehicle validation at all; ADR-004 superseded that on 2026-08-28 with the real field-test run. See the Sprint 0 table below. |
 | Fase 2 | Local diagnostics and warning lights | Severity rules, DTC catalogue, guided warning-light identification, **local TTS** and session logging. | Local evaluation and warning-light catalogue operational without Internet. | MUST | **Closed on device evidence, with check 4 still opportunistic.** Local TTS (RF-031) ships — a layout-wide toggle, spoken assessments and a mute — and on 2026-08-29 the Web Speech path was shown to be inert on the phone because `window.speechSynthesis` does not exist in this Capacitor WebView. ADR-012's option 2 is now implemented through a native Capacitor bridge to Android `TextToSpeech`, and the owner reported the APK working perfectly on the phone. Check 4 in `SPEECH_DEVICE_VALIDATION.md` still needs a stored fault and is not induced by this read-only project. The Rio warning-light catalogue also ships with an unverified-provenance header, see `WARNING_LIGHT_CATALOG_VERIFICATION.md`. |
 | Fase 3 | **Voice and AI** | Push-to-talk, transcription, structured responses, swappable AI provider, output validation and temporary local fallback. | Voice/text query with fallback and a structured response. | MUST | **Closed 2026-09-01 as an MVP with no provider deployed** — [ADR-013](decisions/ADR-013-fase-3-closure.md). Push-to-talk, transcription and the local fallback are device-evidenced (`SPEECH_DEVICE_VALIDATION.md` checks 7, 8 and 9). The swappable provider and output validation are evidenced over a real HTTPS connection by `test/integration/remoteAssistantSeam.test.ts`, against a loopback dummy endpoint — no provider, key or backend ships with the static APK. Activation stays push-to-talk (RF-030); the wake word is out of scope and gated by ADR-011. Six items it does not close are named in the ADR and in the caveats below. |
-| Fase 4 | **Convex and maintenance** | Mandatory synchronization, history, maintenance records, reminders, queue recovery and basic export. | Synchronization and maintenance without compromising local operation. | MUST | **Opened 2026-09-01 on its local half** — [ADR-014](decisions/ADR-014-fase-4-opening.md). **RF-034 is complete on the local side** as of 2026-09-01: DB v2 added the `diagnosticAssessments` and `maintenanceRecords` stores next to sessions, events, DTC observations and the PID cache, and an install at v1 upgrades without losing rows. Evaluations cascade with their session and roll off with eviction; maintenance records never do. **RF-035's local half landed the same day**: DB v3 stores a durable sync queue keyed by an idempotency key, and `drainSyncQueue` pushes one batch behind the owned `SyncTarget` port (R-09), covering T-011. RF-036 is blocked on where service intervals come from, and RF-037 is not started. There is no `convex/` or `server/`: the remote half is gated on the owner deploying an instance. |
+| Fase 4 | **Convex and maintenance** | Mandatory synchronization, history, maintenance records, reminders, queue recovery and basic export. | Synchronization and maintenance without compromising local operation. | MUST | **Opened 2026-09-01 on its local half** — [ADR-014](decisions/ADR-014-fase-4-opening.md). **RF-034 is complete on the local side** as of 2026-09-01: DB v2 added the `diagnosticAssessments` and `maintenanceRecords` stores next to sessions, events, DTC observations and the PID cache, and an install at v1 upgrades without losing rows. Evaluations cascade with their session and roll off with eviction; maintenance records never do. **RF-035's local half landed the same day**: DB v3 stores a durable sync queue keyed by an idempotency key, and `drainSyncQueue` pushes one batch behind the owned `SyncTarget` port (R-09), covering T-011. **RF-036 ships on the local side**: services are recorded in Registro with the interval the owner states, and the panel projects the next one on two axes that are never mixed. RF-037 is not started. There is no `convex/` or `server/`: the remote half is gated on the owner deploying an instance. |
 | Fase 5 | Extensions | Camera, native app, advanced modules, multiple vehicles and historical metrics. | (not listed in §15.3) | **COULD** | Not started. |
 
 Three things this table settles that were being treated as open questions:
@@ -237,16 +237,31 @@ and every operation carries one more attempt. The `SyncTarget` port is the
 seam a Convex client will implement, and per §6 and R-09 the OBD core never
 learns it exists.
 
-**RF-036 is blocked on a decision, not on code.** Its due dates need service
-intervals, and the manual the spec names as their source
+**RF-036 ships with owner-entered intervals**, decided on 2026-09-02. Its due
+dates need service intervals, and the manual the spec names as their source
 (`YB_2019_es_ES.pdf`, chapter 8) carries **618 font dictionaries and zero
 `/ToUnicode` maps**. No extractor can read it correctly — every one produces
 the same shifted bytes — so obtaining those intervals means inferring a font
 encoding, and a wrong digit in a service-interval table is a claim about a
-real car. §10's manual knowledge base is also still deferred. The options are
-an in-repo interval catalogue with a provenance header, owner-entered
-intervals per record, or leaving RF-036 until §10 is undeferred; none of them
-is a call this document can make.
+real car. Asking the person who owns the manual is the honest way to get the
+number, and it keeps the app saying *"this is what you told me"* rather than
+*"this is what Kia recommends"*. If §10 is ever undeferred, extracted
+intervals become defaults that pre-fill that field; nothing built here is
+thrown away.
+
+Two consequences are visible on screen. Every kilometre figure names the
+odometer reading it was measured from and when that reading was entered,
+because the odometer is not among the PIDs this project reads. And the two
+axes are never mixed into one number: ranking "500 km left" against "200 days
+left" needs to know how much this car is driven, so overdue sorts first, then
+dated services, then mileage-only ones.
+
+Maintenance lives inside **Registro** rather than behind a sixth destination.
+`BottomTabBar` hardcodes five columns with a comment saying a sixth must break
+the layout visibly rather than silently reintroduce scrolling, and that
+tripwire did its job. The grouping holds on its own: the other destinations
+are about this session with the car, these two are about what is known over
+time.
 
 A second RF-036 question is open and cheaper to settle: whether the car
 reports its own odometer, which decides where the mileage axis of a due date
