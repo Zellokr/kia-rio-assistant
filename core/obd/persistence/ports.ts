@@ -86,6 +86,12 @@ export interface PersistedDiagnosticAssessment {
  * owner did to the car would lose the oldest service exactly when a due-date
  * calculation needs it most.
  */
+export interface MaintenanceInterval {
+  /** Kilometres between services, or `null` when the owner gave only months. */
+  km: number | null
+  months: number | null
+}
+
 export interface PersistedMaintenanceRecord {
   schemaVersion: 1
   id: string
@@ -94,6 +100,21 @@ export interface PersistedMaintenanceRecord {
   odometerKm: number
   item: string
   notes: string | null
+  /**
+   * How often this service repeats, **as the owner stated it**.
+   *
+   * It is not a Kia figure. The manual the spec names as the source of
+   * European intervals carries 618 font dictionaries and no `/ToUnicode`
+   * map, so reading it means inferring a font encoding, and a guessed digit
+   * in a service-interval table is a claim about a real car. Asking the
+   * person who owns the manual is the honest way to get the number, and it
+   * keeps the app saying *"this is what you told me"* rather than *"this is
+   * what Kia recommends"*.
+   *
+   * `null` when the owner logged a service without saying when it repeats:
+   * the record is still worth keeping, and nothing is projected from it.
+   */
+  interval: MaintenanceInterval | null
 }
 
 export interface PersistedSupportedPidCache {
