@@ -248,6 +248,13 @@ an in-repo interval catalogue with a provenance header, owner-entered
 intervals per record, or leaving RF-036 until §10 is undeferred; none of them
 is a call this document can make.
 
+A second RF-036 question is open and cheaper to settle: whether the car
+reports its own odometer, which decides where the mileage axis of a due date
+comes from. `01A0` is already an allowed read and already a button, so the
+check needs no code —
+[`ODOMETER_PID_VALIDATION.md`](ODOMETER_PID_VALIDATION.md) carries the
+procedure and an empty results row.
+
 RF-035's remote half stays gated on the owner deploying a Convex instance —
 §15.1's own Sprint 0 checklist asks for one and it was never done.
 

@@ -90,9 +90,12 @@ export async function discoverSupportedPids(
         timeoutMs
       )
     } catch (error) {
-      // The physical read-only policy only allows the base range (0100).
-      // A vehicle advertising further ranges must not fail the whole
-      // session — stop discovery with whatever ranges were already read.
+      // The physical read-only policy now approves every capability probe
+      // (0100 through 01C0); approving only 0100 is what stopped this walk at
+      // PID 0x20 against the car on 2026-08-24. Should a probe still be
+      // rejected, a vehicle advertising further ranges must not fail the
+      // whole session — stop discovery with whatever ranges were already
+      // read.
       if (error instanceof PhysicalCommandRejectedError) {
         break
       }
