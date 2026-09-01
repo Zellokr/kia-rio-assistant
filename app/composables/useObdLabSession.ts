@@ -33,6 +33,9 @@ import type {
 } from '~~/core/obd/transport/ObdTransport'
 import { useObdReconnection } from '~/composables/useObdReconnection'
 import { useObdManualCommands } from '~/composables/useObdManualCommands'
+import {
+  composeWorkshopReport
+} from '~~/core/report/composeWorkshopReport'
 import { useObdSessionRecording } from '~/composables/useObdSessionRecording'
 import { useObdTelemetryPolling } from '~/composables/useObdTelemetryPolling'
 import { useVehicleDiagnostics } from '~/composables/useVehicleDiagnostics'
@@ -504,6 +507,48 @@ export function useObdLabSession(options: ObdLabSessionOptions = {}) {
     }
   })
 
+  /**
+   * Copies the workshop report (RF-037).
+   *
+   * Built here rather than in the page because this is where the session,
+   * the diagnostic reads, the assessment and the telemetry are all in scope
+   * at once — the report is exactly their intersection.
+   *
+   * Reports failure the way `copyJson` does, and for the reason written
+   * there: a control that looks like it worked and silently did nothing is
+   * the same class of defect as a frozen reading that looks live.
+   */
+  async function copyWorkshopReport(): Promise<boolean> {
+    const clipboard = globalThis.navigator?.clipboard
+
+    if (!clipboard) {
+      return false
+    }
+
+    const exported = sessionLog.getExport()
+
+    try {
+      await clipboard.writeText(composeWorkshopReport({
+        sessionId: exported.sessionId,
+        startedAt: exported.startedAt,
+        reads: diagnostics.reads.value,
+        assessment: diagnostics.assessment.value ?? null,
+        telemetry: Object.values(telemetry.value)
+          .filter(metric => metric !== undefined)
+          .map(metric => ({
+            label: metric.label,
+            value: metric.value,
+            unit: metric.unit
+          })),
+        generatedAtMs: Date.now()
+      }))
+
+      return true
+    } catch {
+      return false
+    }
+  }
+
   return {
     /**
      * Handed to `watchAssessmentPersistence` in the page: the session owns
@@ -528,6 +573,7 @@ export function useObdLabSession(options: ObdLabSessionOptions = {}) {
     logTruncated,
     clearLog,
     copySessionLog,
+    copyWorkshopReport,
 
     diagnostics,
 

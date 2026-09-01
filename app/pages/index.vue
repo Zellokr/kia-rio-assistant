@@ -69,6 +69,7 @@ const {
   logTruncated,
   clearLog,
   copySessionLog,
+  copyWorkshopReport,
   diagnostics,
   selectDevice,
   connect,
@@ -223,12 +224,21 @@ function runAssistantCommand(intent: QuickCommandIntent): void {
 }
 
 const logCopyStatus = ref('')
+const reportCopyStatus = ref('')
 
 async function copyLog(): Promise<void> {
   const copied = await copySessionLog()
 
   logCopyStatus.value = copied
     ? 'Registro copiado al portapapeles'
+    : 'No se pudo copiar. Concede acceso al portapapeles e inténtalo de nuevo.'
+}
+
+async function copyReport(): Promise<void> {
+  const copied = await copyWorkshopReport()
+
+  reportCopyStatus.value = copied
+    ? 'Informe copiado al portapapeles'
     : 'No se pudo copiar. Concede acceso al portapapeles e inténtalo de nuevo.'
 }
 </script>
@@ -305,11 +315,13 @@ async function copyLog(): Promise<void> {
           :error-message="diagnostics.errorMessage.value"
           :assessment="diagnostics.assessment.value"
           :reads="diagnostics.reads.value"
+          :report-status="reportCopyStatus"
           @back-to-connection="activeView = 'connection'"
           @read-stored="readDiagnosticTroubleCodes('stored')"
           @read-pending="readDiagnosticTroubleCodes('pending')"
           @read-permanent="readDiagnosticTroubleCodes('permanent')"
           @reset="diagnostics.reset()"
+          @copy-report="copyReport"
         />
 
         <WarningLightsView

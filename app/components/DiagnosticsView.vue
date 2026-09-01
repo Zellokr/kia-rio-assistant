@@ -15,6 +15,7 @@ const props = defineProps<{
   errorMessage: string
   assessment: DiagnosticAssessment | undefined
   reads: readonly DtcReadOutcome[]
+  reportStatus?: string
 }>()
 
 type DtcReadAction = 'stored' | 'pending' | 'permanent'
@@ -46,6 +47,7 @@ const emit = defineEmits<{
   'readPending': []
   'readPermanent': []
   'reset': []
+  'copy-report': []
 }>()
 
 function readCodes(action: DtcReadAction): void {
@@ -191,5 +193,37 @@ function readCodes(action: DtcReadAction): void {
       :assessment="props.assessment"
       :reads="props.reads"
     />
+
+    <!--
+      RF-037, and deliberately outside the connection gate above.
+      A workshop report is read after the session, usually with the adapter
+      already unplugged; gating it behind a live connection would remove it
+      at exactly the moment it is wanted.
+
+      Copied rather than downloaded: an `<a download>` over a blob URL is
+      ignored by this Android WebView, which is why the log view's download
+      button was removed on 2026-08-28.
+    -->
+    <div class="flex flex-col gap-2">
+      <UButton
+        color="neutral"
+        variant="subtle"
+        size="lg"
+        icon="i-lucide-clipboard-list"
+        class="justify-center"
+        @click="emit('copy-report')"
+      >
+        Copiar informe para el taller
+      </UButton>
+
+      <p
+        v-if="props.reportStatus"
+        class="text-sm text-muted"
+        role="status"
+        aria-live="polite"
+      >
+        {{ props.reportStatus }}
+      </p>
+    </div>
   </section>
 </template>
