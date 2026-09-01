@@ -86,3 +86,34 @@ trust that prompt as a safety boundary.
 
 If `NUXT_PUBLIC_ASSISTANT_ENDPOINT_URL` is absent, the app never performs a
 remote request. It shows the existing local fallback with reason `no-provider`.
+
+## Validation evidence
+
+`test/integration/remoteAssistantSeam.test.ts` runs this contract against a
+real HTTPS server. The dummy endpoint is a loopback `node:https` server with a
+self-signed certificate generated per run; there is no AI key, no provider
+account and no backend involved. The provider is constructed without an
+injected `fetchImpl`, so the call goes out through the same `globalThis.fetch`
+default the app uses.
+
+Proven on 2026-09-01, eight cases:
+
+| Endpoint behaviour | App result |
+| --- | --- |
+| `200` with a safe `{ "text": ... }` | shown, `source: 'ai'` |
+| `200` with a safe answer | request arrives intact, no `authorization` or `x-api-key` header |
+| `502` | local template, `provider-failed` |
+| `200` without a `text` field | local template, `provider-failed` |
+| `200` with unparseable bytes | local template, `provider-failed` |
+| `200` naming a DTC never sent | local template, `unknown-dtc` |
+| answer slower than the timeout | local template, `provider-timed-out` |
+| nothing listening on the port | local template, `provider-failed` |
+
+The test was mutation-checked: removing the request body and removing the
+status check each made it fail.
+
+**What is still unproven.** Certificate validation is disabled for the
+loopback dummy, so the trusted-certificate requirement above is not exercised.
+Neither is the Android WebView — this is Node's `fetch`, not the one inside the
+APK — nor CORS, which a same-process server cannot test. Both remain
+deployment concerns, and no run on the phone backs any claim in this document.
