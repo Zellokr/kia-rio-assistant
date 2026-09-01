@@ -43,7 +43,7 @@ states separately and which does not always restate the exit criterion.
 | Fase 1 | Local OBD reader | ELM initialization, protocol detection, supported PIDs, telemetry, DTC, errors and reconnection. | Stable local OBD dashboard, tested parser, read-only DTC. | MUST | **Closed on vehicle evidence with one narrow waiver.** ADR-003 closed it on 2026-08-25 with no vehicle validation at all; ADR-004 superseded that on 2026-08-28 with the real field-test run. See the Sprint 0 table below. |
 | Fase 2 | Local diagnostics and warning lights | Severity rules, DTC catalogue, guided warning-light identification, **local TTS** and session logging. | Local evaluation and warning-light catalogue operational without Internet. | MUST | **Closed on device evidence, with check 4 still opportunistic.** Local TTS (RF-031) ships — a layout-wide toggle, spoken assessments and a mute — and on 2026-08-29 the Web Speech path was shown to be inert on the phone because `window.speechSynthesis` does not exist in this Capacitor WebView. ADR-012's option 2 is now implemented through a native Capacitor bridge to Android `TextToSpeech`, and the owner reported the APK working perfectly on the phone. Check 4 in `SPEECH_DEVICE_VALIDATION.md` still needs a stored fault and is not induced by this read-only project. The Rio warning-light catalogue also ships with an unverified-provenance header, see `WARNING_LIGHT_CATALOG_VERIFICATION.md`. |
 | Fase 3 | **Voice and AI** | Push-to-talk, transcription, structured responses, swappable AI provider, output validation and temporary local fallback. | Voice/text query with fallback and a structured response. | MUST | **Closed 2026-09-01 as an MVP with no provider deployed** — [ADR-013](decisions/ADR-013-fase-3-closure.md). Push-to-talk, transcription and the local fallback are device-evidenced (`SPEECH_DEVICE_VALIDATION.md` checks 7, 8 and 9). The swappable provider and output validation are evidenced over a real HTTPS connection by `test/integration/remoteAssistantSeam.test.ts`, against a loopback dummy endpoint — no provider, key or backend ships with the static APK. Activation stays push-to-talk (RF-030); the wake word is out of scope and gated by ADR-011. Six items it does not close are named in the ADR and in the caveats below. |
-| Fase 4 | **Convex and maintenance** | Mandatory synchronization, history, maintenance records, reminders, queue recovery and basic export. | Synchronization and maintenance without compromising local operation. | MUST | **Opened 2026-09-01 on its local half** — [ADR-014](decisions/ADR-014-fase-4-opening.md). **RF-034 is complete on the local side** as of 2026-09-01: DB v2 added the `diagnosticAssessments` and `maintenanceRecords` stores next to sessions, events, DTC observations and the PID cache, and an install at v1 upgrades without losing rows. Evaluations cascade with their session and roll off with eviction; maintenance records never do. RF-035, RF-036 and RF-037 are not started, and there is no `convex/` or `server/`. The remote half is gated on the owner deploying an instance. |
+| Fase 4 | **Convex and maintenance** | Mandatory synchronization, history, maintenance records, reminders, queue recovery and basic export. | Synchronization and maintenance without compromising local operation. | MUST | **Opened 2026-09-01 on its local half** — [ADR-014](decisions/ADR-014-fase-4-opening.md). **RF-034 is complete on the local side** as of 2026-09-01: DB v2 added the `diagnosticAssessments` and `maintenanceRecords` stores next to sessions, events, DTC observations and the PID cache, and an install at v1 upgrades without losing rows. Evaluations cascade with their session and roll off with eviction; maintenance records never do. **RF-035's local half landed the same day**: DB v3 stores a durable sync queue keyed by an idempotency key, and `drainSyncQueue` pushes one batch behind the owned `SyncTarget` port (R-09), covering T-011. RF-036 is blocked on where service intervals come from, and RF-037 is not started. There is no `convex/` or `server/`: the remote half is gated on the owner deploying an instance. |
 | Fase 5 | Extensions | Camera, native app, advanced modules, multiple vehicles and historical metrics. | (not listed in §15.3) | **COULD** | Not started. |
 
 Three things this table settles that were being treated as open questions:
@@ -226,11 +226,30 @@ deliberately asymmetric — an evaluation cascades with its session and rolls
 off with eviction, while a maintenance record, being what the owner typed,
 survives every session lifecycle.
 
-What remains local, and next: **RF-036**'s due-date calculation from those
-maintenance rows, and the fault-tolerant queue behind a port this repository
-owns, as R-09 requires. RF-035's remote half is gated on the owner deploying a
-Convex instance — §15.1's own Sprint 0 checklist asks for one and it was never
-done.
+**RF-035's local half landed the same day.** DB v3 adds a queue keyed by an
+idempotency key rather than an insertion counter, which is what makes
+§15.2's *"reintenta sin duplicar datos"* structural instead of hopeful.
+`drainSyncQueue` pushes exactly one batch and reports what happened; it is
+deliberately not a loop, because retrying until empty would spin against a
+down backend and would decide on its own how long to keep the radio busy in a
+car. T-011 is covered: with the remote unavailable nothing leaves the queue
+and every operation carries one more attempt. The `SyncTarget` port is the
+seam a Convex client will implement, and per §6 and R-09 the OBD core never
+learns it exists.
+
+**RF-036 is blocked on a decision, not on code.** Its due dates need service
+intervals, and the manual the spec names as their source
+(`YB_2019_es_ES.pdf`, chapter 8) carries **618 font dictionaries and zero
+`/ToUnicode` maps**. No extractor can read it correctly — every one produces
+the same shifted bytes — so obtaining those intervals means inferring a font
+encoding, and a wrong digit in a service-interval table is a claim about a
+real car. §10's manual knowledge base is also still deferred. The options are
+an in-repo interval catalogue with a provenance header, owner-entered
+intervals per record, or leaving RF-036 until §10 is undeferred; none of them
+is a call this document can make.
+
+RF-035's remote half stays gated on the owner deploying a Convex instance —
+§15.1's own Sprint 0 checklist asks for one and it was never done.
 
 Reading §7 for that ADR surfaced **RNF-001**, a MUST this repository had never
 written down: a 60-minute session at idle must not hang or overlap commands.
