@@ -118,7 +118,8 @@ export function useObdLabSession(options: ObdLabSessionOptions = {}) {
     recordError,
     recordActivity,
     recordPersistenceError,
-    persistObservations
+    persistObservations,
+    persistAssessment
   } = useObdSessionRecording(sessionLog)
 
   const {
@@ -504,6 +505,13 @@ export function useObdLabSession(options: ObdLabSessionOptions = {}) {
   })
 
   return {
+    /**
+     * Handed to `watchAssessmentPersistence` in the page: the session owns
+     * the store, and the watcher owns the decision about what is worth
+     * keeping.
+     */
+    persistAssessment,
+
     sessionState,
     sessionBusy,
     transportChoice,

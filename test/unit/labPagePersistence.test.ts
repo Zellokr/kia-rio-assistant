@@ -58,6 +58,16 @@ function rejectingPersistence(): ObdPersistence {
     recordObservations: reject,
     listObservations: reject,
     deleteObservation: reject,
+    recordAssessment: reject,
+    listAssessments: reject,
+    deleteAssessment: reject,
+    saveMaintenanceRecord: reject,
+    listMaintenanceRecords: reject,
+    deleteMaintenanceRecord: reject,
+    enqueue: reject,
+    listPendingOperations: reject,
+    markOperationsSynced: reject,
+    recordOperationFailure: reject,
     read: reject,
     write: reject
   } as unknown as ObdPersistence
@@ -92,6 +102,29 @@ describe('lab page persistence', () => {
     await selectAdapter(mountLabPage())
 
     expect(await persistence.listSessions()).toHaveLength(1)
+  })
+
+  /**
+   * The queue exists so a session survives the app dying, so it has to be
+   * queued when the session opens rather than when it ends cleanly.
+   *
+   * This is also the test that keeps `rejectingPersistence` honest. The
+   * session log swallows subscriber errors, so a fake missing `enqueue`
+   * throws a TypeError nobody sees and every assertion around it still
+   * passes — which is exactly what happened before this case existed.
+   */
+  it('queues the session for sync as soon as it opens', async () => {
+    const persistence = new InMemoryObdPersistenceAdapter()
+
+    provideObdPersistence(useNuxtApp(), persistence)
+
+    await selectAdapter(mountLabPage())
+
+    const pending = await persistence.listPendingOperations()
+
+    expect(pending).toHaveLength(1)
+    expect(pending[0]?.kind).toBe('session')
+    expect(pending[0]?.id).toBe(`session:${pending[0]?.recordId}`)
   })
 
   /**

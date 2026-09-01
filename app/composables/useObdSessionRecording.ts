@@ -1,5 +1,8 @@
 import { onScopeDispose } from 'vue'
 
+import type {
+  DiagnosticAssessment
+} from '~~/core/obd/diagnostics/assessDiagnostics'
 import type { DtcObservation } from '~~/core/obd/dtc/DtcCode'
 import type {
   ObdActivityEvent,
@@ -9,6 +12,7 @@ import type {
 import {
   BufferedObdSessionRecorder
 } from '~~/core/obd/persistence/BufferedObdSessionRecorder'
+import { sessionSyncOperation } from '~~/core/sync/sessionSyncOperation'
 import type { ObdPersistence } from '~~/data/repositories/createObdPersistence'
 import { useObdSessionLog } from '~/composables/useObdSessionLog'
 
@@ -117,6 +121,7 @@ export function useObdSessionRecording(sessionLog: ObdSessionLog) {
         { onError: recordPersistenceError }
       )
       persist(persistence.startSession(persistedSession()))
+      enqueueSession(change.session.sessionId)
     } else if (change.type === 'event-recorded') {
       recorder?.record(change.event)
 
@@ -130,6 +135,7 @@ export function useObdSessionRecording(sessionLog: ObdSessionLog) {
     } else if (change.type === 'finished') {
       recorder?.finish()
       persist(persistence.updateSession(persistedSession()))
+      enqueueSession(sessionLog.getExport().sessionId)
     }
   })
 
@@ -160,6 +166,49 @@ export function useObdSessionRecording(sessionLog: ObdSessionLog) {
         observedAt: observation.observedAt
       }))
     ))
+  }
+
+  /**
+   * Queues the session for Convex (RF-035).
+   *
+   * Called when the session opens and again when it ends, and both calls
+   * write the same id, so the queue holds exactly one pending entry per
+   * session. Queuing at the start is deliberate: an Android WebView can be
+   * killed at any moment, and a session that only queued on a clean finish
+   * would be lost in exactly the case the queue exists for. The entry is a
+   * reference, so whichever push finally travels sends the row as it stands
+   * then.
+   */
+  function enqueueSession(sessionId: string): void {
+    if (!persistence) {
+      return
+    }
+
+    persist(persistence.enqueue(sessionSyncOperation(sessionId, Date.now())))
+  }
+
+  /**
+   * Stores an evaluation the session produced.
+   *
+   * Deciding *whether* an evaluation is worth a row belongs to
+   * `watchAssessmentPersistence`; this only writes the one it is handed, with
+   * the session and timestamp the store needs.
+   */
+  function persistAssessment(assessment: DiagnosticAssessment): void {
+    if (!persistence) {
+      return
+    }
+
+    const sessionId = sessionLog.getExport().sessionId
+    const writtenAt = Date.now()
+
+    persist(persistence.recordAssessment({
+      schemaVersion: 1,
+      id: `${sessionId}:assessment:${writtenAt}`,
+      sessionId,
+      recordedAt: new Date(writtenAt).toISOString(),
+      assessment
+    }))
   }
 
   /**
@@ -206,6 +255,7 @@ export function useObdSessionRecording(sessionLog: ObdSessionLog) {
     recordError,
     recordActivity,
     recordPersistenceError,
-    persistObservations
+    persistObservations,
+    persistAssessment
   }
 }

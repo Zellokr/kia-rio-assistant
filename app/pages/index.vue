@@ -4,6 +4,9 @@ import { ref, watch } from 'vue'
 import {
   kiaRioWarningLightsCatalog
 } from '~~/catalog/kia-rio/warning-lights'
+import {
+  watchAssessmentPersistence
+} from '~/composables/useAssessmentPersistence'
 import { useDiagnosticAnnouncements } from '~/composables/useDiagnosticAnnouncements'
 import { useObdLabSession } from '~/composables/useObdLabSession'
 import { useSessionStateBeacon } from '~/composables/useSessionStateBeacon'
@@ -74,7 +77,8 @@ const {
   stopTelemetry,
   sendCommand,
   runQueueTest,
-  readDiagnosticTroubleCodes
+  readDiagnosticTroubleCodes,
+  persistAssessment
 } = session
 
 /**
@@ -83,6 +87,7 @@ const {
  * until it is asked for.
  */
 useDiagnosticAnnouncements(diagnostics.assessment)
+watchAssessmentPersistence(diagnostics.assessment, persistAssessment)
 
 /**
  * Publishes the session state for the header, which renders outside this
