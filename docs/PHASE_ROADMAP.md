@@ -42,7 +42,7 @@ states separately and which does not always restate the exit criterion.
 | Fase 0 | Transport viability | Minimal test page. Connect, send `ATZ` and `0100`, receive a valid response, record traces and repeat the operation. | Recorded demonstration and `ATZ`/`0100`/`010C` log, **or** a documented decision to change transport. | MUST | **Closed.** Closed through the second branch: the transport decision is documented in `docs/decisions/ADR-002-obd-transport.md`, which took the §3.1 decision gate's native-container path. |
 | Fase 1 | Local OBD reader | ELM initialization, protocol detection, supported PIDs, telemetry, DTC, errors and reconnection. | Stable local OBD dashboard, tested parser, read-only DTC. | MUST | **Closed on vehicle evidence with one narrow waiver.** ADR-003 closed it on 2026-08-25 with no vehicle validation at all; ADR-004 superseded that on 2026-08-28 with the real field-test run. See the Sprint 0 table below. |
 | Fase 2 | Local diagnostics and warning lights | Severity rules, DTC catalogue, guided warning-light identification, **local TTS** and session logging. | Local evaluation and warning-light catalogue operational without Internet. | MUST | **Closed on device evidence, with check 4 still opportunistic.** Local TTS (RF-031) ships — a layout-wide toggle, spoken assessments and a mute — and on 2026-08-29 the Web Speech path was shown to be inert on the phone because `window.speechSynthesis` does not exist in this Capacitor WebView. ADR-012's option 2 is now implemented through a native Capacitor bridge to Android `TextToSpeech`, and the owner reported the APK working perfectly on the phone. Check 4 in `SPEECH_DEVICE_VALIDATION.md` still needs a stored fault and is not induced by this read-only project. The Rio warning-light catalogue also ships with an unverified-provenance header, see `WARNING_LIGHT_CATALOG_VERIFICATION.md`. |
-| Fase 3 | **Voice and AI** | Push-to-talk, transcription, structured responses, swappable AI provider, output validation and temporary local fallback. | Voice/text query with fallback and a structured response. | MUST | **Open since 2026-08-28** — ADR-010. Activation is push-to-talk (RF-030); the "hey kirio" wake word is out of scope and gated separately by ADR-011. A safe optional remote-provider seam now exists behind `NUXT_PUBLIC_ASSISTANT_ENDPOINT_URL`; no provider, key or bundled backend ships with the static APK. Its endpoint contract is documented in `ASSISTANT_REMOTE_PROVIDER.md`. |
+| Fase 3 | **Voice and AI** | Push-to-talk, transcription, structured responses, swappable AI provider, output validation and temporary local fallback. | Voice/text query with fallback and a structured response. | MUST | **Closed 2026-09-01 as an MVP with no provider deployed** — [ADR-013](decisions/ADR-013-fase-3-closure.md). Push-to-talk, transcription and the local fallback are device-evidenced (`SPEECH_DEVICE_VALIDATION.md` checks 7, 8 and 9). The swappable provider and output validation are evidenced over a real HTTPS connection by `test/integration/remoteAssistantSeam.test.ts`, against a loopback dummy endpoint — no provider, key or backend ships with the static APK. Activation stays push-to-talk (RF-030); the wake word is out of scope and gated by ADR-011. Six items it does not close are named in the ADR and in the caveats below. |
 | Fase 4 | **Convex and maintenance** | Mandatory synchronization, history, maintenance records, reminders, queue recovery and basic export. | Synchronization and maintenance without compromising local operation. | MUST | Not started. |
 | Fase 5 | Extensions | Camera, native app, advanced modules, multiple vehicles and historical metrics. | (not listed in §15.3) | **COULD** | Not started. |
 
@@ -104,6 +104,13 @@ the browser fallback. Fase 2's local TTS criterion is closed through that native
 path; the assessment-announcement check remains opportunistic until the car has a
 stored fault.
 
+**The §3.1 question this section argues is settled.** It was the transition
+*into* Fase 3, decided on 2026-08-28. Fase 3 itself closed on 2026-09-01
+([ADR-013](decisions/ADR-013-fase-3-closure.md)), so the live §3.1 question is
+now the one before **Fase 4**: Fase 3 has reproducible tests, and its exit
+criterion is verified with six named gaps that ADR-013 lists rather than
+waives. ADR-004's A2 waiver is still carried, not closed.
+
 ## Sprint 0 (Anexo B)
 
 Anexo B's immediate milestone: *"No añadir voz, IA, Convex ni dashboard hasta
@@ -125,7 +132,9 @@ milestone is complete.
 
 ## Open caveats
 
-None of these block code. All three need a vehicle or an owner decision.
+Items 1-5 block no code: they need a vehicle, a phone session or an
+owner decision. Item 6 is the only one that is a code change, and it is a
+known spec gap rather than a defect.
 
 1. **The post-fix Bluetooth-toggle recovery path** has never run on the
    vehicle. `8c88f1d` and `7b2792d` fix the failure A2 observed, and both are
@@ -140,6 +149,22 @@ None of these block code. All three need a vehicle or an owner decision.
    removed after owner approval. Historical evidence may still note that the
    2026-08-28 field reports lived in Telegram, but future builds must not embed
    Telegram credentials.
+4. **No spoken free-form question has reached the assistant panel on the
+   phone.** Check 9 drove spoken *quick commands* and a *typed* free-form
+   question. Dictating a question and getting the structured local answer is
+   wired and unit-tested, and was not rerun on the device after dictation
+   changed to tap-to-start/tap-to-stop. Carried by
+   [ADR-013](decisions/ADR-013-fase-3-closure.md).
+5. **The remote assistant seam has never run inside the Android WebView.**
+   `test/integration/remoteAssistantSeam.test.ts` proves it over a real HTTPS
+   connection using Node's `fetch`, with certificate validation disabled for
+   the loopback dummy. A trusted certificate and CORS from the WebView origin
+   are deployment concerns and are unproven. Carried by ADR-013.
+6. **§9's "sistema relacionado" is missing from the structured answer.**
+   `DiagnosticAssessment` carries §8.2's eight fields and the subsystem lives
+   on `DtcCatalogEntry`, which the assessment does not hold. `composeLocalAnswer`
+   names the gap instead of inferring a system from a code prefix. Carried by
+   ADR-013.
 
 ## A warning about ADR numbering
 
@@ -165,38 +190,54 @@ whether it means the spec's or the repository's.
 
 ## Next step
 
-Fase 3 is open. Its first work item — local TTS (RF-031), which also closes
-Fase 2's outstanding exit criterion — now has a native Android bridge and an
-owner-reported phone pass. RF-030 push-to-talk command wiring is also validated
-on device for quick commands: USB/ADB-assisted testing drove *"temperatura"* to
-the data view, *"estado"* back to the connection view, *"testigo"* to warning
-lights and *"códigos"* to diagnostics/DTC. Unsupported and unknown speech stayed
-local feedback instead of executing commands.
+Fase 3 is closed as of 2026-09-01
+([ADR-013](decisions/ADR-013-fase-3-closure.md)). It closed as an **MVP with no
+AI provider deployed**: push-to-talk, transcription, structured local answers,
+output validation and the local fallback all ship, and the swappable-provider
+half is a seam somebody may point at an endpoint later. RNF-006 is why — a
+static APK cannot hold a model key, so the provider can only ever live behind
+an HTTPS URL the client is told about.
+
+Under §3.1, **Fase 4 (Convex and maintenance) is now legal to open**. ADR-013
+deliberately does not open it; that is the owner's next decision.
+
+### What the device actually proved
 
 Speech uses the device's own engines, not a bundled model
-([ADR-012](decisions/ADR-012-on-device-speech.md)). Those engines are **not**
-reachable from the Web Speech APIs inside this Capacitor WebView: check 1 of
-[`SPEECH_DEVICE_VALIDATION.md`](SPEECH_DEVICE_VALIDATION.md) failed on
-2026-08-29 with `window.speechSynthesis` undefined. ADR-012 anticipated this
-exact outcome as its option 2, so it is a decision taken, not a surprise.
+([ADR-012](decisions/ADR-012-on-device-speech.md)), and the two halves of the
+Web Speech API disagree on this phone. Synthesis is absent — check 1 failed on
+2026-08-29 with `window.speechSynthesis` undefined, which ADR-012 anticipated
+as its option 2 — and it now ships through a native Capacitor bridge to
+Android `TextToSpeech`, which closes Fase 2's `TTS local` criterion.
+Recognition needed no bridge: its constructor is present and unprefixed, a
+real `start()` returned a transcript, and it works with no Internet (checks 6,
+7 and 8).
 
-The native Capacitor bridge is for **synthesis only**. Checks 6 and 7, added and run the same day, settled the other half:
-the two sides of the Web Speech API disagree on this device. Synthesis is
-absent; recognition's constructor is present, unprefixed, and a real
-`start()` returned a transcript — offline as well as online (check 8).
-**Push-to-talk needs no bridge and no network.** It is wired through the Web
-Speech recognizer into the same `parseQuickCommand` path used by typed commands,
-and the installed APK has executed that path on the phone. The one design
-constraint carried forward is that the offline recognition pack belongs to this
-phone, not to Android, so the voice path must degrade to the text command bar on
-a device that lacks it.
+On the installed APK, dictated quick commands drove the same
+`parseQuickCommand` path as typed ones — *"temperatura"*, *"estado"*,
+*"testigo"*, *"códigos"* — and a **typed** *"que significa esto"* opened the
+structured local answer panel showing `Fallback local` and *"sin proveedor de
+IA configurado"* (check 9). The **spoken** free-form question was not rerun
+after dictation changed to tap-to-start/tap-to-stop; that is caveat 4.
 
-The assistant can optionally call a public remote endpoint configured with
-`NUXT_PUBLIC_ASSISTANT_ENDPOINT_URL`. That is only a seam: the static Android
-build still has no Nitro `/api` endpoint, no bundled AI dependency and no
-client-side model key. The endpoint contract lives in
-[`ASSISTANT_REMOTE_PROVIDER.md`](ASSISTANT_REMOTE_PROVIDER.md). When the URL is
-absent, the resolver keeps the existing no-provider local fallback, and any
-remote text remains untrusted until the same validation accepts or rejects it.
+The offline recognition pack belongs to this phone, not to Android, so the
+voice path must keep degrading to the text command bar on a device without
+one.
+
+### The provider seam
+
+The assistant optionally calls a public endpoint configured with
+`NUXT_PUBLIC_ASSISTANT_ENDPOINT_URL`. The static Android build still has no
+Nitro `/api` route, no bundled AI dependency and no client-side model key.
+The endpoint contract, and the evidence behind it, live in
+[`ASSISTANT_REMOTE_PROVIDER.md`](ASSISTANT_REMOTE_PROVIDER.md):
+`test/integration/remoteAssistantSeam.test.ts` exercises it over a real HTTPS
+connection in eight cases, six of which end in the local fallback, because
+the fallback is the part that has to hold. When the URL is absent the resolver keeps the
+no-provider local fallback, and remote text stays untrusted until
+`validateAssistantResponse` accepts or rejects it.
+
+Deploying a real provider is future work governed by that contract. It does
+not reopen Fase 3.
 
 The wake-word viability gate (ADR-011) is unscheduled and blocks nothing.
