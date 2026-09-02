@@ -54,16 +54,16 @@ export function createConvexSyncTarget(
       const accepted: string[] = []
 
       if (sessions.rows.length > 0) {
-        accepted.push(...await send(
-          options.pushSessions,
-          { sessions: sessions.rows }
+        accepted.push(...operationIdsForAcceptedLocalIds(
+          sessions,
+          await send(options.pushSessions, { sessions: sessions.rows })
         ))
       }
 
       if (maintenance.rows.length > 0) {
-        accepted.push(...await send(
-          options.pushMaintenance,
-          { records: maintenance.rows }
+        accepted.push(...operationIdsForAcceptedLocalIds(
+          maintenance,
+          await send(options.pushMaintenance, { records: maintenance.rows })
         ))
       }
 
@@ -93,6 +93,8 @@ async function send(
 
 interface Resolved<Row> {
   readonly rows: Row[]
+  /** Maps Convex-returned row localIds back to the queue operation ids. */
+  readonly operationIdByLocalId: Map<string, string>
   /** Operations whose row no longer exists, so nothing can be sent for them. */
   readonly missing: string[]
 }
@@ -104,7 +106,7 @@ async function resolveSessions(
   const wanted = operations.filter(operation => operation.kind === 'session')
 
   if (wanted.length === 0) {
-    return { rows: [], missing: [] }
+    return { rows: [], operationIdByLocalId: new Map(), missing: [] }
   }
 
   const stored = new Map(
@@ -126,7 +128,7 @@ async function resolveMaintenance(
   const wanted = operations.filter(operation => operation.kind === 'maintenance')
 
   if (wanted.length === 0) {
-    return { rows: [], missing: [] }
+    return { rows: [], operationIdByLocalId: new Map(), missing: [] }
   }
 
   const stored = new Map(
@@ -146,6 +148,7 @@ function partition(
   toRow: (operation: SyncOperation) => Record<string, unknown> | undefined
 ): Resolved<Record<string, unknown>> {
   const rows: Record<string, unknown>[] = []
+  const operationIdByLocalId = new Map<string, string>()
   const missing: string[] = []
 
   for (const operation of operations) {
@@ -153,12 +156,33 @@ function partition(
 
     if (row) {
       rows.push(row)
+
+      if (typeof row.localId === 'string') {
+        operationIdByLocalId.set(row.localId, operation.id)
+      }
     } else {
       missing.push(operation.id)
     }
   }
 
-  return { rows, missing }
+  return { rows, operationIdByLocalId, missing }
+}
+
+function operationIdsForAcceptedLocalIds(
+  resolved: Resolved<Record<string, unknown>>,
+  localIds: readonly string[]
+): string[] {
+  const operationIds = new Set<string>()
+
+  for (const localId of localIds) {
+    const operationId = resolved.operationIdByLocalId.get(localId)
+
+    if (operationId) {
+      operationIds.add(operationId)
+    }
+  }
+
+  return [...operationIds]
 }
 
 /**

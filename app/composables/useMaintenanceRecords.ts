@@ -10,6 +10,7 @@ import {
 import type {
   PersistedMaintenanceRecord
 } from '~~/core/obd/persistence/ports'
+import { maintenanceSyncOperation } from '~~/core/sync/maintenanceSyncOperation'
 import type { ObdPersistence } from '~~/data/repositories/createObdPersistence'
 
 /**
@@ -86,6 +87,17 @@ export function useMaintenanceRecords() {
       await persistence.saveMaintenanceRecord(record)
     } catch {
       errorMessage.value = 'No pude guardar el registro. Inténtalo de nuevo.'
+
+      return false
+    }
+
+    try {
+      await persistence.enqueue(maintenanceSyncOperation(record.id, Date.now()))
+    } catch {
+      errorMessage.value
+        = 'Guardé el registro localmente, pero no pude dejarlo en cola para sincronizar.'
+
+      await load()
 
       return false
     }

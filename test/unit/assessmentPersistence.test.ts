@@ -4,6 +4,7 @@ import { nextTick, ref } from 'vue'
 import type {
   DiagnosticAssessment
 } from '../../core/obd/diagnostics/assessDiagnostics'
+import { maintenanceSyncOperation } from '../../core/sync/maintenanceSyncOperation'
 import { sessionSyncOperation } from '../../core/sync/sessionSyncOperation'
 import {
   watchAssessmentPersistence
@@ -112,6 +113,38 @@ describe('watchAssessmentPersistence', () => {
 
     await nextTick()
     expect(record).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('maintenanceSyncOperation', () => {
+  it('uses the maintenance record id as a stable idempotency key', () => {
+    const first = maintenanceSyncOperation(
+      'abc',
+      Date.parse('2026-09-02T10:00:00.000Z')
+    )
+    const later = maintenanceSyncOperation(
+      'abc',
+      Date.parse('2026-09-02T11:30:00.000Z')
+    )
+
+    expect(first.id).toBe('maintenance:abc')
+    expect(later.id).toBe('maintenance:abc')
+  })
+
+  it('references the maintenance record without snapshotting it', () => {
+    const operation = maintenanceSyncOperation(
+      'abc',
+      Date.parse('2026-09-02T10:00:00.000Z')
+    )
+
+    expect(operation).toEqual({
+      schemaVersion: 1,
+      id: 'maintenance:abc',
+      kind: 'maintenance',
+      recordId: 'abc',
+      enqueuedAt: '2026-09-02T10:00:00.000Z',
+      attempts: 0
+    })
   })
 })
 

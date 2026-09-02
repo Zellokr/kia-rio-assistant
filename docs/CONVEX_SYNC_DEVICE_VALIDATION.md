@@ -110,12 +110,69 @@ for exactly this case.
 
 | Check | Date | Outcome | Notes |
 |---|---|---|---|
-| 1 — reaches Convex from the WebView | — | NOT RUN | |
-| 2 — a real session reaches the deployment | — | NOT RUN | |
-| 3 — offline queue survives and drains | — | NOT RUN | |
+| 1 — reaches Convex from the WebView | 2026-09-02 | PASS | Pixel 9a debug APK reached Convex from the Android WebView. After the accepted-id and maintenance-producer fixes, the app drained pending rows and then synced a new owner-entered maintenance record, showing `Se sincronizaron 1 de 1` and leaving `syncQueue` empty. |
+| 2 — a real session reaches the deployment | 2026-09-02 | NOT RUN | No vehicle/BLE adapter session was opened in this run. An instrumented WebView session row was accepted by Convex during diagnosis, but it is not vehicle evidence. |
+| 3 — offline queue survives and drains | — | NOT RUN | Offline/airplane-mode recovery was not exercised in this run. The online maintenance producer path is now proven to enqueue and drain on the phone. |
 | 4 — app unaffected while sync is down | — | NOT RUN | |
 | 5 — queue survives the app being killed | — | NOT RUN | |
 
-**Until check 1 and check 2 pass, RF-035 is code that has never run where it
-ships**, and Fase 4 must not be reported as closed on the strength of the
-CLI smoke test alone.
+### 2026-09-02 Android WebView finding before the fix
+
+Device: Pixel 9a over Windows ADB, app `dev.krist.kiarioassistant`, debug APK
+built with `pnpm android:build:debug` and installed with `adb install -r`.
+The WebView was inspected through Chrome DevTools Protocol.
+
+Evidence captured from the WebView:
+
+- The production APK opened **Registro** and initially showed
+  `No hay nada pendiente de sincronizar.` / `No había nada pendiente.`
+- Saving a maintenance record through the visible form wrote the row to
+  IndexedDB and showed `Registro guardado`, but `syncQueue` remained empty.
+- After inserting bounded validation rows into IndexedDB to exercise the drain
+  path, the WebView sent:
+  - `sync:pushSessions` with local id
+    `device-validation-session-1788365697936`; Convex answered
+    `success: true` with result `["device-validation-session-1788365697936"]`.
+  - `sync:pushMaintenance` with local id
+    `maintenance:1788365618947:1`; Convex answered `success: true` with result
+    `["maintenance:1788365618947:1"]`.
+- The app then displayed `Se sincronizaron 0 de 2`, and IndexedDB still held both
+  operations with incremented attempts.
+
+This proved the Android WebView could reach the Convex deployment, but RF-035
+was not functionally closed yet: accepted rows were not removed from the queue,
+and the maintenance producer path was not queuing owner-entered maintenance
+records.
+
+### 2026-09-02 Android WebView validation after the fix
+
+The APK was rebuilt with `pnpm android:build:debug`, installed with
+`adb install -r`, and reopened on the same Pixel 9a. The WebView was again
+inspected through Chrome DevTools Protocol.
+
+Evidence captured from the fixed WebView:
+
+- Opening **Registro** drained the previously pending validation operations;
+  `syncQueue` was empty after the initial drain and the **Sincronizar ahora**
+  button was enabled again.
+- Saving a new maintenance record through the visible form created a durable
+  queue operation:
+  `maintenance:maintenance:1788366616493:1`.
+- Pressing **Sincronizar ahora** sent `sync:pushMaintenance` with local id
+  `maintenance:1788366616493:1`; Convex answered `success: true` with result
+  `["maintenance:1788366616493:1"]`.
+- The app displayed `Se sincronizaron 1 de 1`, then
+  `No hay nada pendiente de sincronizar.`, and `syncQueue` was empty.
+- During the run, the Convex WebSocket closed once with code `1006` and later
+  reconnected. The drain no longer remained stuck: the fixed build includes a
+  bounded sync-push timeout so a never-resolving remote push releases the UI and
+  records a failed attempt instead of leaving the button disabled indefinitely.
+
+This proves check 1 on the Android WebView and proves the online maintenance
+producer/drain path on the phone. It still does not close check 2 because no
+real BLE/vehicle session was opened in this run, and it does not close check 3
+because airplane-mode recovery was not exercised.
+
+**Until a real or supported mock session queues and drains successfully on the
+phone, RF-035 is not fully closed**, and Fase 4 must not be reported as closed on
+check 1 alone.

@@ -1,6 +1,6 @@
 // @vitest-environment nuxt
 import { flushPromises, mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
 
 import MaintenancePanel from '../../app/components/MaintenancePanel.vue'
@@ -65,22 +65,38 @@ const oilChange = {
 }
 
 describe('MaintenancePanel', () => {
-  it('writes what the owner typed into the store', async () => {
-    const persistence = new InMemoryObdPersistenceAdapter()
+  it('writes what the owner typed into the store and queues it for sync', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-09-02T10:00:00.000Z'))
 
-    await fillAndSubmit(mountPanel(persistence), oilChange)
+    try {
+      const persistence = new InMemoryObdPersistenceAdapter()
 
-    const stored = await persistence.listMaintenanceRecords()
+      await fillAndSubmit(mountPanel(persistence), oilChange)
 
-    expect(stored).toHaveLength(1)
-    expect(stored[0]).toMatchObject({
-      schemaVersion: 1,
-      performedAt: '2026-08-14',
-      odometerKm: 92_400,
-      item: 'Cambio de aceite y filtro',
-      notes: null,
-      interval: { km: 15_000, months: 12 }
-    })
+      const stored = await persistence.listMaintenanceRecords()
+
+      expect(stored).toHaveLength(1)
+      expect(stored[0]).toMatchObject({
+        schemaVersion: 1,
+        performedAt: '2026-08-14',
+        odometerKm: 92_400,
+        item: 'Cambio de aceite y filtro',
+        notes: null,
+        interval: { km: 15_000, months: 12 }
+      })
+
+      expect(await persistence.listPendingOperations()).toEqual([{
+        schemaVersion: 1,
+        id: `maintenance:${stored[0]!.id}`,
+        kind: 'maintenance',
+        recordId: stored[0]!.id,
+        enqueuedAt: '2026-09-02T10:00:00.000Z',
+        attempts: 0
+      }])
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('shows the projected service and names the reading it used', async () => {

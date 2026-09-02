@@ -14,11 +14,17 @@ import type {
  */
 
 export const DEFAULT_SYNC_BATCH_SIZE = 25
+export const DEFAULT_SYNC_PUSH_TIMEOUT_MS = 15_000
 
 export interface DrainSyncQueueInput {
   readonly queue: SyncQueueRepository
   readonly target: SyncTarget
   readonly batchSize?: number
+  /**
+   * Upper bound for one remote push. A WebView Convex reconnect can otherwise
+   * leave the mutation promise pending forever, which keeps the UI draining.
+   */
+  readonly pushTimeoutMs?: number
 }
 
 export type SyncDrainOutcome = 'empty' | 'drained' | 'failed'
@@ -46,7 +52,10 @@ export async function drainSyncQueue(
   let result
 
   try {
-    result = await input.target.push(batch)
+    result = await withTimeout(
+      input.target.push(batch),
+      input.pushTimeoutMs ?? DEFAULT_SYNC_PUSH_TIMEOUT_MS
+    )
   } catch (error) {
     // T-011. Nothing is removed: the operations are exactly as they were,
     // one attempt older.
@@ -114,4 +123,25 @@ function describeFailure(error: unknown): string {
   return typeof error === 'string'
     ? error
     : 'La sincronización falló sin indicar un motivo'
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+    return promise
+  }
+
+  let timeout: ReturnType<typeof setTimeout> | undefined
+
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeout = setTimeout(() => {
+      reject(new Error('La sincronización excedió el tiempo máximo de espera'))
+    }, timeoutMs)
+  })
+
+  return Promise.race([promise, timeoutPromise])
+    .finally(() => {
+      if (timeout !== undefined) {
+        clearTimeout(timeout)
+      }
+    })
 }

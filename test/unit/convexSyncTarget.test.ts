@@ -89,9 +89,11 @@ describe('createConvexSyncTarget', () => {
     const call = mutation()
     const target = targetWith(persistence as never, call)
 
-    const result = await target.push([operation('s1')])
+    const result = await target.push([
+      operation('session:s1', { recordId: 's1' })
+    ])
 
-    expect(result.acceptedIds).toEqual(['s1'])
+    expect(result.acceptedIds).toEqual(['session:s1'])
 
     const [args] = call.mock.calls[0]!
 
@@ -112,10 +114,10 @@ describe('createConvexSyncTarget', () => {
     const target = targetWith(persistence as never, call)
 
     const result = await target.push([
-      operation('m1', { kind: 'maintenance', recordId: 'm1' })
+      operation('maintenance:m1', { kind: 'maintenance', recordId: 'm1' })
     ])
 
-    expect(result.acceptedIds).toEqual(['m1'])
+    expect(result.acceptedIds).toEqual(['maintenance:m1'])
 
     const [args] = call.mock.calls[0]!
 
@@ -160,12 +162,12 @@ describe('createConvexSyncTarget', () => {
     const target = targetWith(persistence as never, call)
 
     const result = await target.push([
-      operation('s1'),
-      operation('m1', { kind: 'maintenance', recordId: 'm1' })
+      operation('session:s1', { recordId: 's1' }),
+      operation('maintenance:m1', { kind: 'maintenance', recordId: 'm1' })
     ])
 
     expect(call).toHaveBeenCalledTimes(2)
-    expect(result.acceptedIds.sort()).toEqual(['m1', 's1'])
+    expect(result.acceptedIds.sort()).toEqual(['maintenance:m1', 'session:s1'])
   })
 
   it('lets a failing mutation reach the drain rather than swallowing it', async () => {
@@ -182,7 +184,9 @@ describe('createConvexSyncTarget', () => {
     const call = vi.fn().mockResolvedValue([])
     const target = targetWith(persistence as never, call)
 
-    const result = await target.push([operation('s1')])
+    const result = await target.push([
+      operation('session:s1', { recordId: 's1' })
+    ])
 
     expect(result.acceptedIds).toEqual([])
   })

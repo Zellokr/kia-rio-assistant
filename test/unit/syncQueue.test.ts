@@ -158,6 +158,46 @@ describe('drainSyncQueue', () => {
     expect(pending.every(item => item.attempts === 1)).toBe(true)
   })
 
+  it('bounds a never-resolving remote push and counts the attempt', async () => {
+    vi.useFakeTimers()
+
+    try {
+      const queue = new InMemoryObdPersistenceAdapter()
+      await queue.enqueue(operation('1'))
+
+      const remote = target(() => new Promise(() => {}))
+      const drain = drainSyncQueue({
+        queue,
+        target: remote,
+        pushTimeoutMs: 25
+      })
+      let settled = false
+      void drain.then(() => {
+        settled = true
+      })
+
+      await vi.advanceTimersByTimeAsync(24)
+      expect(settled).toBe(false)
+
+      await vi.advanceTimersByTimeAsync(1)
+
+      expect(await drain).toEqual({
+        outcome: 'failed',
+        pushed: 1,
+        accepted: 0,
+        dropped: 0,
+        message: 'La sincronización excedió el tiempo máximo de espera'
+      })
+
+      const pending = await queue.listPendingOperations()
+
+      expect(pending.map(item => item.id)).toEqual(['1'])
+      expect(pending[0]?.attempts).toBe(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('keeps what a partial acceptance left behind', async () => {
     const queue = new InMemoryObdPersistenceAdapter()
     await queue.enqueue(operation('1'))
