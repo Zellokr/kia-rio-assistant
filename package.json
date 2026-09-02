@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "build": "nuxt build",
-    "build:android:web": "nuxt generate",
+    "build:android:web": "node --env-file-if-exists=.env.local node_modules/nuxt/bin/nuxt.mjs generate",
     "cap:sync:android": "pnpm build:android:web && cap sync android",
     "android:open": "cap open android",
     "android:build:debug": "pnpm cap:sync:android && cd android && ./gradlew assembleDebug",
