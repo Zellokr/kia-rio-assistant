@@ -293,11 +293,12 @@ replaced rather than duplicated, and the delete mutation — whose lookup uses
 `.unique()` and would throw on a duplicate — succeeded. Both smoke rows were
 removed afterwards.
 
-**The deployment has no authentication.** The URL ships inside the APK and is
-public by design, so with a Convex-only build that URL is the only thing
-between the internet and write access to these tables. Adding Better Auth is
-the documented next step and it is an owner decision; until it is taken,
-nothing irreplaceable should be synced.
+**The deployment runs without authentication, deliberately** —
+[ADR-015](decisions/ADR-015-no-backend-auth.md). The owner is the only user,
+the APK is side-loaded rather than distributed, the tables hold session
+summaries and one car's service history, and IndexedDB keeps the
+authoritative copy locally. The ADR names the four things that would reopen
+the decision, the first being the APK reaching anyone else.
 
 Reading §7 for that ADR surfaced **RNF-001**, a MUST this repository had never
 written down: a 60-minute session at idle must not hang or overlap commands.
