@@ -280,8 +280,24 @@ check needs no code —
 [`ODOMETER_PID_VALIDATION.md`](ODOMETER_PID_VALIDATION.md) carries the
 procedure and an empty results row.
 
-RF-035's remote half stays gated on the owner deploying a Convex instance —
-§15.1's own Sprint 0 checklist asks for one and it was never done.
+**RF-035's remote half now exists.** A Convex deployment was created by the
+owner on 2026-09-02, `@lupinum/better-convex-nuxt` is registered as a
+Convex-only build with no auth proxy, and `convex/schema.ts` carries only what
+§5 names — sessions and maintenance, indexed by the device's own id, with
+every write upserting on it. `createConvexSyncTarget` reads each row at push
+time, because the queue holds references rather than snapshots.
+
+Verified against the live deployment, not just in tests: pushing a maintenance
+record and a session each returned their `localId`, pushing the same id again
+replaced rather than duplicated, and the delete mutation — whose lookup uses
+`.unique()` and would throw on a duplicate — succeeded. Both smoke rows were
+removed afterwards.
+
+**The deployment has no authentication.** The URL ships inside the APK and is
+public by design, so with a Convex-only build that URL is the only thing
+between the internet and write access to these tables. Adding Better Auth is
+the documented next step and it is an owner decision; until it is taken,
+nothing irreplaceable should be synced.
 
 Reading §7 for that ADR surfaced **RNF-001**, a MUST this repository had never
 written down: a 60-minute session at idle must not hang or overlap commands.
