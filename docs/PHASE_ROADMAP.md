@@ -43,7 +43,7 @@ states separately and which does not always restate the exit criterion.
 | Fase 1 | Local OBD reader | ELM initialization, protocol detection, supported PIDs, telemetry, DTC, errors and reconnection. | Stable local OBD dashboard, tested parser, read-only DTC. | MUST | **Closed on vehicle evidence with one narrow waiver.** ADR-003 closed it on 2026-08-25 with no vehicle validation at all; ADR-004 superseded that on 2026-08-28 with the real field-test run. See the Sprint 0 table below. |
 | Fase 2 | Local diagnostics and warning lights | Severity rules, DTC catalogue, guided warning-light identification, **local TTS** and session logging. | Local evaluation and warning-light catalogue operational without Internet. | MUST | **Closed on device evidence, with check 4 still opportunistic.** Local TTS (RF-031) ships — a layout-wide toggle, spoken assessments and a mute — and on 2026-08-29 the Web Speech path was shown to be inert on the phone because `window.speechSynthesis` does not exist in this Capacitor WebView. ADR-012's option 2 is now implemented through a native Capacitor bridge to Android `TextToSpeech`, and the owner reported the APK working perfectly on the phone. Check 4 in `SPEECH_DEVICE_VALIDATION.md` still needs a stored fault and is not induced by this read-only project. The Rio warning-light catalogue also ships with an unverified-provenance header, see `WARNING_LIGHT_CATALOG_VERIFICATION.md`. |
 | Fase 3 | **Voice and AI** | Push-to-talk, transcription, structured responses, swappable AI provider, output validation and temporary local fallback. | Voice/text query with fallback and a structured response. | MUST | **Closed 2026-09-01 as an MVP with no provider deployed** — [ADR-013](decisions/ADR-013-fase-3-closure.md). Push-to-talk, transcription and the local fallback are device-evidenced (`SPEECH_DEVICE_VALIDATION.md` checks 7, 8 and 9). The swappable provider and output validation are evidenced over a real HTTPS connection by `test/integration/remoteAssistantSeam.test.ts`, against a loopback dummy endpoint — no provider, key or backend ships with the static APK. Activation stays push-to-talk (RF-030); the wake word is out of scope and gated by ADR-011. Six items it does not close are named in the ADR and in the caveats below. |
-| Fase 4 | **Convex and maintenance** | Mandatory synchronization, history, maintenance records, reminders, queue recovery and basic export. | Synchronization and maintenance without compromising local operation. | MUST | **Opened 2026-09-01 on its local half** — [ADR-014](decisions/ADR-014-fase-4-opening.md). **RF-034 is complete on the local side** as of 2026-09-01: DB v2 added the `diagnosticAssessments` and `maintenanceRecords` stores next to sessions, events, DTC observations and the PID cache, and an install at v1 upgrades without losing rows. Evaluations cascade with their session and roll off with eviction; maintenance records never do. **RF-035's local half landed the same day**: DB v3 stores a durable sync queue keyed by an idempotency key, and `drainSyncQueue` pushes one batch behind the owned `SyncTarget` port (R-09), covering T-011. **RF-036 ships on the local side**: services are recorded in Registro with the interval the owner states, and the panel projects the next one on two axes that are never mixed. **RF-037 ships**: a workshop report, copied to the clipboard from Averías, that separates what the vehicle reported from what this app deduced and from what neither can claim. There is no `convex/` or `server/`: the remote half is gated on the owner deploying an instance. |
+| Fase 4 | **Convex and maintenance** | Mandatory synchronization, history, maintenance records, reminders, queue recovery and basic export. | Synchronization and maintenance without compromising local operation. | MUST | **Code complete, device unproven.** RF-034, RF-036 and RF-037 ship; RF-035 ships on both sides and its idempotency was proven against the live deployment — but by the CLI, from a development machine. **No sync has ever run in the Android WebView**, which is the standing ADR-012 warned about. See [`CONVEX_SYNC_DEVICE_VALIDATION.md`](CONVEX_SYNC_DEVICE_VALIDATION.md). "Recordatorios" is read as RF-036's due dates: §3 names the word and no requirement elsewhere defines anything more. |
 | Fase 5 | Extensions | Camera, native app, advanced modules, multiple vehicles and historical metrics. | (not listed in §15.3) | **COULD** | Not started. |
 
 Three things this table settles that were being treated as open questions:
@@ -132,7 +132,7 @@ milestone is complete.
 
 ## Open caveats
 
-Items 1-5, 7 and 8 block no code: they need a vehicle, a phone session or
+Items 1-5 and 7-9 block no code: they need a vehicle, a phone session or
 an owner action. Item 6 is the only one that is a code change, and it is a
 known spec gap rather than a defect.
 
@@ -173,11 +173,18 @@ known spec gap rather than a defect.
    car was **ten** minutes (ADR-004). Nothing in Fase 4 can close this — it is
    a vehicle gate — and **§15.2's MVP acceptance cannot be claimed while it is
    open**. Surfaced by [ADR-014](decisions/ADR-014-fase-4-opening.md).
-8. **Neither an AI provider nor a Convex instance is deployed.** §9.5 states
-   that the full functional version *"no se considerará terminada sin
-   integración operativa de IA y Convex"*, and that degraded mode *"es una
-   medida de resiliencia, no una variante del producto sin backend ni IA"*.
-   Both deployments are owner actions. Carried by ADR-013 and ADR-014.
+8. **No AI provider is deployed.** §9.5 states that the full functional
+   version *"no se considerará terminada sin integración operativa de IA y
+   Convex"*, and that degraded mode *"es una medida de resiliencia, no una
+   variante del producto sin backend ni IA"*. Convex is deployed as of
+   2026-09-02; the AI provider is not, and that deployment is an owner
+   action. Carried by ADR-013 and ADR-014.
+9. **No synchronisation has ever run in the Android WebView.** The queue, the
+   target and the mutations are covered by tests and by a CLI smoke test
+   against the live deployment, and neither is a device. ADR-012 established
+   what that is worth. `CONVEX_SYNC_DEVICE_VALIDATION.md` carries five checks,
+   none of which needs the car, and Fase 4 must not be reported closed until
+   its first two pass.
 
 ## A warning about ADR numbering
 
