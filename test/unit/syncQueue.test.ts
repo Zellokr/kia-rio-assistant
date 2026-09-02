@@ -128,7 +128,7 @@ describe('drainSyncQueue', () => {
 
     const report = await drainSyncQueue({ queue, target: remote })
 
-    expect(report).toEqual({ outcome: 'drained', pushed: 2, accepted: 2 })
+    expect(report).toEqual({ outcome: 'drained', pushed: 2, accepted: 2, dropped: 0 })
     expect(await queue.listPendingOperations()).toEqual([])
   })
 
@@ -148,6 +148,7 @@ describe('drainSyncQueue', () => {
       outcome: 'failed',
       pushed: 2,
       accepted: 0,
+      dropped: 0,
       message: 'Convex no disponible'
     })
 
@@ -166,7 +167,7 @@ describe('drainSyncQueue', () => {
 
     const report = await drainSyncQueue({ queue, target: remote })
 
-    expect(report).toEqual({ outcome: 'drained', pushed: 2, accepted: 1 })
+    expect(report).toEqual({ outcome: 'drained', pushed: 2, accepted: 1, dropped: 0 })
 
     const pending = await queue.listPendingOperations()
 
@@ -208,9 +209,54 @@ describe('drainSyncQueue', () => {
 
     const report = await drainSyncQueue({ queue, target: remote, batchSize: 2 })
 
-    expect(report).toEqual({ outcome: 'drained', pushed: 2, accepted: 1 })
+    expect(report).toEqual({ outcome: 'drained', pushed: 2, accepted: 1, dropped: 0 })
     expect((await queue.listPendingOperations()).map(item => item.id))
       .toEqual(['2', '3'])
+  })
+
+  /**
+   * A session evicted by the twenty-session cap, or a record the owner
+   * deleted, leaves an operation pointing at a row that no longer exists. It
+   * can never be pushed, so it must leave the queue — but calling it
+   * "accepted" would claim the remote took something nobody sent. The target
+   * reports it as dropped instead, and the report counts it separately.
+   */
+  it('removes an operation whose row no longer exists, without calling it accepted', async () => {
+    const queue = new InMemoryObdPersistenceAdapter()
+    await queue.enqueue(operation('1'))
+    await queue.enqueue(operation('2'))
+
+    const remote = target(async () => ({
+      acceptedIds: ['1'],
+      droppedIds: ['2']
+    }))
+
+    const report = await drainSyncQueue({ queue, target: remote })
+
+    expect(report).toEqual({
+      outcome: 'drained',
+      pushed: 2,
+      accepted: 1,
+      dropped: 1
+    })
+    expect(await queue.listPendingOperations()).toEqual([])
+  })
+
+  it('ignores a dropped id the batch never contained', async () => {
+    const queue = new InMemoryObdPersistenceAdapter()
+    await queue.enqueue(operation('1'))
+    await queue.enqueue(operation('2'))
+
+    const remote = target(async () => ({
+      acceptedIds: [],
+      droppedIds: ['2', 'never-sent']
+    }))
+
+    await drainSyncQueue({ queue, target: remote, batchSize: 1 })
+
+    // Only operation 1 was pushed, so only it could be dropped. 2 stays.
+    expect((await queue.listPendingOperations()).map(item => item.id))
+      .toEqual(['1', '2'])
   })
 
   it('never calls the remote for an empty queue', async () => {
@@ -219,7 +265,7 @@ describe('drainSyncQueue', () => {
 
     const report = await drainSyncQueue({ queue, target: remote })
 
-    expect(report).toEqual({ outcome: 'empty', pushed: 0, accepted: 0 })
+    expect(report).toEqual({ outcome: 'empty', pushed: 0, accepted: 0, dropped: 0 })
     expect(remote.push).not.toHaveBeenCalled()
   })
 
@@ -236,7 +282,7 @@ describe('drainSyncQueue', () => {
     const report = await drainSyncQueue({ queue, target: remote, batchSize: 2 })
 
     expect(remote.push).toHaveBeenCalledTimes(1)
-    expect(report).toEqual({ outcome: 'drained', pushed: 2, accepted: 2 })
+    expect(report).toEqual({ outcome: 'drained', pushed: 2, accepted: 2, dropped: 0 })
     expect((await queue.listPendingOperations()).map(item => item.id))
       .toEqual(['3', '4', '5'])
   })

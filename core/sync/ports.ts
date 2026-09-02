@@ -44,6 +44,16 @@ export interface SyncPushResult {
    * one loses the driver's data.
    */
   readonly acceptedIds: readonly string[]
+  /**
+   * Ids that can never be pushed because the row they point at is gone —
+   * a session evicted by the twenty-session cap, or a record the owner
+   * deleted.
+   *
+   * They leave the queue like an accepted operation, and they are reported
+   * apart from one on purpose: nothing reached the remote, and a count that
+   * said otherwise would claim a sync that never happened.
+   */
+  readonly droppedIds?: readonly string[]
 }
 
 export interface SyncTarget {

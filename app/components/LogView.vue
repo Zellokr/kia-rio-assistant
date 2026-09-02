@@ -48,6 +48,8 @@ const {
       destinations are about this session with the car, and these two are
       about what is known over time.
     -->
+    <SyncStatusPanel />
+
     <MaintenancePanel />
 
     <SpeechCapabilityPanel
